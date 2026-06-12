@@ -1,0 +1,408 @@
+<div class="bg-[#022c22] text-emerald-50 w-full min-h-[100dvh] overflow-x-hidden">
+
+  <!-- Navigation -->
+  <header class="mos-nav w-full" [class.scrolled]="navScrolled()">
+    <div class="app-section mos-nav-inner" style="padding-top: max(0.5rem, env(safe-area-inset-top))">
+      <a routerLink="/" class="mos-brand">
+        <span class="mos-brand-mark">M</span>
+        <span class="mos-brand-text min-w-0">
+          <span class="mos-brand-name">MosqueOS</span>
+          <span class="mos-brand-tag">Community Platform</span>
+        </span>
+      </a>
+
+      <nav class="mos-nav-center" aria-label="Main navigation">
+        <button type="button" (click)="scrollTo('home')" class="mos-nav-pill" [class.active]="isActive('home')">Home</button>
+        <button type="button" (click)="scrollTo('features')" class="mos-nav-pill" [class.active]="isActive('features')">Features</button>
+        <a routerLink="/demo" class="mos-nav-pill" (click)="menuOpen.set(false)">Demo</a>
+        <button type="button" (click)="scrollTo('pricing')" class="mos-nav-pill" [class.active]="isActive('pricing')">Pricing</button>
+        <button type="button" (click)="scrollTo('contact')" class="mos-nav-pill" [class.active]="isActive('contact')">Contact</button>
+      </nav>
+
+      <div class="mos-nav-actions">
+        <button type="button" (click)="browseAsGuest()" class="mos-btn-ghost">Guest</button>
+        <a routerLink="/welcome" class="mos-btn-primary">Login</a>
+        <button type="button" class="mos-menu-toggle" [class.open]="menuOpen()"
+          (click)="menuOpen.set(!menuOpen())" [attr.aria-expanded]="menuOpen()" aria-label="Toggle menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+            <line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="mos-mobile-drawer lg:hidden" [class.open]="menuOpen()">
+      <div class="mos-mobile-nav app-section">
+        <button type="button" (click)="scrollTo('home')" class="mos-mobile-link" [class.active]="isActive('home')">Home</button>
+        <button type="button" (click)="scrollTo('features')" class="mos-mobile-link" [class.active]="isActive('features')">Features</button>
+        <a routerLink="/demo" class="mos-mobile-link" (click)="menuOpen.set(false)">Demo Mosque</a>
+        <button type="button" (click)="scrollTo('pricing')" class="mos-mobile-link" [class.active]="isActive('pricing')">Pricing</button>
+        <button type="button" (click)="scrollTo('contact')" class="mos-mobile-link" [class.active]="isActive('contact')">Contact</button>
+        <div class="mos-mobile-cta">
+          <button type="button" (click)="browseAsGuest()" class="mos-btn-ghost" style="display:flex;width:100%;justify-content:center;">Browse as Guest</button>
+          <a routerLink="/welcome" class="mos-btn-primary" style="display:flex;width:100%;justify-content:center;" (click)="menuOpen.set(false)">Login</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 1. Hero -->
+  <section id="home" class="relative bg-gradient-to-b from-[#064e3b] to-[#022c22] w-full">
+    <div class="app-section py-12 sm:py-16 lg:py-20 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+      <div>
+        <p class="mos-hero-in mos-hero-in-1 text-amber-400/90 text-sm uppercase tracking-[0.2em] mb-4 font-bold">{{ tagline }}</p>
+        <h1 class="mos-hero-in mos-hero-in-2 text-3xl sm:text-4xl lg:text-5xl xl:text-[3.25rem] font-serif font-bold text-white leading-tight mb-5">
+          The Digital Operating System for Mosques
+        </h1>
+        <p class="mos-hero-in mos-hero-in-3 text-emerald-100/90 text-base sm:text-lg leading-relaxed mb-8 max-w-xl">
+          Manage prayer times, events, madrassah, announcements, communities and spiritual content — all from one platform.
+        </p>
+      </div>
+
+      <!-- Phone mockups -->
+      <div class="mos-hero-in mos-hero-in-4 mos-phone-row flex flex-col items-center sm:flex-row sm:flex-wrap justify-center lg:justify-end gap-4 sm:gap-5 w-full max-w-full min-w-0">
+        <div class="phone mos-float mos-float-1">
+          <div class="phone-notch"></div>
+          <div class="phone-screen p-3">
+            <p class="text-[10px] text-emerald-400 uppercase tracking-wider mb-1">Prayer Times</p>
+            <p class="text-white font-serif font-bold text-sm mb-2">{{ nextPrayerName() }}</p>
+            <p class="text-amber-400 font-mono text-lg font-bold mos-countdown-live">{{ nextJamaat() }}</p>
+            <p class="text-[9px] text-emerald-400 mt-1 mos-countdown-live">{{ countdown() }}</p>
+            <div class="mt-3 space-y-1">
+              <div *ngFor="let p of heroPrayerSlots()"
+                class="flex justify-between text-[10px]"
+                [class.text-emerald-300]="!p.active"
+                [class.text-amber-400]="p.active"
+                [class.font-bold]="p.active">
+                <span>{{ p.name }}</span>
+                <span>{{ p.jamaat }}</span>
+              </div>
+            </div>
+          </div>
+          <p class="text-center text-xs text-emerald-400 mt-2">Prayer Times</p>
+        </div>
+
+        <div class="phone mos-float mos-float-2">
+          <div class="phone-notch"></div>
+          <div class="phone-screen p-3">
+            <p class="text-[10px] text-emerald-400 uppercase tracking-wider mb-1">Today</p>
+            <p class="text-white font-serif font-bold text-sm mb-1">Next Prayer</p>
+            <p class="text-amber-400 font-mono text-xl font-bold mb-1 mos-countdown-live">{{ countdown() }}</p>
+            <p class="text-[10px] text-emerald-300 mb-2">{{ nextPrayerName() }} · {{ nextJamaat() }}</p>
+            <div class="bg-[#022c22] rounded-lg p-2 mb-2 border border-emerald-800">
+              <p class="text-[9px] text-emerald-300">Recommended Wird</p>
+              <p class="text-[10px] text-white font-bold">Khulasa Wird</p>
+            </div>
+            <div class="bg-[#022c22] rounded-lg p-2 border border-emerald-800">
+              <p class="text-[9px] text-emerald-300">Quran Plan</p>
+              <p class="text-[10px] text-white">Para 5 of 30</p>
+            </div>
+          </div>
+          <p class="text-center text-xs text-emerald-400 mt-2">Today Screen</p>
+        </div>
+
+        <div class="phone mos-float mos-float-3">
+          <div class="phone-notch"></div>
+          <div class="phone-screen p-3">
+            <p class="text-[10px] text-emerald-400 uppercase tracking-wider mb-2">Events</p>
+            <div class="bg-[#022c22] rounded-lg p-2 mb-2 border border-emerald-800" *ngIf="nextEvent(); else staticEvent">
+              <p class="text-[9px] text-amber-400 uppercase">{{ nextEvent()!.eventType }}</p>
+              <p class="text-[10px] text-white font-bold">{{ nextEvent()!.title }}</p>
+              <p class="text-[9px] text-emerald-400">{{ formatTime(nextEvent()!.startTime) }} · {{ nextEvent()!.location || 'Main Hall' }}</p>
+              <p class="text-[10px] text-amber-400 font-mono font-bold mt-1 mos-countdown-live">{{ eventCountdown() }}</p>
+            </div>
+            <ng-template #staticEvent>
+              <div class="bg-[#022c22] rounded-lg p-2 mb-2 border border-emerald-800">
+                <p class="text-[9px] text-amber-400 uppercase">Mawlid</p>
+                <p class="text-[10px] text-white font-bold">Mawlid Night</p>
+                <p class="text-[9px] text-emerald-400">7:30 PM · Main Hall</p>
+              </div>
+            </ng-template>
+            <div class="bg-[#022c22] rounded-lg p-2 border border-emerald-800">
+              <p class="text-[9px] text-amber-400 uppercase">Class</p>
+              <p class="text-[10px] text-white font-bold">Tafsir Circle</p>
+            </div>
+          </div>
+          <p class="text-center text-xs text-emerald-400 mt-2">Events</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Key Benefits -->
+  <section class="py-14 sm:py-20 bg-[#022c22] w-full border-t border-emerald-900/50">
+    <div class="app-section w-full">
+      <h2 class="mos-reveal text-2xl sm:text-3xl font-serif font-bold text-white text-center mb-3">Built for the Whole Mosque</h2>
+      <p class="mos-reveal text-emerald-300 text-center text-base mb-10 max-w-2xl mx-auto">Administration and worship — together, as they should be.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div *ngFor="let b of benefits; let i = index"
+          [class]="'mos-reveal mos-card-hover mos-stagger-' + (i % 6) + ' bg-[#064e3b] rounded-2xl p-6 border border-emerald-800'">
+          <span class="text-3xl mb-3 block">{{ b.icon }}</span>
+          <h3 class="text-lg font-bold text-white mb-3">{{ b.title }}</h3>
+          <ul class="space-y-1.5">
+            <li *ngFor="let item of b.items" class="text-emerald-200 text-sm flex items-start gap-2">
+              <span class="text-amber-400 mt-0.5">•</span>{{ item }}
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Today Screen Showcase -->
+  <section class="py-14 sm:py-20 bg-gradient-to-b from-[#064e3b] to-[#022c22] w-full">
+    <div class="app-section w-full grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+      <div class="mos-reveal">
+        <p class="text-amber-400 text-sm uppercase tracking-widest font-bold mb-3">Strongest Feature</p>
+        <h2 class="text-2xl sm:text-3xl lg:text-4xl font-serif font-bold text-white mb-4">The Today Screen</h2>
+        <p class="text-emerald-100 text-base sm:text-lg leading-relaxed mb-6">
+          The Today Screen automatically adapts throughout the day — guiding members from prayer to wird, Quran and community.
+        </p>
+        <ul class="space-y-3">
+          <li *ngFor="let f of todayFeatures" class="flex gap-3 items-start">
+            <span class="w-6 h-6 rounded-full bg-amber-400/20 text-amber-400 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">✓</span>
+            <div>
+              <p class="text-white font-bold text-base">{{ f.label }}</p>
+              <p class="text-emerald-300 text-sm">{{ f.desc }}</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <div class="mos-reveal mos-stagger-2 mos-card-hover bg-[#022c22] rounded-3xl border border-emerald-700 p-6 sm:p-8 shadow-2xl">
+        <p class="text-emerald-400 text-xs uppercase tracking-widest mb-2">{{ todayDayLabel() }}</p>
+        <h3 class="text-2xl font-serif font-bold text-white mb-1">{{ showcaseGreeting() }}</h3>
+        <p class="text-emerald-300 text-sm mb-6">{{ todayDateStr() }}</p>
+        <div class="bg-gradient-to-r from-emerald-800 to-emerald-900 rounded-2xl p-5 mb-4 text-center border border-emerald-700">
+          <p class="text-emerald-300 text-xs uppercase mb-1">{{ showcaseSubtitle() }}</p>
+          <p class="text-3xl font-serif font-bold text-white">{{ showcasePrayerName() }}</p>
+          <p class="text-2xl font-mono text-amber-400 font-bold mos-countdown-live">{{ showcaseCountdown() }}</p>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-[#064e3b] rounded-xl p-3 border border-emerald-800">
+            <p class="text-[10px] text-amber-400 uppercase">Wird</p>
+            <p class="text-sm text-white font-bold">Khulasa Wird</p>
+          </div>
+          <div class="bg-[#064e3b] rounded-xl p-3 border border-emerald-800">
+            <p class="text-[10px] text-amber-400 uppercase">Quran</p>
+            <p class="text-sm text-white font-bold">Para 12</p>
+          </div>
+          <div class="bg-[#064e3b] rounded-xl p-3 border border-emerald-800 col-span-2">
+            <p class="text-[10px] text-amber-400 uppercase">Dua for Now</p>
+            <p class="text-sm text-white" dir="rtl">رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Features -->
+  <section id="features" class="py-14 sm:py-20 bg-[#022c22] w-full">
+    <div class="app-section w-full">
+      <h2 class="mos-reveal text-2xl sm:text-3xl font-serif font-bold text-white text-center mb-3">Everything Your Mosque Needs</h2>
+      <p class="mos-reveal text-emerald-300 text-center mb-10">From the minbar to the madrassah classroom.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div *ngFor="let g of featureGroups; let i = index"
+          [class]="'mos-reveal mos-card-hover mos-stagger-' + (i % 6) + ' bg-[#064e3b]/60 rounded-2xl p-5 border border-emerald-800'">
+          <h3 class="text-lg font-bold text-amber-400 mb-3">{{ g.title }}</h3>
+          <ul class="space-y-1.5">
+            <li *ngFor="let item of g.items" class="text-emerald-200 text-sm">• {{ item }}</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Who Is It For -->
+  <section class="py-14 sm:py-20 bg-[#064e3b] w-full">
+    <div class="app-section w-full">
+      <h2 class="mos-reveal text-2xl sm:text-3xl font-serif font-bold text-white text-center mb-10">Who Is It For?</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div *ngFor="let a of audiences; let i = index"
+          [class]="'mos-reveal mos-card-hover mos-stagger-' + (i % 6) + ' bg-[#022c22] rounded-2xl p-6 border border-emerald-800 text-center'">
+          <span class="text-4xl mb-4 block">{{ a.icon }}</span>
+          <h3 class="text-lg font-bold text-white mb-2">{{ a.title }}</h3>
+          <p class="text-emerald-300 text-sm leading-relaxed">{{ a.desc }}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. Spiritual Features (USP) -->
+  <section class="py-14 sm:py-20 bg-[#022c22] w-full border-y border-emerald-900/50">
+    <div class="app-section w-full text-center max-w-4xl mx-auto">
+      <p class="mos-reveal text-amber-400 text-sm uppercase tracking-widest font-bold mb-3">Our Difference</p>
+      <h2 class="mos-reveal text-2xl sm:text-3xl lg:text-4xl font-serif font-bold text-white mb-4">More Than Administration</h2>
+      <p class="mos-reveal text-emerald-200 text-base sm:text-lg mb-10 leading-relaxed">
+        MOS is not just software — it strengthens the spiritual life of your community with guided worship tools built in.
+      </p>
+      <div class="flex flex-wrap justify-center gap-3">
+        <span *ngFor="let s of spiritual"
+          class="mos-reveal mos-tag-hover px-4 py-2 bg-[#064e3b] border border-emerald-700 rounded-full text-emerald-100 text-sm font-medium">
+          {{ s }}
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Why MOS -->
+  <section class="py-14 sm:py-20 bg-[#022c22] w-full">
+    <div class="app-section w-full max-w-3xl mx-auto">
+      <h2 class="mos-reveal text-2xl sm:text-3xl font-serif font-bold text-white text-center mb-10">Why MOS?</h2>
+      <div class="mos-reveal mos-card-hover rounded-2xl border border-emerald-800 overflow-hidden">
+        <div class="grid grid-cols-2 bg-[#064e3b] text-xs sm:text-sm font-bold uppercase tracking-wide sm:tracking-wider">
+          <div class="p-2.5 sm:p-4 text-emerald-300 border-r border-emerald-800">Traditional Website</div>
+          <div class="p-2.5 sm:p-4 text-amber-400">MOS</div>
+        </div>
+        <div *ngFor="let row of comparison; let last = last"
+          class="grid grid-cols-2 text-xs sm:text-sm"
+          [class.border-b]="!last" [class.border-emerald-800]="!last">
+          <div class="p-2.5 sm:p-4 text-emerald-400 border-r border-emerald-800 bg-[#022c22]/50 break-anywhere">{{ row.traditional }}</div>
+          <div class="p-2.5 sm:p-4 text-white bg-emerald-900/20 font-medium break-anywhere">{{ row.mos }}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. Bradford Rollout -->
+  <section class="py-14 sm:py-20 bg-[#064e3b] w-full">
+    <div class="app-section w-full">
+      <div class="mos-reveal max-w-3xl mx-auto text-center mb-10">
+        <h2 class="text-2xl sm:text-3xl font-serif font-bold text-white mb-4">Starting with Bradford Mosques</h2>
+        <p class="text-emerald-200 text-base leading-relaxed">
+          Supporting local mosques first, with a roadmap for wider UK rollout. Built with Bradford communities in mind.
+        </p>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-4xl mx-auto">
+        <div *ngFor="let m of bradfordMosques; let i = index"
+          [class]="'mos-reveal mos-card-hover mos-stagger-' + (i % 6) + ' bg-[#022c22] rounded-xl px-4 py-3 border border-emerald-800 flex items-center gap-3'">
+          <span class="text-amber-400 text-lg">📍</span>
+          <span class="text-emerald-100 text-sm">{{ m }}</span>
+        </div>
+      </div>
+      <div class="mos-reveal mos-stagger-2 mt-8 max-w-xl mx-auto bg-[#022c22] rounded-2xl border border-emerald-700 p-6 text-center">
+        <p class="text-emerald-400 text-xs uppercase tracking-widest mb-2">Bradford, West Yorkshire</p>
+        <p class="text-white font-serif text-lg">Serving the Muslim community across BD1–BD18</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Legal (compact) -->
+  <section class="py-8 sm:py-10 bg-[#022c22] w-full border-t border-emerald-900">
+    <div class="app-section w-full max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+      <div id="privacy" class="scroll-mt-24 bg-[#064e3b]/40 rounded-xl p-4 sm:p-5 border border-emerald-800/60">
+        <h3 class="text-base font-bold text-white mb-2">Privacy Policy</h3>
+        <p class="text-emerald-300 text-xs sm:text-sm leading-relaxed">{{ privacySummary }}</p>
+      </div>
+      <div id="terms" class="scroll-mt-24 bg-[#064e3b]/40 rounded-xl p-4 sm:p-5 border border-emerald-800/60">
+        <h3 class="text-base font-bold text-white mb-2">Terms of Service</h3>
+        <p class="text-emerald-300 text-xs sm:text-sm leading-relaxed">{{ termsSummary }}</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing -->
+  <section id="pricing" class="py-14 sm:py-16 bg-[#064e3b] w-full border-t border-emerald-800">
+    <div class="app-section w-full max-w-3xl mx-auto text-center">
+      <p class="mos-reveal text-amber-400 text-xs uppercase tracking-[0.2em] font-bold mb-3">Transparent Pricing</p>
+      <h2 class="mos-reveal text-2xl sm:text-3xl font-serif font-bold text-white mb-4">Simple, Mosque-Friendly Pricing</h2>
+      <p class="mos-reveal text-emerald-100 text-base sm:text-lg leading-relaxed">
+        Flexible plans for single mosques and multi-site organisations — no hidden fees, no complicated contracts.
+      </p>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="mos-footer w-full">
+    <div class="mos-footer-accent"></div>
+
+    <div class="app-section mos-footer-inner py-14 sm:py-16"
+      style="padding-bottom: max(1rem, env(safe-area-inset-bottom))">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-10 lg:gap-8">
+
+        <!-- Brand -->
+        <div class="lg:col-span-5">
+          <div class="flex items-center gap-3 mb-5">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-700 to-emerald-900 border border-emerald-600/50 flex items-center justify-center">
+              <span class="font-serif text-lg font-bold text-amber-400">M</span>
+            </div>
+            <div>
+              <p class="font-serif text-2xl font-bold text-white leading-none">MOS</p>
+              <p class="text-emerald-500 text-xs mt-1 tracking-wide">Mosque Operating System</p>
+            </div>
+          </div>
+          <p class="text-emerald-100 text-base leading-relaxed max-w-sm mb-4">{{ tagline }}</p>
+          <p class="text-emerald-400/80 text-sm leading-relaxed max-w-sm">
+            A trusted digital platform for UK mosques — prayer times, madrassah, community and spiritual life in one place.
+          </p>
+          <p class="inline-flex items-center gap-2 mt-6 px-3 py-1.5 rounded-full bg-emerald-900/40 border border-emerald-800 text-emerald-300 text-xs font-medium">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+            Bradford, UK · MVP Rollout
+          </p>
+        </div>
+
+        <!-- Links -->
+        <div class="lg:col-span-3 lg:pl-4">
+          <p class="text-white font-semibold text-sm uppercase tracking-[0.15em] mb-5">Quick Links</p>
+          <ul class="space-y-3">
+            <li *ngFor="let link of footerLinks">
+              <a *ngIf="link.route" [routerLink]="link.route" class="footer-link">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="opacity-50"><path d="M9 18l6-6-6-6"/></svg>
+                {{ link.label }}
+              </a>
+              <button *ngIf="link.action" type="button" (click)="scrollTo(link.action)" class="footer-link">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="opacity-50"><path d="M9 18l6-6-6-6"/></svg>
+                {{ link.label }}
+              </button>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Contact -->
+        <div id="contact" class="lg:col-span-4 scroll-mt-24">
+          <p class="text-white font-semibold text-sm uppercase tracking-[0.15em] mb-5">Get in Touch</p>
+          <ul class="space-y-4">
+            <li class="footer-contact-item">
+              <span class="footer-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              </span>
+              <div>
+                <p class="text-emerald-400 text-xs uppercase tracking-wider mb-0.5">Email</p>
+                <a href="mailto:hello@mosqueos.uk" class="text-white hover:text-amber-400 transition-colors break-anywhere">hello&#64;mosqueos.uk</a>
+              </div>
+            </li>
+            <li class="footer-contact-item">
+              <span class="footer-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              </span>
+              <div>
+                <p class="text-emerald-400 text-xs uppercase tracking-wider mb-0.5">Phone</p>
+                <a href="tel:+441274000000" class="text-white hover:text-amber-400 transition-colors">+44 1274 000 000</a>
+              </div>
+            </li>
+            <li class="footer-contact-item">
+              <span class="footer-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              </span>
+              <div>
+                <p class="text-emerald-400 text-xs uppercase tracking-wider mb-0.5">Location</p>
+                <p class="text-white">Bradford, West Yorkshire, UK</p>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Bottom bar -->
+      <div class="mt-12 pt-6 border-t border-emerald-900/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <p class="text-emerald-500 text-sm order-2 sm:order-1">
+          &copy; 2026 Mosque Operating System (MOS). All rights reserved.
+        </p>
+        <div class="flex flex-wrap gap-4 sm:gap-6 text-sm order-1 sm:order-2">
+          <button type="button" (click)="scrollTo('privacy')" class="text-emerald-400 hover:text-white transition-colors">Privacy Policy</button>
+          <button type="button" (click)="scrollTo('terms')" class="text-emerald-400 hover:text-white transition-colors">Terms of Service</button>
+        </div>
+      </div>
+    </div>
+  </footer>
+</div>

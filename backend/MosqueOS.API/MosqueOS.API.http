@@ -1,0 +1,6 @@
+@MosqueOS.API_HostAddress = http://localhost:5017
+
+GET {{MosqueOS.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

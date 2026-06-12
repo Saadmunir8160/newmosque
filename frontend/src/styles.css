@@ -1,0 +1,131 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    height: 100%;
+    width: 100%;
+    font-size: 17px;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  @media (min-width: 640px) {
+    html { font-size: 18px; }
+  }
+
+  @media (min-width: 1024px) {
+    html { font-size: 19px; }
+  }
+
+  body {
+    margin: 0;
+    min-height: 100%;
+    min-height: 100dvh;
+    width: 100%;
+    overflow-x: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1rem;
+    line-height: 1.6;
+    background-color: #022c22;
+    color: #ecfdf5;
+  }
+
+  app-root {
+    display: block;
+    width: 100%;
+    min-height: 100%;
+    min-height: 100dvh;
+  }
+
+  img,
+  video,
+  canvas {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+@layer components {
+  .app-viewport {
+    width: 100%;
+    min-height: 100dvh;
+    min-height: 100vh;
+  }
+
+  .app-page {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .break-anywhere {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .app-section {
+    width: 100%;
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+
+  .text-label {
+    @apply text-sm sm:text-base font-bold uppercase tracking-widest;
+  }
+
+  .text-meta {
+    @apply text-sm text-emerald-400 leading-relaxed;
+  }
+
+  .text-stat-label {
+    @apply text-sm sm:text-base text-emerald-300;
+  }
+
+  .text-body {
+    @apply text-base leading-relaxed;
+  }
+
+  .text-body-muted {
+    @apply text-base text-emerald-200 leading-relaxed;
+  }
+
+  .heading-page {
+    @apply text-3xl sm:text-4xl font-bold text-white;
+  }
+
+  .heading-section {
+    @apply text-xl sm:text-2xl font-bold text-white;
+  }
+
+  @media (min-width: 640px) {
+    .app-section {
+      padding-left: max(1.5rem, env(safe-area-inset-left));
+      padding-right: max(1.5rem, env(safe-area-inset-right));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .app-section {
+      padding-left: max(2rem, env(safe-area-inset-left));
+      padding-right: max(2rem, env(safe-area-inset-right));
+    }
+  }
+}
+
+/* Hide scrollbars — scrolling still works */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
