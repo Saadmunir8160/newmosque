@@ -22,6 +22,8 @@ import { SuperUsersComponent } from './modules/super/users/super-users.component
 import { SuperMosqueDataComponent } from './modules/super/mosque-data/super-mosque-data.component';
 import { SuperFeaturesComponent } from './modules/super/features/super-features.component';
 import { SuperAuditComponent } from './modules/super/audit/super-audit.component';
+import { SuperSettingsComponent } from './modules/super/settings/super-settings.component';
+import { SuperReportsComponent } from './modules/super/reports/super-reports.component';
 // Mosque Owner
 import { OwnerDashboardComponent } from './modules/owner/dashboard/owner-dashboard.component';
 import { OwnerClaimComponent } from './modules/owner/claim/owner-claim.component';
@@ -60,7 +62,7 @@ import { MemberPreferencesComponent } from './modules/member/member-preferences.
 import { MemberReadingsComponent } from './modules/member/member-readings.component';
 
 const adminRoles = [ROLES.SuperAdmin, ROLES.MosqueOwner, ROLES.MosqueAdmin];
-const prayerRoles = [...adminRoles, ROLES.PrayerTimesEditor];
+const prayerRoles = [ROLES.SuperAdmin, ROLES.MosqueAdmin, ROLES.PrayerTimesEditor];
 const teacherRoles = [ROLES.Teacher, ...adminRoles];
 const contentRoles = [...adminRoles, ROLES.ContentEditor];
 const worshipRoles = [ROLES.Member, ROLES.Parent, ROLES.Muqaddam, ...adminRoles];
@@ -91,6 +93,10 @@ export const routes: Routes = [
       { path: 'super/mosque-data', component: SuperMosqueDataComponent, canActivate: [authGuard, roleGuard([ROLES.SuperAdmin])] },
       { path: 'super/features', component: SuperFeaturesComponent, canActivate: [authGuard, roleGuard([ROLES.SuperAdmin])] },
       { path: 'super/audit', component: SuperAuditComponent, canActivate: [authGuard, roleGuard([ROLES.SuperAdmin])] },
+      { path: 'super/settings', component: SuperSettingsComponent, canActivate: [authGuard, roleGuard([ROLES.SuperAdmin])] },
+      { path: 'super/reports', component: SuperReportsComponent, canActivate: [authGuard, roleGuard([ROLES.SuperAdmin])] },
+      { path: 'super/mosques/claims', redirectTo: 'super/claims', pathMatch: 'full' },
+      { path: 'super/users/features', redirectTo: 'super/features', pathMatch: 'full' },
 
       // —— Mosque Owner ——
       { path: 'owner', component: OwnerDashboardComponent, canActivate: [authGuard, roleGuard([ROLES.MosqueOwner])] },

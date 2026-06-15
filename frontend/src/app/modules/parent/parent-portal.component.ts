@@ -9,7 +9,7 @@ import { CardComponent } from '../../shared/ui/card.component';
   standalone: true,
   imports: [CommonModule, PageHeaderComponent, CardComponent],
   template: `
-    <app-page-header badge="Parent" title="My Children" subtitle="Attendance, fees, and progress notes" />
+    <app-page-header [useAuthRole]="true" title="My Children" subtitle="Attendance, fees, and progress notes" />
     <p *ngIf="!children().length" class="text-emerald-300">No children linked to your account.</p>
     <app-card *ngFor="let c of children()" class="block mb-6">
       <h3 class="text-2xl font-bold text-white mb-4">{{ c.student.name }}</h3>

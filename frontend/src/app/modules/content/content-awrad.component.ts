@@ -11,7 +11,7 @@ import { WirdCollection } from '../../core/models';
   standalone: true,
   imports: [CommonModule, FormsModule, PageHeaderComponent, CardComponent],
   template: `
-    <app-page-header badge="Content Editor" title="Awrad & Wird Collections" />
+    <app-page-header [useAuthRole]="true" title="Awrad & Wird Collections" />
     <app-card>
       <input class="input mb-2" placeholder="Collection name" [(ngModel)]="form.name">
       <select class="input mb-2" [(ngModel)]="form.tariqa">

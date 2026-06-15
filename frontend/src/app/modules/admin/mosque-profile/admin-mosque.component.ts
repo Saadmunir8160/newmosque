@@ -13,7 +13,7 @@ import { Mosque } from '../../../core/models';
   standalone: true,
   imports: [CommonModule, FormsModule, PageHeaderComponent, CardComponent],
   template: `
-    <app-page-header badge="Mosque Admin" title="Mosque Profile" subtitle="Edit mosque details and public information" />
+    <app-page-header [useAuthRole]="true" title="Mosque Profile" subtitle="Edit mosque details and public information" />
     <app-card *ngIf="mosque() as m">
       <div class="grid md:grid-cols-2 gap-3">
         <input class="input" [(ngModel)]="m.name" placeholder="Name">

@@ -13,7 +13,7 @@ import { JumuahTime, PrayerTimesDaily } from '../../../core/models';
   standalone: true,
   imports: [CommonModule, FormsModule, PageHeaderComponent, CardComponent],
   template: `
-    <app-page-header badge="Prayer Times" title="Edit Timetable" subtitle="Daily jamaat, Jumuah slots and exceptions" />
+    <app-page-header [useAuthRole]="true" title="Edit Timetable" subtitle="Daily jamaat, Jumuah slots and exceptions" />
 
     <app-card *ngIf="times() as t" class="mb-6">
       <h3 class="text-white font-bold mb-4">Daily Jamaat Times</h3>

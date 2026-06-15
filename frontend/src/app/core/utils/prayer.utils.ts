@@ -91,3 +91,54 @@ export function nextJumuahCountdown(
   const list = resolveJumuahCountdowns(slots);
   return list.find(s => s.active) ?? null;
 }
+
+/** Prayer period currently in effect (by adhān start times). */
+export function getActivePrayerName(times: PrayerTimesDaily): string {
+  const now = new Date();
+  const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  const slots = getPrayerSlots(times);
+  let active = 'Isha';
+  for (const p of slots) {
+    if (nowSec < timeToSeconds(p.start)) break;
+    active = p.name;
+  }
+  return active;
+}
+
+export function formatHijriDate(date = new Date()): string {
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      calendar: 'islamic-umalqura',
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(date);
+  } catch {
+    return new Intl.DateTimeFormat('en-GB', {
+      calendar: 'islamic',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(date);
+  }
+}
+
+export function getIslamicMonth(date = new Date()): number {
+  return parseInt(
+    new Intl.DateTimeFormat('en-US-u-ca-islamic', { month: 'numeric' }).format(date),
+    10
+  );
+}
+
+export function isRamadan(date = new Date()): boolean {
+  return getIslamicMonth(date) === 9;
+}
+
+/** Minutes before adhān — common last-minute Suhoor cutoff. */
+export function suhoorEndTime(fajrStart: string, minutesBefore = 10): string {
+  const sec = Math.max(0, timeToSeconds(fajrStart) - minutesBefore * 60);
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:00`;
+}

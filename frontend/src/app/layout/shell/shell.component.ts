@@ -2,7 +2,12 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterOutlet, RouterModule } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
-import { navForGuest, navForRoles, navIcon, navSections } from '../../core/config/nav.config';
+import { navForGuest, navForRoles, navIcon, navSections, navIsSuperAdmin, NavItem } from '../../core/config/nav.config';
+import {
+  SUPER_ADMIN_NAV_SECTIONS,
+  SUPER_ADMIN_NAV_ICONS,
+  superAdminNavItems,
+} from '../../core/config/super-admin-nav.config';
 
 const SIDEBAR_KEY = 'mos_sidebar_collapsed';
 const SECTIONS_KEY = 'mos_nav_sections';
@@ -98,7 +103,7 @@ const SECTIONS_KEY = 'mos_nav_sections';
                         routerLinkActive="bg-emerald-800/50 text-white font-bold"
                         [routerLinkActiveOptions]="{ exact: item.route === '/dashboard' }"
                         class="shell-nav-link px-3 py-2.5 rounded-md hover:bg-emerald-800 text-emerald-100 mx-1">
-                        <span class="shell-nav-icon">{{ navIcon(item) }}</span>
+                        <span class="shell-nav-icon">{{ iconFor(item) }}</span>
                         <span class="truncate">{{ item.label }}</span>
                       </a>
                     </li>
@@ -117,7 +122,7 @@ const SECTIONS_KEY = 'mos_nav_sections';
                 [attr.title]="item.label"
                 [attr.aria-label]="item.label"
                 class="shell-nav-link justify-center px-2 py-2.5 rounded-md hover:bg-emerald-800 text-emerald-100 mx-auto w-10">
-                <span class="shell-nav-icon">{{ navIcon(item) }}</span>
+                <span class="shell-nav-icon">{{ iconFor(item) }}</span>
               </a>
             </li>
           </ul>
@@ -165,7 +170,7 @@ const SECTIONS_KEY = 'mos_nav_sections';
                 <a *ngFor="let item of section.items" [routerLink]="item.route" (click)="menuOpen.set(false)"
                   routerLinkActive="bg-emerald-800/50 text-white font-bold"
                   class="shell-nav-link px-4 py-3 text-base text-emerald-100">
-                  <span class="shell-nav-icon">{{ navIcon(item) }}</span>
+                  <span class="shell-nav-icon">{{ iconFor(item) }}</span>
                   <span>{{ item.label }}</span>
                 </a>
               </div>
@@ -214,14 +219,30 @@ export class ShellComponent {
   sidebarCollapsed = signal(this.readSidebarCollapsed());
   sectionOpen = signal<Record<string, boolean>>(this.readSectionState());
 
-  navIcon = navIcon;
+  isSuperAdmin = computed(() =>
+    !this.authService.isGuest() && navIsSuperAdmin(this.authService.roles()));
+
   sections = computed(() => {
+    if (this.isSuperAdmin()) {
+      return SUPER_ADMIN_NAV_SECTIONS.map(s => ({ section: s.title, items: s.items }));
+    }
     const items = this.authService.isGuest()
       ? navForGuest()
       : navForRoles(this.authService.roles());
     return navSections(items);
   });
-  flatNavItems = computed(() => this.sections().flatMap(s => s.items));
+
+  flatNavItems = computed(() => {
+    if (this.isSuperAdmin()) return superAdminNavItems();
+    return this.sections().flatMap(s => s.items);
+  });
+
+  iconFor(item: NavItem): string {
+    if (this.isSuperAdmin() && item.icon) {
+      return SUPER_ADMIN_NAV_ICONS[item.icon] ?? navIcon(item);
+    }
+    return navIcon(item);
+  }
 
   goToLogin(): void {
     this.router.navigate(['/login']);
@@ -231,6 +252,12 @@ export class ShellComponent {
     'Browse': '👁️',
     'Main': '🏠',
     'Prayer Times': '🕌',
+    'Overview': '▦',
+    'Mosques': '⌂',
+    'Access': '👥',
+    'Content library': '📖',
+    'Oversight': '👁',
+    'System': '⚙',
     'Super Admin': '⚙️',
     'Mosque Owner': '🏛️',
     'Mosque Management': '🔧',

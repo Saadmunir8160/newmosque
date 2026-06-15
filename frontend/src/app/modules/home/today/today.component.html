@@ -12,9 +12,9 @@
       <div class="today-header-grid">
         <div class="today-header-main">
           <div class="today-header-badges">
-            <span class="today-date-chip">{{ d.dayOfWeek }}</span>
+            <app-dashboard-badges
+              [useAuthRole]="authService.isAuthenticated() && !authService.isGuest()" />
             <span *ngIf="d.isFriday" class="today-friday-chip">Jumuah</span>
-            <span *ngIf="isSuperAdmin()" class="today-admin-chip">Super Admin</span>
           </div>
           <h1 class="today-title">{{ d.isFriday ? 'Jumuah Mubarak' : 'Today' }}</h1>
           <p class="today-subtitle">{{ d.date | date:'EEEE, d MMMM y' }}</p>

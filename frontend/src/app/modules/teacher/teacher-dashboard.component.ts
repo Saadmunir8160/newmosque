@@ -10,7 +10,7 @@ import { CardComponent } from '../../shared/ui/card.component';
   standalone: true,
   imports: [CommonModule, RouterModule, PageHeaderComponent, CardComponent],
   template: `
-    <app-page-header badge="Teacher" title="Teacher Dashboard"
+    <app-page-header [useAuthRole]="true" title="Teacher Dashboard"
       subtitle="Your daily workflow — each step opens a working madrassah screen." />
 
     <div class="grid md:grid-cols-3 gap-4 mb-8" *ngIf="dash() as d">
@@ -27,17 +27,30 @@ import { CardComponent } from '../../shared/ui/card.component';
           <div class="flex-1 min-w-0">
             <h3 class="text-white font-bold mb-1">{{ link.title }}</h3>
             <p class="text-emerald-300 text-sm mb-3">{{ link.desc }}</p>
-            <ol class="space-y-1">
-              <li *ngFor="let s of link.steps; let i = index" class="text-emerald-100 text-sm flex gap-2">
-                <span class="text-amber-400/70 font-mono text-xs">{{ link.step }}.{{ i + 1 }}</span>{{ s }}
-              </li>
-            </ol>
+            <ul class="teacher-task-steps">
+              <li *ngFor="let s of link.steps">{{ s }}</li>
+            </ul>
           </div>
           <span class="text-amber-400 text-sm font-bold shrink-0 hidden sm:inline">Open →</span>
         </div>
       </a>
     </div>
-  `
+  `,
+  styles: [`
+    .teacher-task-steps {
+      list-style: disc;
+      margin: 0;
+      padding: 0 0 0 1.125rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .teacher-task-steps li {
+      font-size: 0.875rem;
+      color: #d1fae5;
+      line-height: 1.4;
+    }
+  `]
 })
 export class TeacherDashboardComponent implements OnInit {
   private madrassah = inject(MadrassahService);

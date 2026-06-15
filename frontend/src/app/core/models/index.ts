@@ -117,6 +117,13 @@ export interface JanazaAnnouncement {
   notes?: string;
 }
 
+export interface ReadingCampaign {
+  id: number;
+  mosqueId: number;
+  deceasedName: string;
+  isActive: boolean;
+}
+
 export interface Dua {
   id: number;
   title: string;

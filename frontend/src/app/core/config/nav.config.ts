@@ -86,7 +86,7 @@ export const NAV_ITEMS: NavItem[] = [
 
   { section: 'Mosque Management', label: 'Mosque Profile', route: '/dashboard/admin/mosque', roles: ADMINS },
 
-  { section: 'Mosque Management', label: 'Edit Prayer Times', route: '/dashboard/admin/prayer-times', roles: [...ADMINS, ROLES.PrayerTimesEditor] },
+  { section: 'Mosque Management', label: 'Edit Prayer Times', route: '/dashboard/admin/prayer-times', roles: [ROLES.SuperAdmin, ROLES.MosqueAdmin, ROLES.PrayerTimesEditor] },
 
   { section: 'Mosque Management', label: 'Manage Announcements', route: '/dashboard/admin/announcements', roles: ADMINS },
 
@@ -206,9 +206,13 @@ export function navForGuest(): NavItem[] {
   return GUEST_NAV_ITEMS;
 }
 
+export function navIsSuperAdmin(userRoles: string[]): boolean {
+  return userRoles.includes(ROLES.SuperAdmin);
+}
+
 export function navForRoles(userRoles: string[]): NavItem[] {
 
-  if (userRoles.includes(ROLES.SuperAdmin)) return NAV_ITEMS;
+  if (navIsSuperAdmin(userRoles)) return [];
 
 
 

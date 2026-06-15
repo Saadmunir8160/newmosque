@@ -10,7 +10,7 @@ import { environment } from '../../../environments/environment';
   standalone: true,
   imports: [CommonModule, PageHeaderComponent, CardComponent],
   template: `
-    <app-page-header badge="Muqaddam" title="Murid Summary" subtitle="Tariqa groups, wird progress and spiritual guidance" />
+    <app-page-header [useAuthRole]="true" title="Murid Summary" subtitle="Tariqa groups, wird progress and spiritual guidance" />
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
       <app-card><p class="text-stat-label">Tariqa Groups</p><p class="text-2xl font-bold text-white">{{ communities().length }}</p></app-card>

@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   Announcement, JanazaAnnouncement, JumuahTime, Mosque,
-  MosqueEvent, ParticipationOpportunity, PrayerTimesDaily
+  MosqueEvent, ParticipationOpportunity, PrayerTimesDaily, ReadingCampaign
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -47,5 +47,9 @@ export class MosqueService {
 
   getParticipation(mosqueId: number): Observable<ParticipationOpportunity[]> {
     return this.http.get<ParticipationOpportunity[]>(`${this.base}/mosques/${mosqueId}/participation`);
+  }
+
+  getReadingCampaigns(mosqueId: number): Observable<ReadingCampaign[]> {
+    return this.http.get<ReadingCampaign[]>(`${this.base}/mosques/${mosqueId}/reading-campaigns`);
   }
 }

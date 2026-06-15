@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { roleDisplayName } from '../constants/roles';
 import { LoginResponse, UserProfile } from '../models';
 
 const GUEST_KEY = 'mosque_os_guest';
@@ -135,5 +136,9 @@ export class AuthService {
   hasRole(role: string): boolean {
     if (this.isGuest() || !this.isAuthenticated()) return false;
     return this.roles().includes(role) || this.roles().includes('Super Admin');
+  }
+
+  primaryRoleName(): string {
+    return roleDisplayName(this.roles());
   }
 }

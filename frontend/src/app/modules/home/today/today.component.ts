@@ -8,11 +8,12 @@ import { PlatformService, PlatformStats } from '../../../core/services/platform.
 import { TodayResponse, QuranCard } from '../../../core/models';
 import { ROLES } from '../../../core/constants/roles';
 import { countdownToJamaat, formatTime12, getPrayerSlots } from '../../../core/utils/prayer.utils';
+import { DashboardBadgesComponent } from '../../../shared/ui/dashboard-badges.component';
 
 @Component({
   selector: 'app-today',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, DashboardBadgesComponent],
   templateUrl: './today.component.html',
   styles: [`
     :host { display: block; width: 100%; }
@@ -67,23 +68,24 @@ import { countdownToJamaat, formatTime12, getPrayerSlots } from '../../../core/u
     .today-header-badges {
       display: flex;
       flex-wrap: wrap;
+      align-items: center;
       gap: 0.5rem;
       margin-bottom: 0.75rem;
     }
-    .today-date-chip,
-    .today-friday-chip,
-    .today-admin-chip {
+    .today-header-badges app-dashboard-badges {
+      display: contents;
+    }
+    .today-friday-chip {
       font-size: 0.6875rem;
       font-weight: 700;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       padding: 0.25rem 0.625rem;
       border-radius: 9999px;
-      border: 1px solid var(--today-border);
+      color: #fcd34d;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      background: var(--today-gold-soft);
     }
-    .today-date-chip { color: var(--today-muted); background: var(--today-surface); }
-    .today-friday-chip { color: #fcd34d; border-color: rgba(245, 158, 11, 0.35); background: var(--today-gold-soft); }
-    .today-admin-chip { color: #fde68a; border-color: rgba(245, 158, 11, 0.3); background: rgba(245, 158, 11, 0.08); }
     .today-title {
       font-family: ui-serif, Georgia, serif;
       font-size: clamp(1.875rem, 4vw, 2.75rem);
@@ -607,7 +609,6 @@ export class TodayComponent implements OnInit, OnDestroy {
   formatTime = formatTime12;
 
   isSuperAdmin = computed(() => this.authService.roles().includes(ROLES.SuperAdmin));
-
   private timer?: ReturnType<typeof setInterval>;
 
   ngOnInit(): void {
