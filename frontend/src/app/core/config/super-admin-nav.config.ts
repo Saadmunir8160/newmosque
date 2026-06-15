@@ -7,48 +7,23 @@ export interface SuperNavSection {
 
 export const SUPER_ADMIN_NAV_SECTIONS: SuperNavSection[] = [
   {
-    title: 'Overview',
+    title: 'Super Admin',
     items: [
-      { section: 'Overview', label: 'Dashboard / stats', route: '/dashboard/super', icon: 'dashboard' },
-      { section: 'Overview', label: 'Platform analytics', route: '/dashboard/super/reports', icon: 'chart' },
-    ],
-  },
-  {
-    title: 'Mosques',
-    items: [
-      { section: 'Mosques', label: 'All mosques', route: '/dashboard/super/mosques', icon: 'mosque' },
-      { section: 'Mosques', label: 'Seed new mosque', route: '/dashboard/super/mosques', icon: 'plus' },
-      { section: 'Mosques', label: 'Claim requests', route: '/dashboard/super/claims', icon: 'stamp' },
-    ],
-  },
-  {
-    title: 'Access',
-    items: [
-      { section: 'Access', label: 'Users & roles', route: '/dashboard/super/users', icon: 'users' },
-      { section: 'Access', label: 'Module feature flags', route: '/dashboard/super/features', icon: 'toggle' },
-    ],
-  },
-  {
-    title: 'Content library',
-    items: [
-      { section: 'Content library', label: 'Awrad & Wird', route: '/dashboard/content/awrad', icon: 'book' },
-      { section: 'Content library', label: 'Duas & Adhkar', route: '/dashboard/content/duas', icon: 'prayer' },
-      { section: 'Content library', label: 'Ritual / Umrah / Hajj guides', route: '/dashboard/content/ritual-guides', icon: 'route' },
-    ],
-  },
-  {
-    title: 'Oversight',
-    items: [
-      { section: 'Oversight', label: 'Prayer times (all)', route: '/dashboard/admin/prayer-times', icon: 'clock' },
-      { section: 'Oversight', label: 'Announcements / events', route: '/dashboard/admin/announcements', icon: 'speaker' },
-      { section: 'Oversight', label: 'Janaza & readings', route: '/dashboard/admin/janaza', icon: 'flower' },
-    ],
-  },
-  {
-    title: 'System',
-    items: [
-      { section: 'System', label: 'Audit logs', route: '/dashboard/super/audit', icon: 'history' },
-      { section: 'System', label: 'Platform settings', route: '/dashboard/super/settings', icon: 'settings' },
+      { section: 'Super Admin', label: 'Dashboard', route: '/dashboard/super', icon: 'dashboard' },
+      { section: 'Super Admin', label: 'Mosques', route: '/dashboard/super/mosques', icon: 'mosque' },
+      { section: 'Super Admin', label: 'Claims', route: '/dashboard/super/claims', icon: 'stamp' },
+      { section: 'Super Admin', label: 'Users & roles', route: '/dashboard/super/users', icon: 'users' },
+      { section: 'Super Admin', label: 'Module flags', route: '/dashboard/super/features', icon: 'toggle' },
+      { section: 'Super Admin', label: 'Content library', route: '/dashboard/content/awrad', icon: 'book' },
+      { section: 'Super Admin', label: 'Adhkar library', route: '/dashboard/content/adhkar', icon: 'dot' },
+      { section: 'Super Admin', label: 'Duas library', route: '/dashboard/content/duas', icon: 'prayer' },
+      { section: 'Super Admin', label: 'Ritual guides', route: '/dashboard/content/ritual-guides', icon: 'route' },
+      { section: 'Super Admin', label: 'Umrah & Hajj guides', route: '/dashboard/member/preferences', icon: 'journey' },
+      { section: 'Super Admin', label: 'Janaza oversight', route: '/dashboard/admin/janaza', icon: 'flower' },
+      { section: 'Super Admin', label: 'Death readings', route: '/dashboard/muqaddam/readings', icon: 'readings' },
+      { section: 'Super Admin', label: 'Audit logs', route: '/dashboard/super/audit', icon: 'history' },
+      { section: 'Super Admin', label: 'Platform settings', route: '/dashboard/super/settings', icon: 'settings' },
+      { section: 'Super Admin', label: 'Reports', route: '/dashboard/super/reports', icon: 'chart' },
     ],
   },
 ];
@@ -66,11 +41,14 @@ export const SUPER_ADMIN_NAV_ICONS: Record<string, string> = {
   users: '👥',
   toggle: '◎',
   book: '📖',
+  dot: '◉',
   prayer: '🤲',
   route: '↗',
+  journey: '✈',
   clock: '⏰',
   speaker: '📢',
   flower: '✿',
+  readings: '📚',
   history: '↺',
   settings: '⚙',
   campaigns: '📿',

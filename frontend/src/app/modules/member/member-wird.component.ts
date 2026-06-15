@@ -13,7 +13,7 @@ import { WirdCollection } from '../../core/models';
     <app-page-header badge="Member" title="My Wird" subtitle="Recommended reading and guided collections" />
     <app-card *ngIf="recommended() as rec" class="mb-6">
       <span class="text-amber-400 text-sm font-bold uppercase">Recommended Now</span>
-      <h3 class="text-xl font-bold text-white mt-2">{{ rec.collection?.name }}</h3>
+      <h3 class="text-xl font-bold text-white mt-2">{{ rec.collection.name }}</h3>
       <p class="text-emerald-300 text-sm">Slot: {{ rec.slot }}</p>
       <button class="btn mt-3" (click)="complete(rec.collection.id)">Mark Complete</button>
     </app-card>

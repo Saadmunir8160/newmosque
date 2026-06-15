@@ -28,6 +28,14 @@ export interface MosqueSetting {
   isEnabled: boolean;
 }
 
+export interface MosqueStaffMember {
+  id: string;
+  userName: string;
+  email: string;
+  fullName: string;
+  roles: string[];
+}
+
 export interface Mosque {
   id: number;
   name: string;

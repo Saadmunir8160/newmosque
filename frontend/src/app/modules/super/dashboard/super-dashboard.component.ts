@@ -93,9 +93,9 @@ interface RoleCount {
       <header class="sdash-header">
         <div>
           <app-dashboard-badges [useAuthRole]="true" />
-          <h1 class="sdash-title">Dashboard overview</h1>
+          <h1 class="sdash-title">Dashboard</h1>
           <p class="sdash-greeting">{{ greeting() }}</p>
-          <p class="sdash-sub">Platform pulse · live prayer & community signals</p>
+          <p class="sdash-sub">Live overview · prayer times · users & mosques</p>
         </div>
         <button type="button" class="sdash-refresh" (click)="refresh()" [disabled]="loading()">
           {{ loading() ? 'Refreshing…' : 'Refresh' }}
@@ -215,9 +215,9 @@ interface RoleCount {
         <article class="scard scard--mini scard--interactive">
           <span class="mini-icon">📖</span>
           <div>
-            <p class="mini-label">Wisdom slider</p>
+            <p class="mini-label">Daily reminders</p>
             <p class="mini-value mini-value--sm">{{ activeSlide().kind }}</p>
-            <p class="mini-hint">Auto-rotating</p>
+            <p class="mini-hint">Rotating quotes & notices</p>
           </div>
         </article>
       </div>
@@ -338,8 +338,8 @@ interface RoleCount {
 
       <!-- 12. Platform roadmap -->
       <section class="sdash-section">
-        <h3 class="sdash-section-title">Platform roadmap</h3>
-        <p class="sdash-section-desc">Step-by-step guide for full platform setup — each card opens a live screen.</p>
+        <h3 class="sdash-section-title">Setup guide</h3>
+        <p class="sdash-section-desc">Step-by-step tasks to configure the platform — each card opens the relevant screen.</p>
         <div class="roadmap-list">
           <a *ngFor="let w of workflow" [routerLink]="w.route" class="scard roadmap-card scard--interactive">
             <div class="roadmap-inner">

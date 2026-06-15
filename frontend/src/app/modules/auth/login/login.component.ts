@@ -12,31 +12,35 @@ import { AuthService } from '../../../core/auth/auth.service';
     :host { display: block; min-height: 100dvh; }
     .auth-page {
       min-height: 100dvh; display: flex; flex-direction: column;
-      padding: 1.5rem 1rem 1.5rem;
-      padding-top: max(1.5rem, env(safe-area-inset-top));
-      padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+      padding: 1rem 0.875rem 1.125rem;
+      padding-top: max(1rem, env(safe-area-inset-top));
+      padding-bottom: max(1.125rem, env(safe-area-inset-bottom));
       position: relative; overflow: hidden;
     }
     @media (min-width: 640px) {
       .auth-page {
-        padding: 2.5rem 1.5rem 2rem;
-        padding-top: max(2.5rem, env(safe-area-inset-top));
+        padding: 2rem 1.25rem 1.75rem;
+        padding-top: max(2rem, env(safe-area-inset-top));
       }
     }
     .bg-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
     .bg-overlay { position: absolute; inset: 0; background: rgba(6, 78, 59, 0.88); z-index: 1; }
-    .auth-inner { position: relative; z-index: 2; width: 100%; max-width: 400px; margin: 0 auto; flex: 1; display: flex; flex-direction: column; }
-    .auth-title {
-      color: #fff; font-size: clamp(1.35rem, 5vw, 1.65rem); font-weight: 800; line-height: 1.25;
-      margin: 0 0 1.5rem; letter-spacing: -0.02em;
+    .auth-inner {
+      position: relative; z-index: 2; width: 100%;
+      max-width: min(400px, calc(100vw - 1.75rem));
+      margin: 0 auto; flex: 1; display: flex; flex-direction: column;
     }
-    @media (min-width: 640px) { .auth-title { margin-bottom: 2rem; } }
-    .field { margin-bottom: 1rem; }
-    .field-label { display: block; font-size: 0.8rem; font-weight: 600; color: #a7f3d0; margin-bottom: 6px; }
+    .auth-title {
+      color: #fff; font-size: clamp(1.1rem, 4.5vw, 1.5rem); font-weight: 800; line-height: 1.25;
+      margin: 0 0 1.1rem; letter-spacing: -0.02em;
+    }
+    @media (min-width: 640px) { .auth-title { margin-bottom: 1.6rem; } }
+    .field { margin-bottom: 0.85rem; }
+    .field-label { display: block; font-size: 0.74rem; font-weight: 600; color: #a7f3d0; margin-bottom: 5px; }
     .input-wrap {
       width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.08);
       border: 1.5px solid rgba(167,243,208,0.35); border-radius: 12px;
-      padding: 14px 16px; font-size: 15px; color: #f8fafc; outline: none;
+      padding: 11px 13px; font-size: 0.88rem; color: #f8fafc; outline: none;
       transition: border-color 0.2s, background 0.2s;
     }
     .input-wrap::placeholder { color: rgba(167,243,208,0.5); }
@@ -47,25 +51,25 @@ import { AuthService } from '../../../core/auth/auth.service';
       position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
       background: none; border: none; color: #6ee7b7; cursor: pointer; padding: 4px; line-height: 0;
     }
-    .forgot-row { text-align: right; margin: 0.5rem 0 1.5rem; }
-    .forgot-row a { color: #a7f3d0; font-size: 0.82rem; text-decoration: none; }
+    .forgot-row { text-align: right; margin: 0.4rem 0 1rem; }
+    .forgot-row a { color: #a7f3d0; font-size: 0.75rem; text-decoration: none; }
     .forgot-row a:hover { color: #fff; text-decoration: underline; }
     .btn-login {
-      width: 100%; padding: 15px; border-radius: 14px; border: none; cursor: pointer;
-      background: #fff; color: #022c22; font-size: 1rem; font-weight: 700;
+      width: 100%; padding: 12px; border-radius: 12px; border: none; cursor: pointer;
+      background: #fff; color: #022c22; font-size: 0.9rem; font-weight: 700;
       box-shadow: 0 6px 20px rgba(0,0,0,0.18); transition: transform 0.15s, opacity 0.2s;
     }
     .btn-login:hover:not(:disabled) { transform: translateY(-1px); }
     .btn-login:disabled { opacity: 0.65; cursor: not-allowed; }
     .auth-footer {
-      margin-top: auto; padding-top: 2rem; text-align: center;
-      color: #6ee7b7; font-size: 0.9rem;
+      margin-top: auto; padding-top: 1.25rem; text-align: center;
+      color: #6ee7b7; font-size: 0.8rem;
     }
     .auth-footer a { color: #fff; font-weight: 700; text-decoration: none; }
     .auth-footer a:hover { text-decoration: underline; }
     .error-box {
       background: rgba(127,29,29,0.35); border: 1px solid #991b1b; color: #fecaca;
-      padding: 10px 12px; border-radius: 10px; font-size: 0.82rem; margin-bottom: 1rem;
+      padding: 9px 10px; border-radius: 10px; font-size: 0.76rem; margin-bottom: 0.75rem;
     }
     .hp-field { position: absolute; left: -9999px; opacity: 0; pointer-events: none; }
     .pass-mask { -webkit-text-security: disc; text-security: disc; }

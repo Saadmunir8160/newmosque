@@ -2,12 +2,17 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterOutlet, RouterModule } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
-import { navForGuest, navForRoles, navIcon, navSections, navIsSuperAdmin, NavItem } from '../../core/config/nav.config';
+import { navForGuest, navForRoles, navIcon, navSections, navIsSuperAdmin, navIsMosqueOwner, NavItem } from '../../core/config/nav.config';
 import {
   SUPER_ADMIN_NAV_SECTIONS,
   SUPER_ADMIN_NAV_ICONS,
   superAdminNavItems,
 } from '../../core/config/super-admin-nav.config';
+import {
+  OWNER_NAV_SECTIONS,
+  OWNER_NAV_ICONS,
+  ownerNavItems,
+} from '../../core/config/owner-nav.config';
 
 const SIDEBAR_KEY = 'mos_sidebar_collapsed';
 const SECTIONS_KEY = 'mos_nav_sections';
@@ -222,9 +227,15 @@ export class ShellComponent {
   isSuperAdmin = computed(() =>
     !this.authService.isGuest() && navIsSuperAdmin(this.authService.roles()));
 
+  isMosqueOwner = computed(() =>
+    !this.authService.isGuest() && navIsMosqueOwner(this.authService.roles()));
+
   sections = computed(() => {
     if (this.isSuperAdmin()) {
       return SUPER_ADMIN_NAV_SECTIONS.map(s => ({ section: s.title, items: s.items }));
+    }
+    if (this.isMosqueOwner()) {
+      return OWNER_NAV_SECTIONS.map(s => ({ section: s.title, items: s.items }));
     }
     const items = this.authService.isGuest()
       ? navForGuest()
@@ -234,12 +245,16 @@ export class ShellComponent {
 
   flatNavItems = computed(() => {
     if (this.isSuperAdmin()) return superAdminNavItems();
+    if (this.isMosqueOwner()) return ownerNavItems();
     return this.sections().flatMap(s => s.items);
   });
 
   iconFor(item: NavItem): string {
     if (this.isSuperAdmin() && item.icon) {
       return SUPER_ADMIN_NAV_ICONS[item.icon] ?? navIcon(item);
+    }
+    if (this.isMosqueOwner() && item.icon) {
+      return OWNER_NAV_ICONS[item.icon] ?? navIcon(item);
     }
     return navIcon(item);
   }
@@ -255,7 +270,7 @@ export class ShellComponent {
     'Overview': '▦',
     'Mosques': '⌂',
     'Access': '👥',
-    'Content library': '📖',
+    'Content': '📖',
     'Oversight': '👁',
     'System': '⚙',
     'Super Admin': '⚙️',
@@ -263,7 +278,6 @@ export class ShellComponent {
     'Mosque Management': '🔧',
     'Madrassah': '📚',
     'Muqaddam': '📿',
-    'Content': '📝',
     'Parent': '👨‍👩‍👧',
     'My Worship': '🌙',
   };

@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Announcement, JanazaAnnouncement, Mosque, MosqueEvent, MosqueSetting, ParticipationOpportunity, PrayerTimesDaily } from '../models';
+import { Announcement, JanazaAnnouncement, Mosque, MosqueEvent, MosqueSetting, MosqueStaffMember, ParticipationOpportunity, PrayerTimesDaily } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class AdminService {
@@ -23,8 +23,30 @@ export class AdminService {
     return this.http.post(`${this.base}/mosques/${id}/verify`, {});
   }
 
-  claimMosque(id: number): Observable<unknown> {
-    return this.http.post(`${this.base}/mosques/${id}/claim`, {});
+  claimMosque(id: number): Observable<{ message: string; mosque?: Mosque }> {
+    return this.http.post<{ message: string; mosque?: Mosque }>(`${this.base}/mosques/${id}/claim`, {});
+  }
+
+  getOwnerMosque(): Observable<{
+    mosque: Mosque | null;
+    profileCompleteness: number;
+    missingFields: string[];
+  }> {
+    return this.http.get<{
+      mosque: Mosque | null;
+      profileCompleteness: number;
+      missingFields: string[];
+    }>(`${this.base}/mosques/my-mosque`);
+  }
+
+  getMosqueStaff(mosqueId: number): Observable<MosqueStaffMember[]> {
+    return this.http.get<MosqueStaffMember[]>(`${this.base}/mosques/${mosqueId}/staff`);
+  }
+
+  removeStaff(mosqueId: number, userId: string, role: string): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(
+      `${this.base}/mosques/${mosqueId}/staff?userId=${encodeURIComponent(userId)}&role=${encodeURIComponent(role)}`
+    );
   }
 
   updateMosque(id: number, mosque: Partial<Mosque>): Observable<Mosque> {

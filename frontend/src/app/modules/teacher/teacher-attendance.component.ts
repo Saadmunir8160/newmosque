@@ -36,7 +36,7 @@ import { MadrassahService, MadrassahClass } from '../../core/services/madrassah.
         <div class="att-rows">
           <div *ngFor="let e of cls.enrolments; let i = index" class="att-row">
             <span class="att-row-num">{{ i + 1 }}</span>
-            <span class="att-row-name">{{ e.student?.name }}</span>
+            <span class="att-row-name">{{ e.student.name }}</span>
             <select class="att-status" [(ngModel)]="statusMap[e.student!.id]">
               <option value="Present">Present</option>
               <option value="Absent">Absent</option>

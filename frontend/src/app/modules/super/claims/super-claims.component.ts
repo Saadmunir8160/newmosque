@@ -11,24 +11,29 @@ import { Mosque } from '../../../core/models';
   standalone: true,
   imports: [CommonModule, FormsModule, PageHeaderComponent, CardComponent],
   template: `
-    <app-page-header badge="Super Admin" title="Mosque Claims" subtitle="Approve or reject mosque owner claims" />
-    <p *ngIf="!pending().length" class="text-emerald-300">No pending claims.</p>
-    <app-card *ngFor="let m of pending()" class="block mb-4">
-      <h4 class="text-white font-bold">{{ m.name }}</h4>
-      <p class="text-emerald-300 text-sm mb-2">{{ m.address }}, {{ m.city }}</p>
-      <p class="text-emerald-400 text-sm mb-4">Owner ID: {{ m.ownerId || '—' }}</p>
-      <input class="input mb-3" placeholder="Rejection reason (optional)" [(ngModel)]="rejectReason[m.id]">
-      <div class="flex gap-2">
-        <button class="btn-approve" (click)="approve(m.id)">Approve</button>
-        <button class="btn-reject" (click)="reject(m.id)">Reject</button>
+    <app-page-header
+      badge="Super Admin"
+      title="Ownership claims"
+      subtitle="Review mosque ownership requests. Approving activates the mosque and grants the owner admin access." />
+
+    <div *ngIf="!pending().length" class="admin-empty">
+      <p class="admin-empty-title">All clear</p>
+      <p class="admin-empty-desc">There are no pending ownership claims at the moment.</p>
+    </div>
+
+    <app-card *ngFor="let m of pending()" class="block mb-3" [interactive]="true">
+      <h4 class="text-white font-semibold text-base m-0">{{ m.name }}</h4>
+      <p class="admin-meta mt-1">{{ m.address }}, {{ m.city }} {{ m.postcode }}</p>
+      <p class="text-xs text-emerald-500 mt-2">Claimant user ID: {{ m.ownerId || 'Unknown' }}</p>
+      <label class="block text-xs text-emerald-400 mt-4 mb-1">Rejection note (optional)</label>
+      <input class="admin-input mb-3" placeholder="Reason shown in audit log only"
+        [(ngModel)]="rejectReason[m.id]">
+      <div class="flex flex-wrap gap-2">
+        <button type="button" class="admin-btn admin-btn--success" (click)="approve(m.id)">Approve claim</button>
+        <button type="button" class="admin-btn admin-btn--danger" (click)="reject(m.id)">Reject</button>
       </div>
     </app-card>
-  `,
-  styles: [`
-    .input{background:#022c22;border:1px solid #065f46;border-radius:8px;padding:8px;color:#fff;width:100%}
-    .btn-approve{background:#10b981;color:#022c22;font-weight:700;padding:8px 16px;border-radius:8px;border:none;cursor:pointer}
-    .btn-reject{background:#ef4444;color:#fff;font-weight:700;padding:8px 16px;border-radius:8px;border:none;cursor:pointer}
-  `]
+  `
 })
 export class SuperClaimsComponent implements OnInit {
   private platform = inject(PlatformService);

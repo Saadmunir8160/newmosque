@@ -8,11 +8,14 @@
       Back to Home
     </a>
     <span class="text-sm sm:text-base font-bold text-white truncate text-center flex-1 min-w-0 basis-full sm:basis-auto order-3 sm:order-none px-2">{{ mosque()?.name || 'Sample Mosque' }}</span>
-    <span class="px-2.5 py-1 rounded-full bg-amber-400/15 border border-amber-400/40 text-amber-400 text-xs font-bold shrink-0"
+    <span *ngIf="!isPublicProfile" class="px-2.5 py-1 rounded-full bg-amber-400/15 border border-amber-400/40 text-amber-400 text-xs font-bold shrink-0"
       [class.demo-tour-pill]="tourActive()">
       {{ tourActive() ? 'LIVE TOUR' : 'LIVE DEMO' }}
     </span>
-    <button *ngIf="!tourActive() && tourCompleted()" type="button" (click)="replayTour()"
+    <span *ngIf="isPublicProfile" class="px-2.5 py-1 rounded-full bg-emerald-400/15 border border-emerald-400/40 text-emerald-300 text-xs font-bold shrink-0">
+      PUBLIC PROFILE
+    </span>
+    <button *ngIf="!isPublicProfile && !tourActive() && tourCompleted()" type="button" (click)="replayTour()"
       class="hidden sm:inline-flex shrink-0 px-2.5 py-1 rounded-lg border border-emerald-700 text-emerald-200 text-xs font-medium hover:text-white hover:border-emerald-500 transition-colors">
       Replay tour
     </button>

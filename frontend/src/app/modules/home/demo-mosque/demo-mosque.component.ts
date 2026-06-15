@@ -1,7 +1,7 @@
 import { afterNextRender, Component, Injector, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
-import { forkJoin } from 'rxjs';
+import { ActivatedRoute, RouterModule } from '@angular/router';
+import { forkJoin, of } from 'rxjs';
 import { MosqueService } from '../../../core/services/mosque.service';
 import { TodayService } from '../../../core/services/today.service';
 import {
@@ -35,6 +35,7 @@ export class DemoMosqueComponent implements OnInit, OnDestroy {
   private mosqueService = inject(MosqueService);
   private todayService = inject(TodayService);
   private injector = inject(Injector);
+  private route = inject(ActivatedRoute);
 
   mosque = signal<Mosque | null>(null);
   prayerTimes = signal<PrayerTimesDaily | null>(null);
@@ -59,16 +60,35 @@ export class DemoMosqueComponent implements OnInit, OnDestroy {
   private tourCancelled = false;
   private tourProgrammaticScroll = false;
   private userScrollHandler?: () => void;
-  readonly slug = environment.defaultMosqueSlug;
+  slug = environment.defaultMosqueSlug;
+  isPublicProfile = false;
 
   private readonly tourSections = [
     'demo-hero', 'jamaat', 'announcements', 'events', 'dua', 'demo-footer'
   ];
 
   ngOnInit(): void {
-    const mosqueId = environment.defaultMosqueId;
+    const slugParam = this.route.snapshot.paramMap.get('slug');
+    this.slug = slugParam ?? environment.defaultMosqueSlug;
+    this.isPublicProfile = !!slugParam;
+
+    this.mosqueService.getBySlug(this.slug).subscribe({
+      next: (mosque) => this.loadMosqueData(mosque),
+      error: () => this.onDemoReady()
+    });
+
+    this.timer = setInterval(() => {
+      const pt = this.prayerTimes();
+      if (pt) this.tickPrayer(pt);
+      const j = this.jumuah();
+      if (j.length) this.tickJumuah(j);
+    }, 1000);
+  }
+
+  private loadMosqueData(mosque: Mosque): void {
+    const mosqueId = mosque.id;
     forkJoin({
-      mosque: this.mosqueService.getBySlug(this.slug),
+      mosque: of(mosque),
       prayers: this.mosqueService.getDailyPrayerTimes(mosqueId),
       jumuah: this.mosqueService.getJumuahTimes(mosqueId),
       announcements: this.mosqueService.getAnnouncements(mosqueId),
@@ -90,13 +110,6 @@ export class DemoMosqueComponent implements OnInit, OnDestroy {
       },
       error: () => this.onDemoReady()
     });
-
-    this.timer = setInterval(() => {
-      const pt = this.prayerTimes();
-      if (pt) this.tickPrayer(pt);
-      const j = this.jumuah();
-      if (j.length) this.tickJumuah(j);
-    }, 1000);
   }
 
   ngOnDestroy(): void {
@@ -117,7 +130,7 @@ export class DemoMosqueComponent implements OnInit, OnDestroy {
 
   private onDemoReady(): void {
     this.loading.set(false);
-    this.scheduleTourStart();
+    if (!this.isPublicProfile) this.scheduleTourStart();
   }
 
   private scheduleTourStart(force = false): void {

@@ -12,16 +12,16 @@
   html {
     height: 100%;
     width: 100%;
-    font-size: 17px;
+    font-size: 13px;
     -webkit-text-size-adjust: 100%;
   }
 
   @media (min-width: 640px) {
-    html { font-size: 18px; }
+    html { font-size: 14px; }
   }
 
   @media (min-width: 1024px) {
-    html { font-size: 19px; }
+    html { font-size: 15px; }
   }
 
   body {
@@ -32,7 +32,7 @@
     overflow-x: hidden;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     font-size: 1rem;
-    line-height: 1.6;
+    line-height: 1.5;
     background-color: #022c22;
     color: #ecfdf5;
   }
@@ -72,42 +72,91 @@
 
   .app-section {
     width: 100%;
-    padding-left: max(1rem, env(safe-area-inset-left));
-    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+    padding-right: max(0.75rem, env(safe-area-inset-right));
   }
 
   .text-label {
-    @apply text-sm sm:text-base font-bold uppercase tracking-widest;
+    @apply text-xs sm:text-sm font-bold uppercase tracking-widest;
   }
 
   .text-meta {
-    @apply text-sm text-emerald-400 leading-relaxed;
+    @apply text-xs sm:text-sm text-emerald-400 leading-relaxed;
   }
 
   .text-stat-label {
-    @apply text-sm sm:text-base text-emerald-300;
+    @apply text-xs sm:text-sm text-emerald-300;
   }
 
   .text-body {
-    @apply text-base leading-relaxed;
+    @apply text-sm sm:text-base leading-relaxed;
   }
 
   .text-body-muted {
-    @apply text-base text-emerald-200 leading-relaxed;
+    @apply text-sm sm:text-base text-emerald-200 leading-relaxed;
   }
 
   .heading-page {
-    @apply text-3xl sm:text-4xl font-bold text-white;
+    @apply text-xl sm:text-2xl font-bold text-white tracking-tight;
   }
 
   .heading-section {
-    @apply text-xl sm:text-2xl font-bold text-white;
+    @apply text-base sm:text-lg font-semibold text-white;
+  }
+
+  /* Super Admin / mosque admin shared UI */
+  .admin-toolbar {
+    @apply flex flex-wrap items-center justify-between gap-2.5 mb-3;
+  }
+
+  .admin-search {
+    @apply w-full sm:max-w-xs bg-[#022c22] border border-emerald-800 rounded-lg px-2.5 py-2 text-xs sm:text-sm text-white placeholder:text-emerald-600 focus:outline-none focus:border-amber-500/50;
+  }
+
+  .admin-input {
+    @apply w-full bg-[#022c22] border border-emerald-800 rounded-lg px-2.5 py-2 text-xs sm:text-sm text-white placeholder:text-emerald-600 focus:outline-none focus:border-amber-500/50;
+  }
+
+  .admin-btn {
+    @apply inline-flex items-center justify-center gap-1.5 bg-amber-500 text-[#022c22] font-semibold text-xs sm:text-sm px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border-none cursor-pointer transition hover:bg-amber-400 disabled:opacity-50 disabled:cursor-wait;
+  }
+
+  .admin-btn--ghost {
+    @apply bg-transparent text-emerald-200 border border-emerald-700 hover:border-amber-500/40 hover:text-amber-300;
+  }
+
+  .admin-btn--success {
+    @apply bg-emerald-500 text-[#022c22] hover:bg-emerald-400;
+  }
+
+  .admin-btn--danger {
+    @apply bg-red-500 text-white hover:bg-red-400;
+  }
+
+  .admin-empty {
+    @apply text-center py-10 px-4 bg-[#064e3b] border border-dashed border-emerald-800 rounded-xl;
+  }
+
+  .admin-empty-title {
+    @apply text-white font-semibold text-sm sm:text-base m-0;
+  }
+
+  .admin-empty-desc {
+    @apply text-emerald-300/80 text-xs sm:text-sm mt-2 m-0 max-w-md mx-auto;
+  }
+
+  .admin-role-pill {
+    @apply inline-flex items-center gap-1 text-xs font-medium bg-emerald-950 text-emerald-200 px-2.5 py-1 rounded-full border border-emerald-800;
+  }
+
+  .admin-meta {
+    @apply text-sm text-emerald-400/90;
   }
 
   @media (min-width: 640px) {
     .app-section {
-      padding-left: max(1.5rem, env(safe-area-inset-left));
-      padding-right: max(1.5rem, env(safe-area-inset-right));
+      padding-left: max(1.25rem, env(safe-area-inset-left));
+      padding-right: max(1.25rem, env(safe-area-inset-right));
     }
   }
 

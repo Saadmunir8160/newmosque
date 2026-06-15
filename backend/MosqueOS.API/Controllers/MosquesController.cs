@@ -38,6 +38,36 @@ namespace MosqueOS.API.Controllers
             return Ok(await query.OrderBy(m => m.Name).ToListAsync());
         }
 
+        /// <summary>Owner's mosque (by OwnerId) with profile completeness hints.</summary>
+        [Authorize(Roles = Roles.MosqueOwner)]
+        [HttpGet("my-mosque")]
+        public async Task<IActionResult> GetOwnerMosque()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            var mosque = await _unitOfWork.Repository<Mosque>().QueryNoTracking()
+                .FirstOrDefaultAsync(m => m.OwnerId == userId);
+
+            if (mosque == null)
+                return Ok(new { mosque = (Mosque?)null, profileCompleteness = 0, missingFields = Array.Empty<string>() });
+
+            var fields = new Dictionary<string, string?>
+            {
+                ["name"] = mosque.Name,
+                ["address"] = mosque.Address,
+                ["city"] = mosque.City,
+                ["postcode"] = mosque.Postcode,
+                ["phone"] = mosque.Phone,
+                ["email"] = mosque.Email,
+                ["description"] = mosque.Description,
+                ["logoUrl"] = mosque.LogoUrl,
+                ["bannerUrl"] = mosque.BannerUrl,
+            };
+            var missing = fields.Where(f => string.IsNullOrWhiteSpace(f.Value)).Select(f => f.Key).ToList();
+            var completeness = (int)Math.Round((fields.Count - missing.Count) / (double)fields.Count * 100);
+
+            return Ok(new { mosque, profileCompleteness = completeness, missingFields = missing });
+        }
+
         [HttpGet("{slug}")]
         public async Task<IActionResult> GetBySlug(string slug)
         {
@@ -87,21 +117,99 @@ namespace MosqueOS.API.Controllers
         }
 
         /// <summary>Mosque owner claims an unclaimed listing (manual approval in MVP).</summary>
-        [Authorize]
+        [Authorize(Roles = Roles.MosqueOwner)]
         [HttpPost("{id:int}/claim")]
         public async Task<IActionResult> Claim(int id)
         {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            var existing = await _unitOfWork.Repository<Mosque>().Query()
+                .FirstOrDefaultAsync(m => m.OwnerId == userId && m.Status == MosqueStatus.Claimed);
+            if (existing != null)
+                return Conflict(new { message = "You already have a pending claim awaiting verification." });
+
             var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
             if (mosque == null) return NotFound();
             if (mosque.Status != MosqueStatus.Unclaimed)
                 return Conflict(new { message = "Mosque has already been claimed." });
 
             mosque.Status = MosqueStatus.Claimed;
-            mosque.OwnerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            mosque.OwnerId = userId;
             mosque.UpdatedAt = DateTime.UtcNow;
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user != null)
+            {
+                user.HomeMosqueId = id;
+                await _userManager.UpdateAsync(user);
+            }
+
             await _unitOfWork.SaveChangesAsync();
 
-            return Ok(new { message = "Claim submitted. Awaiting super admin verification." });
+            return Ok(new { message = "Claim submitted. Awaiting super admin verification.", mosque });
+        }
+
+        /// <summary>Staff linked to this mosque (home mosque + roles).</summary>
+        [Authorize(Roles = Roles.MosqueManagers)]
+        [HttpGet("{id:int}/staff")]
+        public async Task<IActionResult> GetStaff(int id)
+        {
+            var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
+            if (mosque == null) return NotFound();
+
+            var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
+            if (!isSuperAdmin && mosque.OwnerId != actorId && !User.IsInRole(Roles.MosqueAdmin))
+                return Forbid();
+
+            var users = await _userManager.Users.Where(u => u.HomeMosqueId == id).ToListAsync();
+            var staffRoles = new[]
+            {
+                Roles.MosqueAdmin, Roles.PrayerTimesEditor, Roles.Teacher,
+                Roles.ContentEditor, Roles.Muqaddam
+            };
+
+            var result = new List<object>();
+            foreach (var u in users)
+            {
+                var roles = await _userManager.GetRolesAsync(u);
+                var mosqueRoles = roles.Where(r => staffRoles.Contains(r)).ToList();
+                if (mosqueRoles.Count == 0 && u.Id == mosque.OwnerId) continue;
+                result.Add(new
+                {
+                    u.Id,
+                    u.UserName,
+                    u.Email,
+                    u.FullName,
+                    Roles = mosqueRoles
+                });
+            }
+
+            return Ok(result);
+        }
+
+        /// <summary>Remove a staff role from a user at this mosque.</summary>
+        [Authorize(Roles = Roles.MosqueOwner + "," + Roles.MosqueAdmin + "," + Roles.SuperAdmin)]
+        [HttpDelete("{id:int}/staff")]
+        public async Task<IActionResult> RemoveStaff(int id, [FromQuery] string userId, [FromQuery] string role)
+        {
+            var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
+            if (mosque == null) return NotFound();
+
+            if (mosque.Status != MosqueStatus.Active && !User.IsInRole(Roles.SuperAdmin))
+                return BadRequest(new { message = "Staff management is available after super admin verification (ACTIVE status)." });
+
+            var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!User.IsInRole(Roles.SuperAdmin) && mosque.OwnerId != actorId && !User.IsInRole(Roles.MosqueAdmin))
+                return Forbid();
+
+            if (role == Roles.SuperAdmin || role == Roles.MosqueOwner)
+                return BadRequest(new { message = "Cannot remove this role via staff management." });
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null) return NotFound();
+
+            await _userManager.RemoveFromRoleAsync(user, role);
+            return Ok(new { message = $"Removed {role} from {user.UserName}." });
         }
 
         [Authorize(Roles = Roles.SuperAdmin)]
@@ -152,6 +260,9 @@ namespace MosqueOS.API.Controllers
         {
             var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
             if (mosque == null) return NotFound();
+
+            if (mosque.Status != MosqueStatus.Active && !User.IsInRole(Roles.SuperAdmin))
+                return BadRequest(new { message = "Assign staff after your mosque is verified (ACTIVE status)." });
 
             var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);

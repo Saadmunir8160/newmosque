@@ -14,7 +14,7 @@ import { CardComponent } from '../../shared/ui/card.component';
       <h4 class="text-white font-bold text-lg">{{ c.name }}</h4>
       <p class="text-emerald-300 text-sm mb-4">{{ c.schedule }}</p>
       <ul class="space-y-1">
-        <li *ngFor="let e of c.enrolments" class="text-emerald-100 text-sm">• {{ e.student?.name }} ({{ e.status }})</li>
+        <li *ngFor="let e of c.enrolments" class="text-emerald-100 text-sm">• {{ e.student.name }} ({{ e.status }})</li>
       </ul>
     </app-card>
   `

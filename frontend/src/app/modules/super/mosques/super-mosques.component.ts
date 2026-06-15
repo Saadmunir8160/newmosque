@@ -12,38 +12,72 @@ import { Mosque } from '../../../core/models';
   standalone: true,
   imports: [CommonModule, FormsModule, PageHeaderComponent, CardComponent],
   template: `
-    <app-page-header badge="Super Admin" title="Mosque Listings" subtitle="Create and seed unclaimed mosque listings for rollout" />
-    <app-card>
-      <h3 class="text-white font-bold mb-4">Seed New Mosque Listing</h3>
+    <app-page-header
+      badge="Super Admin"
+      title="Mosque listings"
+      subtitle="Add unclaimed mosques for rollout and monitor status across Bradford and beyond." />
+
+    <app-card class="block mb-5">
+      <h3 class="heading-section text-base mb-1">Add new listing</h3>
+      <p class="text-sm text-emerald-300/80 mb-4">Creates an unclaimed mosque ready for an owner to claim later.</p>
       <div class="grid md:grid-cols-2 gap-3 mb-4">
-        <input class="input" placeholder="Name" [(ngModel)]="form.name">
-        <input class="input" placeholder="Slug" [(ngModel)]="form.slug">
-        <input class="input" placeholder="City" [(ngModel)]="form.city">
-        <input class="input" placeholder="Postcode" [(ngModel)]="form.postcode">
-        <input class="input md:col-span-2" placeholder="Address" [(ngModel)]="form.address">
-        <textarea class="input md:col-span-2" rows="2" placeholder="Description" [(ngModel)]="form.description"></textarea>
+        <div>
+          <label class="block text-xs text-emerald-400 mb-1">Mosque name</label>
+          <input class="admin-input" placeholder="Masjid Al-Noor" [(ngModel)]="form.name">
+        </div>
+        <div>
+          <label class="block text-xs text-emerald-400 mb-1">URL slug</label>
+          <input class="admin-input" placeholder="masjid-al-noor-bradford" [(ngModel)]="form.slug">
+        </div>
+        <div>
+          <label class="block text-xs text-emerald-400 mb-1">City</label>
+          <input class="admin-input" [(ngModel)]="form.city">
+        </div>
+        <div>
+          <label class="block text-xs text-emerald-400 mb-1">Postcode</label>
+          <input class="admin-input" placeholder="BD1 1AA" [(ngModel)]="form.postcode">
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-xs text-emerald-400 mb-1">Address</label>
+          <input class="admin-input" [(ngModel)]="form.address">
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-xs text-emerald-400 mb-1">Short description</label>
+          <textarea class="admin-input" rows="2" [(ngModel)]="form.description"></textarea>
+        </div>
       </div>
-      <button class="btn" (click)="seed()">Seed Listing (Unclaimed)</button>
-      <p *ngIf="msg()" class="text-emerald-300 text-sm mt-2">{{ msg() }}</p>
+      <button type="button" class="admin-btn" (click)="seed()">Create listing</button>
+      <p *ngIf="msg()" class="text-sm mt-3" [class.text-emerald-300]="msgOk()" [class.text-red-300]="!msgOk()">{{ msg() }}</p>
     </app-card>
-    <div class="mt-6 space-y-3">
-      <app-card *ngFor="let m of mosques()">
-        <div class="flex justify-between items-start">
+
+    <h3 class="heading-section text-base mb-3">All listings ({{ mosques().length }})</h3>
+    <div class="space-y-3">
+      <app-card *ngFor="let m of mosques()" [interactive]="true">
+        <div class="flex justify-between items-start gap-3">
           <div>
-            <h4 class="text-white font-bold">{{ m.name }}</h4>
-            <p class="text-emerald-300 text-sm">{{ m.city }} · <span [class.text-amber-400]="m.status==='Claimed'" [class.text-green-400]="m.status==='Active'">{{ m.status }}</span></p>
+            <h4 class="text-white font-semibold m-0">{{ m.name }}</h4>
+            <p class="admin-meta mt-1">{{ m.city }} · {{ m.postcode || '—' }}</p>
           </div>
+          <span class="text-xs font-bold uppercase tracking-wide px-2 py-1 rounded-full border status-pill"
+            [attr.data-status]="m.status">
+            {{ m.status }}
+          </span>
         </div>
       </app-card>
     </div>
   `,
-  styles: [`.input{background:#022c22;border:1px solid #065f46;border-radius:8px;padding:10px;color:#fff;width:100%}.btn{background:#f59e0b;color:#022c22;font-weight:700;padding:10px 20px;border-radius:8px;border:none;cursor:pointer}`]
+  styles: [`
+    .status-pill[data-status="Active"] { color: #6ee7b7; border-color: #047857; }
+    .status-pill[data-status="Claimed"] { color: #fcd34d; border-color: rgba(245, 158, 11, 0.45); }
+    .status-pill[data-status="Unclaimed"] { color: #94a3b8; border-color: #475569; }
+  `]
 })
 export class SuperMosquesComponent implements OnInit {
   private admin = inject(AdminService);
   private platform = inject(PlatformService);
   mosques = signal<Mosque[]>([]);
   msg = signal('');
+  msgOk = signal(true);
   form = { name: '', slug: '', city: 'Bradford', postcode: '', address: '', description: '' };
 
   ngOnInit(): void { this.load(); }
@@ -55,11 +89,15 @@ export class SuperMosquesComponent implements OnInit {
   seed(): void {
     this.platform.seedMosque({ ...this.form, country: 'United Kingdom', timezone: 'Europe/London' }).subscribe({
       next: () => {
-        this.msg.set('Mosque listing seeded as Unclaimed.');
+        this.msg.set('Listing created successfully.');
+        this.msgOk.set(true);
         this.form = { name: '', slug: '', city: 'Bradford', postcode: '', address: '', description: '' };
         this.load();
       },
-      error: () => this.msg.set('Failed — slug may already exist.')
+      error: () => {
+        this.msg.set('Could not create listing — check the slug is unique.');
+        this.msgOk.set(false);
+      }
     });
   }
 }

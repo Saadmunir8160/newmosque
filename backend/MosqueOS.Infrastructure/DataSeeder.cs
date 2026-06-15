@@ -36,6 +36,40 @@ namespace MosqueOS.Infrastructure
             await EnsureUser(userManager, "google_user", "google.user@mosqueos.uk", "Google Member", "Google@123", Roles.Member);
             await EnsureUser(userManager, "facebook_user", "facebook.user@mosqueos.uk", "Facebook Member", "Facebook@123", Roles.Member);
 
+            // Idempotent: ensure demo owner is linked to the Bradford mosque
+            var existingDemo = await db.Mosques.FirstOrDefaultAsync(m => m.Slug == "masjid-al-noor-bradford");
+            if (existingDemo != null)
+            {
+                if (string.IsNullOrEmpty(existingDemo.OwnerId))
+                {
+                    existingDemo.OwnerId = owner.Id;
+                    existingDemo.Status = MosqueStatus.Active;
+                }
+                if (owner.HomeMosqueId != existingDemo.Id)
+                {
+                    owner.HomeMosqueId = existingDemo.Id;
+                    await userManager.UpdateAsync(owner);
+                }
+                await db.SaveChangesAsync();
+            }
+
+            // Idempotent: ensure at least one unclaimed listing exists for claim flow testing
+            if (!await db.Mosques.AnyAsync(m => m.Status == MosqueStatus.Unclaimed))
+            {
+                db.Mosques.Add(new Mosque
+                {
+                    Name = "Masjid Al-Huda Leeds",
+                    Slug = "masjid-al-huda-leeds",
+                    Address = "45 Roundhay Road",
+                    City = "Leeds",
+                    Postcode = "LS8 5AN",
+                    Country = "United Kingdom",
+                    Description = "Community mosque in Leeds — awaiting an owner to claim this listing.",
+                    Status = MosqueStatus.Unclaimed
+                });
+                await db.SaveChangesAsync();
+            }
+
             if (await db.Mosques.AnyAsync()) return; // demo data already seeded
 
             // ---- 3.1 Sample mosque (Bradford) ----
@@ -55,6 +89,23 @@ namespace MosqueOS.Infrastructure
                 OwnerId = owner.Id
             };
             db.Mosques.Add(mosque);
+            await db.SaveChangesAsync();
+
+            owner.HomeMosqueId = mosque.Id;
+            await userManager.UpdateAsync(owner);
+
+            // Unclaimed listing for owner claim flow demos
+            db.Mosques.Add(new Mosque
+            {
+                Name = "Masjid Al-Huda Leeds",
+                Slug = "masjid-al-huda-leeds",
+                Address = "45 Roundhay Road",
+                City = "Leeds",
+                Postcode = "LS8 5AN",
+                Country = "United Kingdom",
+                Description = "Community mosque in Leeds — awaiting an owner to claim this listing.",
+                Status = MosqueStatus.Unclaimed
+            });
             await db.SaveChangesAsync();
 
             // Module feature flags

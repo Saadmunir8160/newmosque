@@ -36,7 +36,7 @@ import { JumuahTime, PrayerTimesDaily } from '../../../core/models';
       </div>
       <div class="space-y-2">
         <div *ngFor="let j of jumuah()" class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 py-2 border-b border-emerald-800">
-          <span class="text-white min-w-0 break-anywhere">Jamaat {{ j.slotNumber }} — {{ j.jamaatTime?.slice(0,5) }}</span>
+          <span class="text-white min-w-0 break-anywhere">Jamaat {{ j.slotNumber }} — {{ j.jamaatTime.slice(0,5) }}</span>
           <button class="text-red-400 text-sm shrink-0 self-start sm:self-center" (click)="removeJumuah(j.id)">Remove</button>
         </div>
       </div>

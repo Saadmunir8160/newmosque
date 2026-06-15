@@ -71,6 +71,20 @@ export class TeacherDashboardComponent implements OnInit {
       desc: 'Mark who attended today\'s session.',
       steps: ['Select class and date', 'Mark each student present or absent', 'Save — parents can view in portal'],
     },
+    {
+      step: 3,
+      route: '/dashboard/teacher/progress-notes',
+      title: 'Progress Notes',
+      desc: 'Add notes for each student and class.',
+      steps: ['Select class and student', 'Write lesson feedback', 'Save notes for parent/admin review'],
+    },
+    {
+      step: 4,
+      route: '/dashboard/teacher/reports',
+      title: 'Class Reports',
+      desc: 'Review attendance summary across your classes.',
+      steps: ['Open class attendance summary', 'Track present/absent/late split', 'Use trends for follow-up actions'],
+    },
   ];
 
   ngOnInit(): void {

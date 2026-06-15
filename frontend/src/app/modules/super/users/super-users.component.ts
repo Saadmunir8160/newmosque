@@ -11,45 +11,90 @@ import { ROLES } from '../../../core/constants/roles';
   standalone: true,
   imports: [CommonModule, FormsModule, PageHeaderComponent, CardComponent],
   template: `
-    <app-page-header badge="Super Admin" title="User Management" subtitle="Assign roles to platform users" />
+    <app-page-header
+      badge="Super Admin"
+      title="Users & roles"
+      subtitle="Manage platform accounts and assign permissions. Changes apply immediately." />
 
-    <app-card *ngFor="let u of users()" class="block mb-4">
-      <div class="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
-        <div>
-          <h4 class="text-white font-bold">{{ u.fullName || u.userName }}</h4>
-          <p class="text-emerald-300 text-sm">{{ u.userName }} · {{ u.email }}</p>
-          <div class="flex flex-wrap gap-2 mt-2">
-            <span *ngFor="let r of u.roles" class="text-sm bg-emerald-900 text-emerald-200 px-2 py-1 rounded">
+    <div class="admin-toolbar">
+      <input class="admin-search" type="search" placeholder="Search name, username or email…"
+        [(ngModel)]="query" (ngModelChange)="onSearch()">
+      <span class="admin-meta">{{ filtered().length }} of {{ users().length }} users</span>
+    </div>
+
+    <div *ngIf="!filtered().length" class="admin-empty">
+      <p class="admin-empty-title">{{ users().length ? 'No matches' : 'No users yet' }}</p>
+      <p class="admin-empty-desc">
+        {{ users().length ? 'Try a different search term.' : 'Users appear here after they register or are seeded.' }}
+      </p>
+    </div>
+
+    <app-card *ngFor="let u of filtered()" class="block mb-3" [interactive]="true">
+      <div class="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
+        <div class="min-w-0">
+          <h4 class="text-white font-semibold text-base m-0">{{ u.fullName || u.userName }}</h4>
+          <p class="admin-meta mt-1">{{ u.userName }} · {{ u.email || 'No email' }}</p>
+          <p class="text-xs text-emerald-600 mt-1">Joined {{ u.createdAt | date:'mediumDate' }}</p>
+          <div class="flex flex-wrap gap-2 mt-3">
+            <span *ngFor="let r of u.roles" class="admin-role-pill">
               {{ r }}
-              <button *ngIf="r !== 'Super Admin'" class="ml-1 text-red-400" (click)="removeRole(u.id, r)">×</button>
+              <button *ngIf="r !== 'Super Admin'" type="button" class="text-red-400 hover:text-red-300 ml-0.5"
+                (click)="removeRole(u.id, r)" title="Remove role">×</button>
             </span>
+            <span *ngIf="!u.roles.length" class="text-xs text-emerald-600 italic">No roles assigned</span>
           </div>
         </div>
-        <div class="flex gap-2 items-center">
-          <select class="input" [(ngModel)]="rolePick[u.id]">
-            <option value="">Add role...</option>
+        <div class="flex flex-wrap gap-2 items-center shrink-0">
+          <select class="admin-input max-w-[11rem]" [(ngModel)]="rolePick[u.id]">
+            <option value="">Add role…</option>
             <option *ngFor="let r of allRoles" [value]="r">{{ r }}</option>
           </select>
-          <button class="btn" (click)="assign(u.id)">Assign</button>
+          <button type="button" class="admin-btn" (click)="assign(u.id)">Assign</button>
         </div>
       </div>
     </app-card>
-  `,
-  styles: [`.input{background:#022c22;border:1px solid #065f46;border-radius:8px;padding:8px;color:#fff}.btn{background:#f59e0b;color:#022c22;font-weight:700;padding:8px 14px;border-radius:8px;border:none;cursor:pointer}`]
+  `
 })
 export class SuperUsersComponent implements OnInit {
   private platform = inject(PlatformService);
   users = signal<PlatformUser[]>([]);
+  filtered = signal<PlatformUser[]>([]);
   allRoles = Object.values(ROLES);
   rolePick: Record<string, string> = {};
+  query = '';
 
   ngOnInit(): void { this.load(); }
-  load(): void { this.platform.getUsers().subscribe(u => this.users.set(u)); }
+
+  load(): void {
+    this.platform.getUsers().subscribe(u => {
+      this.users.set(u);
+      this.applyFilter();
+    });
+  }
+
+  onSearch(): void { this.applyFilter(); }
+
+  private applyFilter(): void {
+    const q = this.query.trim().toLowerCase();
+    const list = this.users();
+    if (!q) {
+      this.filtered.set(list);
+      return;
+    }
+    this.filtered.set(list.filter(u =>
+      (u.fullName?.toLowerCase().includes(q)) ||
+      u.userName.toLowerCase().includes(q) ||
+      (u.email?.toLowerCase().includes(q))
+    ));
+  }
 
   assign(userId: string): void {
     const role = this.rolePick[userId];
     if (!role) return;
-    this.platform.assignRole(userId, role).subscribe(() => { this.rolePick[userId] = ''; this.load(); });
+    this.platform.assignRole(userId, role).subscribe(() => {
+      this.rolePick[userId] = '';
+      this.load();
+    });
   }
 
   removeRole(userId: string, role: string): void {

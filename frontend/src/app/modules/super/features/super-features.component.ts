@@ -6,28 +6,63 @@ import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
 import { CardComponent } from '../../../shared/ui/card.component';
 import { Mosque, MosqueSetting } from '../../../core/models';
 
+const MODULE_LABELS: Record<string, string> = {
+  PrayerTimes: 'Prayer times',
+  Announcements: 'Announcements',
+  Events: 'Events',
+  Madrassah: 'Madrassah',
+  Communities: 'Communities',
+  Awrad: 'Awrad & Wird',
+  Adhkar: 'Daily adhkar',
+  Duas: 'Duas library',
+  Quran: 'Qur\'an plans',
+  RitualGuides: 'Ritual guides',
+  Janaza: 'Janaza',
+  DeathReadings: 'Death readings',
+  Participation: 'Community participation',
+  JourneyGuides: 'Umrah & Hajj guides',
+};
+
 @Component({
   selector: 'app-super-features',
   standalone: true,
   imports: [CommonModule, FormsModule, PageHeaderComponent, CardComponent],
   template: `
-    <app-page-header badge="Super Admin" title="Feature Flags" subtitle="Enable or disable modules for any mosque" />
+    <app-page-header
+      badge="Super Admin"
+      title="Module toggles"
+      subtitle="Turn features on or off for each mosque. Disabled modules are hidden from that mosque's menu." />
 
-    <app-card class="mb-6">
-      <select class="input" [(ngModel)]="mosqueId" (ngModelChange)="loadSettings()">
-        <option [ngValue]="0">Select mosque...</option>
-        <option *ngFor="let m of mosques()" [ngValue]="m.id">{{ m.name }}</option>
+    <app-card class="block mb-4">
+      <label class="block text-xs text-emerald-400 mb-1">Select mosque</label>
+      <select class="admin-input" [(ngModel)]="mosqueId" (ngModelChange)="loadSettings()">
+        <option [ngValue]="0">Choose a mosque…</option>
+        <option *ngFor="let m of mosques()" [ngValue]="m.id">{{ m.name }} ({{ m.city }})</option>
       </select>
     </app-card>
 
-    <app-card *ngFor="let s of settings()" class="block mb-3">
+    <div *ngIf="mosqueId && !settings().length" class="admin-empty">
+      <p class="admin-empty-title">No modules configured</p>
+      <p class="admin-empty-desc">This mosque has no feature flags yet.</p>
+    </div>
+
+    <div *ngIf="!mosqueId" class="admin-empty">
+      <p class="admin-empty-desc">Select a mosque above to manage its modules.</p>
+    </div>
+
+    <app-card *ngFor="let s of settings()" class="block mb-2" [interactive]="true">
       <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-        <span class="text-white font-bold min-w-0 break-anywhere">{{ s.moduleKey }}</span>
-        <button class="btn shrink-0 self-start sm:self-center" [class.off]="!s.isEnabled" (click)="toggle(s)">{{ s.isEnabled ? 'Enabled' : 'Disabled' }}</button>
+        <div>
+          <span class="text-white font-medium">{{ moduleLabel(s.moduleKey) }}</span>
+          <p class="text-xs text-emerald-600 m-0 mt-0.5">{{ s.moduleKey }}</p>
+        </div>
+        <button type="button" class="admin-btn shrink-0" [class.admin-btn--ghost]="!s.isEnabled"
+          [class.admin-btn--success]="s.isEnabled" (click)="toggle(s)">
+          {{ s.isEnabled ? 'Enabled' : 'Disabled' }}
+        </button>
       </div>
     </app-card>
-  `,
-  styles: [`.input{background:#022c22;border:1px solid #065f46;border-radius:8px;padding:10px;color:#fff;width:100%}.btn{background:#10b981;color:#022c22;font-weight:700;padding:6px 14px;border-radius:6px;border:none;cursor:pointer}.off{background:#64748b;color:#fff}`]
+  `
 })
 export class SuperFeaturesComponent implements OnInit {
   private admin = inject(AdminService);
@@ -36,6 +71,10 @@ export class SuperFeaturesComponent implements OnInit {
   mosqueId = 0;
 
   ngOnInit(): void { this.admin.getAllMosques().subscribe(m => this.mosques.set(m)); }
+
+  moduleLabel(key: string): string {
+    return MODULE_LABELS[key] ?? key;
+  }
 
   loadSettings(): void {
     if (!this.mosqueId) { this.settings.set([]); return; }
