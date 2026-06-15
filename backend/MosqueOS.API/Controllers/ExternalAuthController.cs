@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authentication.Facebook;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using MosqueOS.API.Services;
+using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
 using System.Security.Claims;
@@ -16,14 +16,14 @@ namespace MosqueOS.API.Controllers
     {
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly UserManager<ApplicationUser> _userManager;
-        private readonly JwtTokenService _jwt;
+        private readonly IJwtTokenService _jwt;
         private readonly IConfiguration _configuration;
         private readonly IWebHostEnvironment _environment;
 
         public ExternalAuthController(
             SignInManager<ApplicationUser> signInManager,
             UserManager<ApplicationUser> userManager,
-            JwtTokenService jwt,
+            IJwtTokenService jwt,
             IConfiguration configuration,
             IWebHostEnvironment environment)
         {

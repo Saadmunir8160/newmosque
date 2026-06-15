@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
-using MosqueOS.Infrastructure;
 using System.Security.Claims;
 
 namespace MosqueOS.API.Controllers
@@ -12,21 +12,21 @@ namespace MosqueOS.API.Controllers
     [ApiController]
     public class PrayerTimesController : ControllerBase
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public PrayerTimesController(ApplicationDbContext db) => _db = db;
+        public PrayerTimesController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
 
         /// <summary>Public daily timetable. Defaults to today (Europe/London).</summary>
         [HttpGet("daily")]
         public async Task<IActionResult> GetDaily(int mosqueId, [FromQuery] DateOnly? date)
         {
             var target = date ?? TodayLondon();
-            var row = await _db.PrayerTimesDaily.AsNoTracking()
+            var row = await _unitOfWork.Repository<PrayerTimesDaily>().QueryNoTracking()
                 .FirstOrDefaultAsync(p => p.MosqueId == mosqueId && p.Date == target);
 
             if (row == null) return NotFound(new { message = "No prayer times for this date." });
 
-            var exceptions = await _db.PrayerExceptions.AsNoTracking()
+            var exceptions = await _unitOfWork.Repository<PrayerException>().QueryNoTracking()
                 .Where(e => e.MosqueId == mosqueId && e.Date == target)
                 .ToListAsync();
 
@@ -44,7 +44,7 @@ namespace MosqueOS.API.Controllers
                 month = today.Month;
             }
 
-            var rows = await _db.PrayerTimesDaily.AsNoTracking()
+            var rows = await _unitOfWork.Repository<PrayerTimesDaily>().QueryNoTracking()
                 .Where(p => p.MosqueId == mosqueId && p.Date.Year == year && p.Date.Month == month)
                 .OrderBy(p => p.Date)
                 .ToListAsync();
@@ -56,14 +56,14 @@ namespace MosqueOS.API.Controllers
         [HttpPut("daily")]
         public async Task<IActionResult> UpsertDaily(int mosqueId, [FromBody] PrayerTimesDaily input)
         {
-            var row = await _db.PrayerTimesDaily
+            var row = await _unitOfWork.Repository<PrayerTimesDaily>().Query()
                 .FirstOrDefaultAsync(p => p.MosqueId == mosqueId && p.Date == input.Date);
 
             if (row == null)
             {
                 input.MosqueId = mosqueId;
                 input.Id = 0;
-                _db.PrayerTimesDaily.Add(input);
+                _unitOfWork.Repository<PrayerTimesDaily>().Add(input);
                 row = input;
             }
             else
@@ -77,7 +77,7 @@ namespace MosqueOS.API.Controllers
             }
 
             // Audit trail (spec section 9)
-            _db.PrayerTimeAuditLogs.Add(new PrayerTimeAuditLog
+            _unitOfWork.Repository<PrayerTimeAuditLog>().Add(new PrayerTimeAuditLog
             {
                 MosqueId = mosqueId,
                 Date = input.Date,
@@ -85,7 +85,7 @@ namespace MosqueOS.API.Controllers
                 ChangeDescription = $"Daily prayer times upserted for {input.Date:yyyy-MM-dd}"
             });
 
-            await _db.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
             return Ok(row);
         }
 
@@ -93,7 +93,7 @@ namespace MosqueOS.API.Controllers
 
         [HttpGet("jumuah")]
         public async Task<IActionResult> GetJumuah(int mosqueId) =>
-            Ok(await _db.JumuahTimes.AsNoTracking()
+            Ok(await _unitOfWork.Repository<JumuahTime>().QueryNoTracking()
                 .Where(j => j.MosqueId == mosqueId)
                 .OrderBy(j => j.SlotNumber)
                 .ToListAsync());
@@ -104,8 +104,8 @@ namespace MosqueOS.API.Controllers
         {
             slot.MosqueId = mosqueId;
             slot.Id = 0;
-            _db.JumuahTimes.Add(slot);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<JumuahTime>().Add(slot);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(slot);
         }
 
@@ -113,12 +113,12 @@ namespace MosqueOS.API.Controllers
         [HttpDelete("jumuah/{slotId:int}")]
         public async Task<IActionResult> DeleteJumuah(int mosqueId, int slotId)
         {
-            var slot = await _db.JumuahTimes
+            var slot = await _unitOfWork.Repository<JumuahTime>().Query()
                 .FirstOrDefaultAsync(j => j.Id == slotId && j.MosqueId == mosqueId);
             if (slot == null) return NotFound();
 
-            _db.JumuahTimes.Remove(slot);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<JumuahTime>().Remove(slot);
+            await _unitOfWork.SaveChangesAsync();
             return NoContent();
         }
 
@@ -130,8 +130,8 @@ namespace MosqueOS.API.Controllers
         {
             ex.MosqueId = mosqueId;
             ex.Id = 0;
-            _db.PrayerExceptions.Add(ex);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<PrayerException>().Add(ex);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(ex);
         }
 
@@ -139,19 +139,19 @@ namespace MosqueOS.API.Controllers
         [HttpDelete("exceptions/{exceptionId:int}")]
         public async Task<IActionResult> DeleteException(int mosqueId, int exceptionId)
         {
-            var ex = await _db.PrayerExceptions
+            var ex = await _unitOfWork.Repository<PrayerException>().Query()
                 .FirstOrDefaultAsync(e => e.Id == exceptionId && e.MosqueId == mosqueId);
             if (ex == null) return NotFound();
 
-            _db.PrayerExceptions.Remove(ex);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<PrayerException>().Remove(ex);
+            await _unitOfWork.SaveChangesAsync();
             return NoContent();
         }
 
         [Authorize(Roles = Roles.Admins)]
         [HttpGet("audit-log")]
         public async Task<IActionResult> GetAuditLog(int mosqueId) =>
-            Ok(await _db.PrayerTimeAuditLogs.AsNoTracking()
+            Ok(await _unitOfWork.Repository<PrayerTimeAuditLog>().QueryNoTracking()
                 .Where(a => a.MosqueId == mosqueId)
                 .OrderByDescending(a => a.CreatedAt)
                 .Take(100)

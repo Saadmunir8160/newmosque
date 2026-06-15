@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using MosqueOS.API.Services;
+using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
@@ -13,9 +13,9 @@ namespace MosqueOS.API.Controllers
     public class AuthController : ControllerBase
     {
         private readonly UserManager<ApplicationUser> _userManager;
-        private readonly JwtTokenService _jwt;
+        private readonly IJwtTokenService _jwt;
 
-        public AuthController(UserManager<ApplicationUser> userManager, JwtTokenService jwt)
+        public AuthController(UserManager<ApplicationUser> userManager, IJwtTokenService jwt)
         {
             _userManager = userManager;
             _jwt = jwt;

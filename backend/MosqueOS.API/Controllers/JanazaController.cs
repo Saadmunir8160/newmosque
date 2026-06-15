@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
-using MosqueOS.Infrastructure;
 using System.Security.Claims;
 
 namespace MosqueOS.API.Controllers
@@ -13,13 +13,13 @@ namespace MosqueOS.API.Controllers
     [ApiController]
     public class JanazaController : ControllerBase
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public JanazaController(ApplicationDbContext db) => _db = db;
+        public JanazaController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
 
         [HttpGet]
         public async Task<IActionResult> GetAll(int mosqueId) =>
-            Ok(await _db.JanazaAnnouncements.AsNoTracking()
+            Ok(await _unitOfWork.Repository<JanazaAnnouncement>().QueryNoTracking()
                 .Where(j => j.MosqueId == mosqueId)
                 .OrderByDescending(j => j.JanazaDate)
                 .ToListAsync());
@@ -27,7 +27,7 @@ namespace MosqueOS.API.Controllers
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Get(int mosqueId, int id)
         {
-            var item = await _db.JanazaAnnouncements.AsNoTracking()
+            var item = await _unitOfWork.Repository<JanazaAnnouncement>().QueryNoTracking()
                 .FirstOrDefaultAsync(j => j.Id == id && j.MosqueId == mosqueId);
             return item == null ? NotFound() : Ok(item);
         }
@@ -38,8 +38,8 @@ namespace MosqueOS.API.Controllers
         {
             input.Id = 0;
             input.MosqueId = mosqueId;
-            _db.JanazaAnnouncements.Add(input);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<JanazaAnnouncement>().Add(input);
+            await _unitOfWork.SaveChangesAsync();
             return CreatedAtAction(nameof(Get), new { mosqueId, id = input.Id }, input);
         }
 
@@ -47,12 +47,12 @@ namespace MosqueOS.API.Controllers
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int mosqueId, int id)
         {
-            var item = await _db.JanazaAnnouncements
+            var item = await _unitOfWork.Repository<JanazaAnnouncement>().Query()
                 .FirstOrDefaultAsync(j => j.Id == id && j.MosqueId == mosqueId);
             if (item == null) return NotFound();
 
-            _db.JanazaAnnouncements.Remove(item);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<JanazaAnnouncement>().Remove(item);
+            await _unitOfWork.SaveChangesAsync();
             return NoContent();
         }
     }
@@ -61,13 +61,13 @@ namespace MosqueOS.API.Controllers
     [ApiController]
     public class DeathReadingsController : ControllerBase
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public DeathReadingsController(ApplicationDbContext db) => _db = db;
+        public DeathReadingsController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
 
         [HttpGet]
         public async Task<IActionResult> GetAll(int mosqueId) =>
-            Ok(await _db.ReadingCampaigns.AsNoTracking()
+            Ok(await _unitOfWork.Repository<ReadingCampaign>().QueryNoTracking()
                 .Where(c => c.MosqueId == mosqueId && c.IsActive)
                 .OrderByDescending(c => c.CreatedAt)
                 .ToListAsync());
@@ -76,7 +76,7 @@ namespace MosqueOS.API.Controllers
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Get(int mosqueId, int id)
         {
-            var campaign = await _db.ReadingCampaigns.AsNoTracking()
+            var campaign = await _unitOfWork.Repository<ReadingCampaign>().QueryNoTracking()
                 .Include(c => c.Allocations)
                 .FirstOrDefaultAsync(c => c.Id == id && c.MosqueId == mosqueId);
             if (campaign == null) return NotFound();
@@ -96,8 +96,8 @@ namespace MosqueOS.API.Controllers
             campaign.Id = 0;
             campaign.MosqueId = mosqueId;
             campaign.CreatedById = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            _db.ReadingCampaigns.Add(campaign);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<ReadingCampaign>().Add(campaign);
+            await _unitOfWork.SaveChangesAsync();
             return CreatedAtAction(nameof(Get), new { mosqueId, id = campaign.Id }, campaign);
         }
 
@@ -107,8 +107,8 @@ namespace MosqueOS.API.Controllers
         {
             allocation.Id = 0;
             allocation.CampaignId = id;
-            _db.ReadingAllocations.Add(allocation);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<ReadingAllocation>().Add(allocation);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(allocation);
         }
 
@@ -117,13 +117,13 @@ namespace MosqueOS.API.Controllers
         [HttpPost("allocations/{allocationId:int}/claim")]
         public async Task<IActionResult> ClaimAllocation(int mosqueId, int allocationId)
         {
-            var allocation = await _db.ReadingAllocations.FindAsync(allocationId);
+            var allocation = await _unitOfWork.Repository<ReadingAllocation>().FindAsync(allocationId);
             if (allocation == null) return NotFound();
             if (allocation.UserId != null) return Conflict(new { message = "Already assigned." });
 
             allocation.UserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             allocation.UpdatedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
             return Ok(allocation);
         }
 
@@ -132,13 +132,13 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> CompleteAllocation(int mosqueId, int allocationId)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var allocation = await _db.ReadingAllocations
+            var allocation = await _unitOfWork.Repository<ReadingAllocation>().Query()
                 .FirstOrDefaultAsync(a => a.Id == allocationId && a.UserId == userId);
             if (allocation == null) return NotFound();
 
             allocation.Status = ReadingAllocationStatus.Completed;
             allocation.UpdatedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
             return Ok(allocation);
         }
     }

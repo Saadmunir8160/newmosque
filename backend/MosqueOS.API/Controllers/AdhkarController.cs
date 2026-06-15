@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
-using MosqueOS.Infrastructure;
 using System.Security.Claims;
 
 namespace MosqueOS.API.Controllers
@@ -13,16 +13,16 @@ namespace MosqueOS.API.Controllers
     [ApiController]
     public class AdhkarController : ControllerBase
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public AdhkarController(ApplicationDbContext db) => _db = db;
+        public AdhkarController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
 
         // ---- Library ----
 
         [HttpGet("items")]
         public async Task<IActionResult> GetItems([FromQuery] string? category)
         {
-            var query = _db.AdhkarItems.AsNoTracking().AsQueryable();
+            var query = _unitOfWork.Repository<AdhkarItem>().QueryNoTracking().AsQueryable();
             if (!string.IsNullOrWhiteSpace(category)) query = query.Where(a => a.Category == category);
             return Ok(await query.OrderBy(a => a.Title).ToListAsync());
         }
@@ -32,8 +32,8 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> CreateItem([FromBody] AdhkarItem item)
         {
             item.Id = 0;
-            _db.AdhkarItems.Add(item);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<AdhkarItem>().Add(item);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(item);
         }
 
@@ -44,7 +44,7 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> Mine([FromQuery] bool relevantOnly = false)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-            var query = _db.UserAdhkar.AsNoTracking()
+            var query = _unitOfWork.Repository<UserAdhkar>().QueryNoTracking()
                 .Include(u => u.AdhkarItem)
                 .Where(u => u.UserId == userId);
 
@@ -62,7 +62,7 @@ namespace MosqueOS.API.Controllers
             var items = await query.ToListAsync();
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var ids = items.Select(i => i.Id).ToList();
-            var logs = await _db.UserAdhkarLogs.AsNoTracking()
+            var logs = await _unitOfWork.Repository<UserAdhkarLog>().QueryNoTracking()
                 .Where(l => ids.Contains(l.UserAdhkarId) && l.Date == today)
                 .ToListAsync();
 
@@ -79,8 +79,8 @@ namespace MosqueOS.API.Controllers
         {
             item.Id = 0;
             item.UserId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-            _db.UserAdhkar.Add(item);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<UserAdhkar>().Add(item);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(item);
         }
 
@@ -89,13 +89,13 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> RemoveFromMine(int id)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-            var item = await _db.UserAdhkar.FirstOrDefaultAsync(u => u.Id == id && u.UserId == userId);
+            var item = await _unitOfWork.Repository<UserAdhkar>().Query().FirstOrDefaultAsync(u => u.Id == id && u.UserId == userId);
             if (item == null) return NotFound();
 
-            var logs = _db.UserAdhkarLogs.Where(l => l.UserAdhkarId == id);
-            _db.UserAdhkarLogs.RemoveRange(logs);
-            _db.UserAdhkar.Remove(item);
-            await _db.SaveChangesAsync();
+            var logs = _unitOfWork.Repository<UserAdhkarLog>().Query().Where(l => l.UserAdhkarId == id);
+            _unitOfWork.Repository<UserAdhkarLog>().RemoveRange(logs);
+            _unitOfWork.Repository<UserAdhkar>().Remove(item);
+            await _unitOfWork.SaveChangesAsync();
             return NoContent();
         }
 
@@ -105,22 +105,22 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> Increment(int id, [FromQuery] int by = 1)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-            var item = await _db.UserAdhkar.FirstOrDefaultAsync(u => u.Id == id && u.UserId == userId);
+            var item = await _unitOfWork.Repository<UserAdhkar>().Query().FirstOrDefaultAsync(u => u.Id == id && u.UserId == userId);
             if (item == null) return NotFound();
 
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
-            var log = await _db.UserAdhkarLogs
+            var log = await _unitOfWork.Repository<UserAdhkarLog>().Query()
                 .FirstOrDefaultAsync(l => l.UserAdhkarId == id && l.Date == today);
 
             if (log == null)
             {
                 log = new UserAdhkarLog { UserAdhkarId = id, Date = today, CountCompleted = 0 };
-                _db.UserAdhkarLogs.Add(log);
+                _unitOfWork.Repository<UserAdhkarLog>().Add(log);
             }
 
             log.CountCompleted = Math.Min(log.CountCompleted + by, item.TargetCount);
             log.UpdatedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
 
             return Ok(new
             {

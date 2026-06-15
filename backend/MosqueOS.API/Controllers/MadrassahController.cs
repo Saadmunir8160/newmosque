@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
-using MosqueOS.Infrastructure;
 using System.Security.Claims;
 
 namespace MosqueOS.API.Controllers
@@ -14,24 +14,24 @@ namespace MosqueOS.API.Controllers
     [Authorize]
     public class MadrassahController : ControllerBase
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public MadrassahController(ApplicationDbContext db) => _db = db;
+        public MadrassahController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
 
         // ---- Students ----
 
         [Authorize(Roles = Roles.MadrassahManagers)]
         [HttpGet("students")]
         public async Task<IActionResult> GetStudents() =>
-            Ok(await _db.Students.AsNoTracking().Include(s => s.Guardians).OrderBy(s => s.Name).ToListAsync());
+            Ok(await _unitOfWork.Repository<Student>().QueryNoTracking().Include(s => s.Guardians).OrderBy(s => s.Name).ToListAsync());
 
         [Authorize(Roles = Roles.MadrassahManagers)]
         [HttpPost("students")]
         public async Task<IActionResult> CreateStudent([FromBody] Student student)
         {
             student.Id = 0;
-            _db.Students.Add(student);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<Student>().Add(student);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(student);
         }
 
@@ -39,7 +39,7 @@ namespace MosqueOS.API.Controllers
         [HttpPut("students/{id:int}")]
         public async Task<IActionResult> UpdateStudent(int id, [FromBody] Student input)
         {
-            var student = await _db.Students.FindAsync(id);
+            var student = await _unitOfWork.Repository<Student>().FindAsync(id);
             if (student == null) return NotFound();
 
             student.Name = input.Name;
@@ -47,7 +47,7 @@ namespace MosqueOS.API.Controllers
             student.Gender = input.Gender;
             student.UserId = input.UserId;
             student.UpdatedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
             return Ok(student);
         }
 
@@ -57,8 +57,8 @@ namespace MosqueOS.API.Controllers
         {
             guardian.Id = 0;
             guardian.StudentId = studentId;
-            _db.Guardians.Add(guardian);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<Guardian>().Add(guardian);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(guardian);
         }
 
@@ -67,7 +67,7 @@ namespace MosqueOS.API.Controllers
         [Authorize(Roles = Roles.MadrassahManagers)]
         [HttpGet("classes")]
         public async Task<IActionResult> GetClasses() =>
-            Ok(await _db.MadrassahClasses.AsNoTracking()
+            Ok(await _unitOfWork.Repository<MadrassahClass>().QueryNoTracking()
                 .Include(c => c.Enrolments).ThenInclude(e => e.Student)
                 .ToListAsync());
 
@@ -76,8 +76,8 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> CreateClass([FromBody] MadrassahClass cls)
         {
             cls.Id = 0;
-            _db.MadrassahClasses.Add(cls);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<MadrassahClass>().Add(cls);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(cls);
         }
 
@@ -85,12 +85,12 @@ namespace MosqueOS.API.Controllers
         [HttpPost("classes/{classId:int}/enrol/{studentId:int}")]
         public async Task<IActionResult> Enrol(int classId, int studentId)
         {
-            if (await _db.Enrolments.AnyAsync(e => e.ClassId == classId && e.StudentId == studentId))
+            if (await _unitOfWork.Repository<Enrolment>().Query().AnyAsync(e => e.ClassId == classId && e.StudentId == studentId))
                 return Conflict(new { message = "Student already enrolled." });
 
             var enrolment = new Enrolment { ClassId = classId, StudentId = studentId };
-            _db.Enrolments.Add(enrolment);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<Enrolment>().Add(enrolment);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(enrolment);
         }
 
@@ -102,8 +102,8 @@ namespace MosqueOS.API.Controllers
         {
             session.Id = 0;
             session.ClassId = classId;
-            _db.AttendanceSessions.Add(session);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<AttendanceSession>().Add(session);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(session);
         }
 
@@ -111,7 +111,7 @@ namespace MosqueOS.API.Controllers
         [HttpPost("sessions/{sessionId:int}/attendance")]
         public async Task<IActionResult> RecordAttendance(int sessionId, [FromBody] List<AttendanceRecordDto> records)
         {
-            var session = await _db.AttendanceSessions
+            var session = await _unitOfWork.Repository<AttendanceSession>().Query()
                 .Include(s => s.Records)
                 .FirstOrDefaultAsync(s => s.Id == sessionId);
             if (session == null) return NotFound();
@@ -135,14 +135,14 @@ namespace MosqueOS.API.Controllers
                 }
             }
 
-            await _db.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
             return Ok(session.Records);
         }
 
         [Authorize(Roles = Roles.MadrassahManagers)]
         [HttpGet("classes/{classId:int}/sessions")]
         public async Task<IActionResult> GetSessions(int classId) =>
-            Ok(await _db.AttendanceSessions.AsNoTracking()
+            Ok(await _unitOfWork.Repository<AttendanceSession>().QueryNoTracking()
                 .Include(s => s.Records)
                 .Where(s => s.ClassId == classId)
                 .OrderByDescending(s => s.Date)
@@ -156,8 +156,8 @@ namespace MosqueOS.API.Controllers
         {
             fee.Id = 0;
             fee.StudentId = studentId;
-            _db.Fees.Add(fee);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<Fee>().Add(fee);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(fee);
         }
 
@@ -165,13 +165,13 @@ namespace MosqueOS.API.Controllers
         [HttpPost("fees/{feeId:int}/mark-paid")]
         public async Task<IActionResult> MarkFeePaid(int feeId)
         {
-            var fee = await _db.Fees.FindAsync(feeId);
+            var fee = await _unitOfWork.Repository<Fee>().FindAsync(feeId);
             if (fee == null) return NotFound();
 
             fee.Status = FeeStatus.Paid;
             fee.PaidAt = DateTime.UtcNow;
             fee.UpdatedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
             return Ok(fee);
         }
 
@@ -184,8 +184,8 @@ namespace MosqueOS.API.Controllers
             note.Id = 0;
             note.StudentId = studentId;
             note.CreatedById = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            _db.ProgressNotes.Add(note);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<ProgressNote>().Add(note);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(note);
         }
 
@@ -196,7 +196,7 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> MyChildren()
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var children = await _db.Guardians.AsNoTracking()
+            var children = await _unitOfWork.Repository<Guardian>().QueryNoTracking()
                 .Where(g => g.UserId == userId)
                 .Select(g => g.Student!)
                 .ToListAsync();
@@ -204,17 +204,17 @@ namespace MosqueOS.API.Controllers
             var result = new List<object>();
             foreach (var child in children)
             {
-                var attendance = await _db.AttendanceRecords.AsNoTracking()
+                var attendance = await _unitOfWork.Repository<AttendanceRecord>().QueryNoTracking()
                     .Where(r => r.StudentId == child.Id)
                     .GroupBy(r => r.Status)
                     .Select(g => new { Status = g.Key.ToString(), Count = g.Count() })
                     .ToListAsync();
 
-                var fees = await _db.Fees.AsNoTracking()
+                var fees = await _unitOfWork.Repository<Fee>().QueryNoTracking()
                     .Where(f => f.StudentId == child.Id)
                     .ToListAsync();
 
-                var notes = await _db.ProgressNotes.AsNoTracking()
+                var notes = await _unitOfWork.Repository<ProgressNote>().QueryNoTracking()
                     .Where(n => n.StudentId == child.Id)
                     .OrderByDescending(n => n.CreatedAt)
                     .ToListAsync();
@@ -231,12 +231,12 @@ namespace MosqueOS.API.Controllers
         [HttpGet("dashboard")]
         public async Task<IActionResult> Dashboard()
         {
-            var totalStudents = await _db.Students.CountAsync();
-            var totalClasses = await _db.MadrassahClasses.CountAsync();
-            var totalRecords = await _db.AttendanceRecords.CountAsync();
-            var presentRecords = await _db.AttendanceRecords
+            var totalStudents = await _unitOfWork.Repository<Student>().Query().CountAsync();
+            var totalClasses = await _unitOfWork.Repository<MadrassahClass>().Query().CountAsync();
+            var totalRecords = await _unitOfWork.Repository<AttendanceRecord>().Query().CountAsync();
+            var presentRecords = await _unitOfWork.Repository<AttendanceRecord>().Query()
                 .CountAsync(r => r.Status == AttendanceStatus.Present);
-            var unpaidFees = await _db.Fees.CountAsync(f => f.Status == FeeStatus.Unpaid);
+            var unpaidFees = await _unitOfWork.Repository<Fee>().Query().CountAsync(f => f.Status == FeeStatus.Unpaid);
 
             return Ok(new
             {

@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
-using MosqueOS.Infrastructure;
 
 namespace MosqueOS.API.Controllers
 {
@@ -11,22 +11,22 @@ namespace MosqueOS.API.Controllers
     [ApiController]
     public class DuasController : ControllerBase
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public DuasController(ApplicationDbContext db) => _db = db;
+        public DuasController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
 
         /// <summary>Browse organised by category (morning, wudu, after_prayer, mosque, general, food, sleep, travel).</summary>
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] string? category)
         {
-            var query = _db.Duas.AsNoTracking().AsQueryable();
+            var query = _unitOfWork.Repository<Dua>().QueryNoTracking().AsQueryable();
             if (!string.IsNullOrWhiteSpace(category)) query = query.Where(d => d.Category == category);
             return Ok(await query.OrderBy(d => d.Category).ThenBy(d => d.Title).ToListAsync());
         }
 
         [HttpGet("categories")]
         public async Task<IActionResult> GetCategories() =>
-            Ok(await _db.Duas.AsNoTracking().Select(d => d.Category).Distinct().OrderBy(c => c).ToListAsync());
+            Ok(await _unitOfWork.Repository<Dua>().QueryNoTracking().Select(d => d.Category).Distinct().OrderBy(c => c).ToListAsync());
 
         /// <summary>Single most relevant dua for the current time (home screen, spec 3.9).</summary>
         [HttpGet("recommended-now")]
@@ -43,11 +43,11 @@ namespace MosqueOS.API.Controllers
                 _ => "sleep"
             };
 
-            var dua = await _db.Duas.AsNoTracking()
+            var dua = await _unitOfWork.Repository<Dua>().QueryNoTracking()
                 .Where(d => d.Category == category)
                 .OrderBy(d => d.Id)
                 .FirstOrDefaultAsync()
-                ?? await _db.Duas.AsNoTracking().OrderBy(d => d.Id).FirstOrDefaultAsync();
+                ?? await _unitOfWork.Repository<Dua>().QueryNoTracking().OrderBy(d => d.Id).FirstOrDefaultAsync();
 
             return Ok(dua);
         }
@@ -55,7 +55,7 @@ namespace MosqueOS.API.Controllers
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Get(int id)
         {
-            var dua = await _db.Duas.AsNoTracking().FirstOrDefaultAsync(d => d.Id == id);
+            var dua = await _unitOfWork.Repository<Dua>().QueryNoTracking().FirstOrDefaultAsync(d => d.Id == id);
             return dua == null ? NotFound() : Ok(dua);
         }
 
@@ -64,8 +64,8 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> Create([FromBody] Dua dua)
         {
             dua.Id = 0;
-            _db.Duas.Add(dua);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<Dua>().Add(dua);
+            await _unitOfWork.SaveChangesAsync();
             return CreatedAtAction(nameof(Get), new { id = dua.Id }, dua);
         }
 
@@ -73,7 +73,7 @@ namespace MosqueOS.API.Controllers
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update(int id, [FromBody] Dua input)
         {
-            var dua = await _db.Duas.FindAsync(id);
+            var dua = await _unitOfWork.Repository<Dua>().FindAsync(id);
             if (dua == null) return NotFound();
 
             dua.Title = input.Title;
@@ -88,7 +88,7 @@ namespace MosqueOS.API.Controllers
             dua.AudioUrl = input.AudioUrl;
             dua.UpdatedAt = DateTime.UtcNow;
 
-            await _db.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
             return Ok(dua);
         }
 
@@ -96,12 +96,12 @@ namespace MosqueOS.API.Controllers
 
         [HttpGet("collections")]
         public async Task<IActionResult> GetCollections() =>
-            Ok(await _db.DuaCollections.AsNoTracking().OrderBy(c => c.Name).ToListAsync());
+            Ok(await _unitOfWork.Repository<DuaCollection>().QueryNoTracking().OrderBy(c => c.Name).ToListAsync());
 
         [HttpGet("collections/{id:int}")]
         public async Task<IActionResult> GetCollection(int id)
         {
-            var collection = await _db.DuaCollections.AsNoTracking()
+            var collection = await _unitOfWork.Repository<DuaCollection>().QueryNoTracking()
                 .Include(c => c.Items.OrderBy(i => i.OrderIndex))
                 .ThenInclude(i => i.Dua)
                 .FirstOrDefaultAsync(c => c.Id == id);
@@ -113,8 +113,8 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> CreateCollection([FromBody] DuaCollection collection)
         {
             collection.Id = 0;
-            _db.DuaCollections.Add(collection);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<DuaCollection>().Add(collection);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(collection);
         }
 
@@ -124,8 +124,8 @@ namespace MosqueOS.API.Controllers
         {
             item.Id = 0;
             item.CollectionId = id;
-            _db.DuaCollectionItems.Add(item);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<DuaCollectionItem>().Add(item);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(item);
         }
     }

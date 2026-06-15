@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\MosqueOS.Domain\MosqueOS.Domain.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
-using MosqueOS.Infrastructure;
 using System.Security.Claims;
 
 namespace MosqueOS.API.Controllers
@@ -13,14 +13,14 @@ namespace MosqueOS.API.Controllers
     [ApiController]
     public class CommunitiesController : ControllerBase
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public CommunitiesController(ApplicationDbContext db) => _db = db;
+        public CommunitiesController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
 
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] int? mosqueId)
         {
-            var query = _db.Communities.AsNoTracking().Where(c => c.IsPublic);
+            var query = _unitOfWork.Repository<Community>().QueryNoTracking().Where(c => c.IsPublic);
             if (mosqueId.HasValue) query = query.Where(c => c.MosqueId == mosqueId);
             return Ok(await query.OrderBy(c => c.Name).ToListAsync());
         }
@@ -28,7 +28,7 @@ namespace MosqueOS.API.Controllers
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Get(int id)
         {
-            var community = await _db.Communities.AsNoTracking()
+            var community = await _unitOfWork.Repository<Community>().QueryNoTracking()
                 .Include(c => c.Members)
                 .Include(c => c.Resources)
                 .FirstOrDefaultAsync(c => c.Id == id);
@@ -40,8 +40,8 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> Create([FromBody] Community community)
         {
             community.Id = 0;
-            _db.Communities.Add(community);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<Community>().Add(community);
+            await _unitOfWork.SaveChangesAsync();
             return CreatedAtAction(nameof(Get), new { id = community.Id }, community);
         }
 
@@ -50,12 +50,13 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> Join(int id)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-            if (await _db.CommunityMembers.AnyAsync(m => m.CommunityId == id && m.UserId == userId))
+            if (await _unitOfWork.Repository<CommunityMember>().Query()
+                .AnyAsync(m => m.CommunityId == id && m.UserId == userId))
                 return Conflict(new { message = "Already a member." });
 
             var member = new CommunityMember { CommunityId = id, UserId = userId, Role = CommunityRole.Member };
-            _db.CommunityMembers.Add(member);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<CommunityMember>().Add(member);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(member);
         }
 
@@ -63,7 +64,7 @@ namespace MosqueOS.API.Controllers
 
         [HttpGet("{id:int}/posts")]
         public async Task<IActionResult> GetPosts(int id) =>
-            Ok(await _db.CommunityPosts.AsNoTracking()
+            Ok(await _unitOfWork.Repository<CommunityPost>().QueryNoTracking()
                 .Where(p => p.CommunityId == id)
                 .OrderByDescending(p => p.CreatedAt)
                 .Take(50)
@@ -74,15 +75,15 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> CreatePost(int id, [FromBody] CommunityPost post)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-            var isMember = await _db.CommunityMembers
+            var isMember = await _unitOfWork.Repository<CommunityMember>().Query()
                 .AnyAsync(m => m.CommunityId == id && m.UserId == userId);
             if (!isMember) return Forbid();
 
             post.Id = 0;
             post.CommunityId = id;
             post.AuthorId = userId;
-            _db.CommunityPosts.Add(post);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<CommunityPost>().Add(post);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(post);
         }
 
@@ -93,7 +94,7 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> AddResource(int id, [FromBody] CommunityResource resource)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-            var membership = await _db.CommunityMembers
+            var membership = await _unitOfWork.Repository<CommunityMember>().Query()
                 .FirstOrDefaultAsync(m => m.CommunityId == id && m.UserId == userId);
             var isPlatformAdmin = User.IsInRole(Roles.SuperAdmin) || User.IsInRole(Roles.MosqueAdmin);
 
@@ -102,8 +103,8 @@ namespace MosqueOS.API.Controllers
 
             resource.Id = 0;
             resource.CommunityId = id;
-            _db.CommunityResources.Add(resource);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<CommunityResource>().Add(resource);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(resource);
         }
     }

@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
-using MosqueOS.Infrastructure;
 
 namespace MosqueOS.API.Controllers
 {
@@ -13,15 +13,15 @@ namespace MosqueOS.API.Controllers
     [Authorize(Roles = Roles.MuridSummaryViewers)]
     public class MuqaddamController : ControllerBase
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public MuqaddamController(ApplicationDbContext db) => _db = db;
+        public MuqaddamController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
 
         /// <summary>Tariqa community members with wird progress summaries.</summary>
         [HttpGet("murids")]
         public async Task<IActionResult> GetMuridSummaries([FromQuery] int? mosqueId)
         {
-            var communityQuery = _db.Communities.AsNoTracking()
+            var communityQuery = _unitOfWork.Repository<Community>().QueryNoTracking()
                 .Where(c => c.Type == CommunityType.Tariqa);
 
             if (mosqueId.HasValue)
@@ -29,7 +29,7 @@ namespace MosqueOS.API.Controllers
 
             var communityIds = await communityQuery.Select(c => c.Id).ToListAsync();
 
-            var members = await _db.CommunityMembers.AsNoTracking()
+            var members = await _unitOfWork.Repository<CommunityMember>().QueryNoTracking()
                 .Include(m => m.User)
                 .Include(m => m.Community)
                 .Where(m => communityIds.Contains(m.CommunityId))
@@ -37,17 +37,17 @@ namespace MosqueOS.API.Controllers
 
             var userIds = members.Select(m => m.UserId).Distinct().ToList();
 
-            var wirdProgress = await _db.UserWirdProgress.AsNoTracking()
+            var wirdProgress = await _unitOfWork.Repository<UserWirdProgress>().QueryNoTracking()
                 .Include(p => p.Collection)
                 .Where(p => userIds.Contains(p.UserId))
                 .ToListAsync();
 
-            var quranPlans = await _db.QuranPlans.AsNoTracking()
+            var quranPlans = await _unitOfWork.Repository<QuranPlan>().QueryNoTracking()
                 .Include(p => p.Progress)
                 .Where(p => userIds.Contains(p.UserId))
                 .ToListAsync();
 
-            var readingAllocations = await _db.ReadingAllocations.AsNoTracking()
+            var readingAllocations = await _unitOfWork.Repository<ReadingAllocation>().QueryNoTracking()
                 .Include(a => a.Campaign)
                 .Where(a => a.UserId != null && userIds.Contains(a.UserId))
                 .ToListAsync();
@@ -82,7 +82,7 @@ namespace MosqueOS.API.Controllers
         [HttpGet("communities")]
         public async Task<IActionResult> GetTariqaCommunities([FromQuery] int? mosqueId)
         {
-            var query = _db.Communities.AsNoTracking()
+            var query = _unitOfWork.Repository<Community>().QueryNoTracking()
                 .Where(c => c.Type == CommunityType.Tariqa);
 
             if (mosqueId.HasValue)

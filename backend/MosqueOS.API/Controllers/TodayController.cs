@@ -1,9 +1,8 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Entities;
-using MosqueOS.Infrastructure;
 using System.Security.Claims;
 
 namespace MosqueOS.API.Controllers
@@ -13,9 +12,9 @@ namespace MosqueOS.API.Controllers
     [ApiController]
     public class TodayController : ControllerBase
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public TodayController(ApplicationDbContext db) => _db = db;
+        public TodayController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
 
         [HttpGet]
         public async Task<IActionResult> Get([FromQuery] int? mosqueId)
@@ -28,17 +27,17 @@ namespace MosqueOS.API.Controllers
             ApplicationUser? user = null;
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (userId != null)
-                user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+                user = await _unitOfWork.Repository<ApplicationUser>().QueryNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
 
             var resolvedMosqueId = mosqueId ?? user?.HomeMosqueId
-                ?? await _db.Mosques.AsNoTracking().Select(m => (int?)m.Id).FirstOrDefaultAsync();
+                ?? await _unitOfWork.Repository<Mosque>().QueryNoTracking().Select(m => (int?)m.Id).FirstOrDefaultAsync();
 
             // 2-3. Prayer times + next prayer
             PrayerTimesDaily? prayerTimes = null;
             object? nextPrayer = null;
             if (resolvedMosqueId.HasValue)
             {
-                prayerTimes = await _db.PrayerTimesDaily.AsNoTracking()
+                prayerTimes = await _unitOfWork.Repository<PrayerTimesDaily>().QueryNoTracking()
                     .FirstOrDefaultAsync(p => p.MosqueId == resolvedMosqueId && p.Date == today);
                 if (prayerTimes != null)
                     nextPrayer = ResolveNextPrayer(prayerTimes, TimeOnly.FromDateTime(now));
@@ -48,7 +47,7 @@ namespace MosqueOS.API.Controllers
             Event? tonightEvent = null;
             if (resolvedMosqueId.HasValue)
             {
-                tonightEvent = await _db.Events.AsNoTracking()
+                tonightEvent = await _unitOfWork.Repository<Event>().QueryNoTracking()
                     .Include(e => e.WirdCollection)
                     .Where(e => e.MosqueId == resolvedMosqueId && e.Date == today
                              && e.Status == EventStatus.Scheduled)
@@ -59,14 +58,14 @@ namespace MosqueOS.API.Controllers
             // 5. Primary recommended reading (time + tariqa)
             // Prefer the user's tariqa, then General, then any daily collection
             var tariqa = user?.Tariqa ?? Tariqa.General;
-            var recommendedWird = await _db.WirdCollections.AsNoTracking()
+            var recommendedWird = await _unitOfWork.Repository<WirdCollection>().QueryNoTracking()
                 .Where(c => c.Type == WirdCollectionType.Daily)
                 .OrderBy(c => c.Tariqa == tariqa ? 0 : c.Tariqa == Tariqa.General ? 1 : 2)
                 .FirstOrDefaultAsync();
 
             // 8. Announcements (top 3 published)
             var announcements = resolvedMosqueId.HasValue
-                ? await _db.Announcements.AsNoTracking()
+                ? await _unitOfWork.Repository<Announcement>().QueryNoTracking()
                     .Where(a => a.MosqueId == resolvedMosqueId && a.Status == PublishStatus.Published)
                     .OrderByDescending(a => a.IsFeatured)
                     .ThenByDescending(a => a.PublishedAt)
@@ -76,7 +75,7 @@ namespace MosqueOS.API.Controllers
 
             // 9. One participation prompt
             var participationPrompt = resolvedMosqueId.HasValue
-                ? await _db.ParticipationOpportunities.AsNoTracking()
+                ? await _unitOfWork.Repository<ParticipationOpportunity>().QueryNoTracking()
                     .Where(o => o.MosqueId == resolvedMosqueId && o.IsActive)
                     .OrderBy(o => o.Date)
                     .FirstOrDefaultAsync()
@@ -86,7 +85,7 @@ namespace MosqueOS.API.Controllers
             object? quranCard = null;
             if (userId != null)
             {
-                var plan = await _db.QuranPlans.AsNoTracking()
+                var plan = await _unitOfWork.Repository<QuranPlan>().QueryNoTracking()
                     .Include(p => p.Progress)
                     .Where(p => p.UserId == userId)
                     .OrderByDescending(p => p.StartDate)
@@ -112,7 +111,7 @@ namespace MosqueOS.API.Controllers
                 >= 18 and < 22 => "after_prayer",
                 _ => "sleep"
             };
-            var recommendedDua = await _db.Duas.AsNoTracking()
+            var recommendedDua = await _unitOfWork.Repository<Dua>().QueryNoTracking()
                 .Where(d => d.Category == duaCategory)
                 .OrderBy(d => d.Id)
                 .FirstOrDefaultAsync();

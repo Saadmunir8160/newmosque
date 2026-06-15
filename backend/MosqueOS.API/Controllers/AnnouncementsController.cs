@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
-using MosqueOS.Infrastructure;
 using System.Security.Claims;
 
 namespace MosqueOS.API.Controllers
@@ -13,15 +13,15 @@ namespace MosqueOS.API.Controllers
     [ApiController]
     public class AnnouncementsController : ControllerBase
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public AnnouncementsController(ApplicationDbContext db) => _db = db;
+        public AnnouncementsController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
 
         /// <summary>Public: published announcements only. Admins see all via ?all=true.</summary>
         [HttpGet]
         public async Task<IActionResult> GetAll(int mosqueId, [FromQuery] bool all = false)
         {
-            var query = _db.Announcements.AsNoTracking().Where(a => a.MosqueId == mosqueId);
+            var query = _unitOfWork.Repository<Announcement>().QueryNoTracking().Where(a => a.MosqueId == mosqueId);
 
             var isAdmin = User.IsInRole(Roles.SuperAdmin) || User.IsInRole(Roles.MosqueAdmin);
             if (!all || !isAdmin)
@@ -36,7 +36,7 @@ namespace MosqueOS.API.Controllers
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Get(int mosqueId, int id)
         {
-            var item = await _db.Announcements.AsNoTracking()
+            var item = await _unitOfWork.Repository<Announcement>().QueryNoTracking()
                 .FirstOrDefaultAsync(a => a.Id == id && a.MosqueId == mosqueId);
             return item == null ? NotFound() : Ok(item);
         }
@@ -51,8 +51,8 @@ namespace MosqueOS.API.Controllers
             if (input.Status == PublishStatus.Published)
                 input.PublishedAt = DateTime.UtcNow;
 
-            _db.Announcements.Add(input);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<Announcement>().Add(input);
+            await _unitOfWork.SaveChangesAsync();
             return CreatedAtAction(nameof(Get), new { mosqueId, id = input.Id }, input);
         }
 
@@ -60,7 +60,7 @@ namespace MosqueOS.API.Controllers
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update(int mosqueId, int id, [FromBody] Announcement input)
         {
-            var item = await _db.Announcements
+            var item = await _unitOfWork.Repository<Announcement>().Query()
                 .FirstOrDefaultAsync(a => a.Id == id && a.MosqueId == mosqueId);
             if (item == null) return NotFound();
 
@@ -71,7 +71,7 @@ namespace MosqueOS.API.Controllers
             item.IsFeatured = input.IsFeatured;
             item.UpdatedAt = DateTime.UtcNow;
 
-            await _db.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
             return Ok(item);
         }
 
@@ -89,18 +89,18 @@ namespace MosqueOS.API.Controllers
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int mosqueId, int id)
         {
-            var item = await _db.Announcements
+            var item = await _unitOfWork.Repository<Announcement>().Query()
                 .FirstOrDefaultAsync(a => a.Id == id && a.MosqueId == mosqueId);
             if (item == null) return NotFound();
 
-            _db.Announcements.Remove(item);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<Announcement>().Remove(item);
+            await _unitOfWork.SaveChangesAsync();
             return NoContent();
         }
 
         private async Task<IActionResult> SetStatus(int mosqueId, int id, PublishStatus status)
         {
-            var item = await _db.Announcements
+            var item = await _unitOfWork.Repository<Announcement>().Query()
                 .FirstOrDefaultAsync(a => a.Id == id && a.MosqueId == mosqueId);
             if (item == null) return NotFound();
 
@@ -109,7 +109,7 @@ namespace MosqueOS.API.Controllers
                 item.PublishedAt = DateTime.UtcNow;
             item.UpdatedAt = DateTime.UtcNow;
 
-            await _db.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
             return Ok(item);
         }
     }

@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
-using MosqueOS.Infrastructure;
 
 namespace MosqueOS.API.Controllers
 {
@@ -11,14 +11,14 @@ namespace MosqueOS.API.Controllers
     [ApiController]
     public class EventsController : ControllerBase
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public EventsController(ApplicationDbContext db) => _db = db;
+        public EventsController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
 
         [HttpGet]
         public async Task<IActionResult> GetAll(int mosqueId, [FromQuery] bool upcomingOnly = true)
         {
-            var query = _db.Events.AsNoTracking().Where(e => e.MosqueId == mosqueId);
+            var query = _unitOfWork.Repository<Event>().QueryNoTracking().Where(e => e.MosqueId == mosqueId);
             if (upcomingOnly)
             {
                 var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -30,7 +30,7 @@ namespace MosqueOS.API.Controllers
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Get(int mosqueId, int id)
         {
-            var item = await _db.Events.AsNoTracking()
+            var item = await _unitOfWork.Repository<Event>().QueryNoTracking()
                 .Include(e => e.WirdCollection)
                 .FirstOrDefaultAsync(e => e.Id == id && e.MosqueId == mosqueId);
             return item == null ? NotFound() : Ok(item);
@@ -42,8 +42,8 @@ namespace MosqueOS.API.Controllers
         {
             input.Id = 0;
             input.MosqueId = mosqueId;
-            _db.Events.Add(input);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<Event>().Add(input);
+            await _unitOfWork.SaveChangesAsync();
             return CreatedAtAction(nameof(Get), new { mosqueId, id = input.Id }, input);
         }
 
@@ -51,7 +51,7 @@ namespace MosqueOS.API.Controllers
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update(int mosqueId, int id, [FromBody] Event input)
         {
-            var item = await _db.Events
+            var item = await _unitOfWork.Repository<Event>().Query()
                 .FirstOrDefaultAsync(e => e.Id == id && e.MosqueId == mosqueId);
             if (item == null) return NotFound();
 
@@ -68,7 +68,7 @@ namespace MosqueOS.API.Controllers
             item.WirdCollectionId = input.WirdCollectionId;
             item.UpdatedAt = DateTime.UtcNow;
 
-            await _db.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
             return Ok(item);
         }
 
@@ -76,12 +76,12 @@ namespace MosqueOS.API.Controllers
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int mosqueId, int id)
         {
-            var item = await _db.Events
+            var item = await _unitOfWork.Repository<Event>().Query()
                 .FirstOrDefaultAsync(e => e.Id == id && e.MosqueId == mosqueId);
             if (item == null) return NotFound();
 
-            _db.Events.Remove(item);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<Event>().Remove(item);
+            await _unitOfWork.SaveChangesAsync();
             return NoContent();
         }
     }

@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Entities;
-using MosqueOS.Infrastructure;
 using System.Security.Claims;
 
 namespace MosqueOS.API.Controllers
@@ -13,15 +13,15 @@ namespace MosqueOS.API.Controllers
     [Authorize]
     public class QuranController : ControllerBase
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public QuranController(ApplicationDbContext db) => _db = db;
+        public QuranController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
 
         [HttpGet("my-plan")]
         public async Task<IActionResult> MyPlan()
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-            var plan = await _db.QuranPlans.AsNoTracking()
+            var plan = await _unitOfWork.Repository<QuranPlan>().QueryNoTracking()
                 .Include(p => p.Progress.OrderBy(x => x.ParaNumber))
                 .Where(p => p.UserId == userId)
                 .OrderByDescending(p => p.StartDate)
@@ -58,8 +58,8 @@ namespace MosqueOS.API.Controllers
             for (var i = 1; i <= 30; i++)
                 plan.Progress.Add(new QuranProgress { ParaNumber = i });
 
-            _db.QuranPlans.Add(plan);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<QuranPlan>().Add(plan);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(plan);
         }
 
@@ -69,7 +69,7 @@ namespace MosqueOS.API.Controllers
             if (paraNumber is < 1 or > 30) return BadRequest(new { message = "Para must be 1-30." });
 
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-            var plan = await _db.QuranPlans
+            var plan = await _unitOfWork.Repository<QuranPlan>().Query()
                 .Include(p => p.Progress)
                 .Where(p => p.UserId == userId)
                 .OrderByDescending(p => p.StartDate)
@@ -81,7 +81,7 @@ namespace MosqueOS.API.Controllers
             progress.CompletedAt = DateTime.UtcNow;
             progress.UpdatedAt = DateTime.UtcNow;
 
-            await _db.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
             return Ok(new
             {
                 paraNumber,

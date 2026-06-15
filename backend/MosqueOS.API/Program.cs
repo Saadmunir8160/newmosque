@@ -1,11 +1,9 @@
 using Microsoft.AspNetCore.Authentication.Facebook;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using MosqueOS.API.Services;
-using MosqueOS.Domain.Entities;
+using Microsoft.OpenApi.Models;
+using MosqueOS.Application;
 using MosqueOS.Infrastructure;
 using System.Text;
 using System.Text.Json;
@@ -16,30 +14,20 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        // Enums as strings ("Published" instead of 1) for a friendlier API
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-        // Break navigation-property cycles (e.g. Mosque -> Settings -> Mosque)
-        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
     });
 
-// Database Configuration
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-// Identity Configuration
-builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
-    .AddEntityFrameworkStores<ApplicationDbContext>()
-    .AddDefaultTokenProviders();
-
-builder.Services.AddScoped<JwtTokenService>();
+// Clean Architecture layers
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
 
 var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
 var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
 var facebookAppId = builder.Configuration["Authentication:Facebook:AppId"];
 var facebookAppSecret = builder.Configuration["Authentication:Facebook:AppSecret"];
 
-// Authentication Configuration
 var authBuilder = builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -50,13 +38,14 @@ var authBuilder = builder.Services.AddAuthentication(options =>
 {
     options.SaveToken = true;
     options.RequireHttpsMetadata = false;
-    options.TokenValidationParameters = new TokenValidationParameters()
+    options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
         ValidateAudience = true,
         ValidAudience = builder.Configuration["JWT:ValidAudience"],
         ValidIssuer = builder.Configuration["JWT:ValidIssuer"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JWT:Secret"] ?? "SuperSecretKeyForDevelopmentOnlyPleaseChange123"))
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(builder.Configuration["JWT:Secret"] ?? "SuperSecretKeyForDevelopmentOnlyPleaseChange123"))
     };
 });
 
@@ -66,7 +55,7 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
     {
         options.ClientId = googleClientId;
         options.ClientSecret = googleClientSecret;
-        options.SignInScheme = IdentityConstants.ExternalScheme;
+        options.SignInScheme = Microsoft.AspNetCore.Identity.IdentityConstants.ExternalScheme;
     });
 }
 
@@ -76,11 +65,10 @@ if (!string.IsNullOrWhiteSpace(facebookAppId) && !string.IsNullOrWhiteSpace(face
     {
         options.AppId = facebookAppId;
         options.AppSecret = facebookAppSecret;
-        options.SignInScheme = IdentityConstants.ExternalScheme;
+        options.SignInScheme = Microsoft.AspNetCore.Identity.IdentityConstants.ExternalScheme;
     });
 }
 
-// CORS for the Angular dev server
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
@@ -89,23 +77,57 @@ builder.Services.AddCors(options =>
               .AllowAnyMethod());
 });
 
-builder.Services.AddOpenApi();
+// Swagger / OpenAPI
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "MosqueOS API",
+        Version = "v1",
+        Description = "MosqueOS REST API — Clean Architecture, Repository Pattern, EF Core Code First."
+    });
+
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "JWT token from POST /api/v1/auth/login"
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 
 var app = builder.Build();
 
-// Apply migrations and seed roles, demo users, and MVP demo data
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    var userManager = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<MosqueOS.Domain.Entities.ApplicationUser>>();
+    var roleManager = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<Microsoft.AspNetCore.Identity.IdentityRole>>();
     await DataSeeder.SeedAsync(db, userManager, roleManager);
 }
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "MosqueOS API v1");
+        options.RoutePrefix = "swagger";
+    });
 }
 
 app.UseCors("Frontend");
@@ -113,23 +135,21 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// Visiting http://localhost:5000/ in a browser — Web API has no default homepage
 app.MapGet("/", () => Results.Ok(new
 {
     name = "MosqueOS API",
     version = "v1",
+    architecture = "Clean Architecture · Repository Pattern · EF Core Code First",
     status = "running",
-    message = "This is a REST API. Use the endpoints below — there is no web UI at /.",
+    message = "REST API — use Swagger UI for interactive docs.",
     endpoints = new
     {
+        swagger = "/swagger",
         today = "/api/v1/today?mosqueId=1",
         mosques = "/api/v1/mosques",
-        mosqueProfile = "/api/v1/mosques/masjid-al-noor-bradford",
-        prayerTimes = "/api/v1/mosques/1/prayer-times/daily",
-        login = "POST /api/v1/auth/login",
-        openApi = app.Environment.IsDevelopment() ? "/openapi/v1.json" : null
+        login = "POST /api/v1/auth/login"
     },
-    frontend = "Run the Angular app separately: cd frontend && ng serve → http://localhost:4200"
+    frontend = "Angular app: cd frontend && ng serve → http://localhost:4200"
 }));
 
 app.Run();

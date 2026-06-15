@@ -2,10 +2,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
-using MosqueOS.Infrastructure;
 using System.Security.Claims;
 
 namespace MosqueOS.API.Controllers
@@ -14,16 +14,16 @@ namespace MosqueOS.API.Controllers
     [ApiController]
     public class MosquesController : ControllerBase
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
 
         public MosquesController(
-            ApplicationDbContext db,
+            IUnitOfWork unitOfWork,
             UserManager<ApplicationUser> userManager,
             RoleManager<IdentityRole> roleManager)
         {
-            _db = db;
+            _unitOfWork = unitOfWork;
             _userManager = userManager;
             _roleManager = roleManager;
         }
@@ -31,7 +31,7 @@ namespace MosqueOS.API.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] string? city)
         {
-            var query = _db.Mosques.AsNoTracking().AsQueryable();
+            var query = _unitOfWork.Repository<Mosque>().QueryNoTracking().AsQueryable();
             if (!string.IsNullOrWhiteSpace(city))
                 query = query.Where(m => m.City == city);
 
@@ -41,7 +41,7 @@ namespace MosqueOS.API.Controllers
         [HttpGet("{slug}")]
         public async Task<IActionResult> GetBySlug(string slug)
         {
-            var mosque = await _db.Mosques.AsNoTracking()
+            var mosque = await _unitOfWork.Repository<Mosque>().QueryNoTracking()
                 .Include(m => m.Settings)
                 .FirstOrDefaultAsync(m => m.Slug == slug);
 
@@ -52,11 +52,11 @@ namespace MosqueOS.API.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] Mosque mosque)
         {
-            if (await _db.Mosques.AnyAsync(m => m.Slug == mosque.Slug))
+            if (await _unitOfWork.Repository<Mosque>().Query().AnyAsync(m => m.Slug == mosque.Slug))
                 return Conflict(new { message = "Slug already in use." });
 
-            _db.Mosques.Add(mosque);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<Mosque>().Add(mosque);
+            await _unitOfWork.SaveChangesAsync();
             return CreatedAtAction(nameof(GetBySlug), new { slug = mosque.Slug }, mosque);
         }
 
@@ -64,7 +64,7 @@ namespace MosqueOS.API.Controllers
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update(int id, [FromBody] Mosque updated)
         {
-            var mosque = await _db.Mosques.FindAsync(id);
+            var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
             if (mosque == null) return NotFound();
 
             mosque.Name = updated.Name;
@@ -82,7 +82,7 @@ namespace MosqueOS.API.Controllers
             mosque.BannerUrl = updated.BannerUrl;
             mosque.UpdatedAt = DateTime.UtcNow;
 
-            await _db.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
             return Ok(mosque);
         }
 
@@ -91,7 +91,7 @@ namespace MosqueOS.API.Controllers
         [HttpPost("{id:int}/claim")]
         public async Task<IActionResult> Claim(int id)
         {
-            var mosque = await _db.Mosques.FindAsync(id);
+            var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
             if (mosque == null) return NotFound();
             if (mosque.Status != MosqueStatus.Unclaimed)
                 return Conflict(new { message = "Mosque has already been claimed." });
@@ -99,7 +99,7 @@ namespace MosqueOS.API.Controllers
             mosque.Status = MosqueStatus.Claimed;
             mosque.OwnerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             mosque.UpdatedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
 
             return Ok(new { message = "Claim submitted. Awaiting super admin verification." });
         }
@@ -108,12 +108,12 @@ namespace MosqueOS.API.Controllers
         [HttpPost("{id:int}/verify")]
         public async Task<IActionResult> Verify(int id)
         {
-            var mosque = await _db.Mosques.FindAsync(id);
+            var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
             if (mosque == null) return NotFound();
 
             mosque.Status = MosqueStatus.Active;
             mosque.UpdatedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
             return Ok(new { message = "Mosque verified and active." });
         }
 
@@ -121,19 +121,19 @@ namespace MosqueOS.API.Controllers
 
         [HttpGet("{id:int}/settings")]
         public async Task<IActionResult> GetSettings(int id) =>
-            Ok(await _db.MosqueSettings.AsNoTracking().Where(s => s.MosqueId == id).ToListAsync());
+            Ok(await _unitOfWork.Repository<MosqueSetting>().QueryNoTracking().Where(s => s.MosqueId == id).ToListAsync());
 
         [Authorize(Roles = Roles.SuperAdmin + "," + Roles.Admins)]
         [HttpPut("{id:int}/settings/{moduleKey}")]
         public async Task<IActionResult> SetModuleFlag(int id, string moduleKey, [FromQuery] bool enabled)
         {
-            var setting = await _db.MosqueSettings
+            var setting = await _unitOfWork.Repository<MosqueSetting>().Query()
                 .FirstOrDefaultAsync(s => s.MosqueId == id && s.ModuleKey == moduleKey);
 
             if (setting == null)
             {
                 setting = new MosqueSetting { MosqueId = id, ModuleKey = moduleKey, IsEnabled = enabled };
-                _db.MosqueSettings.Add(setting);
+                _unitOfWork.Repository<MosqueSetting>().Add(setting);
             }
             else
             {
@@ -141,7 +141,7 @@ namespace MosqueOS.API.Controllers
                 setting.UpdatedAt = DateTime.UtcNow;
             }
 
-            await _db.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
             return Ok(setting);
         }
 
@@ -150,7 +150,7 @@ namespace MosqueOS.API.Controllers
         [HttpPost("{id:int}/assign-staff")]
         public async Task<IActionResult> AssignStaff(int id, [FromBody] AssignStaffDto dto)
         {
-            var mosque = await _db.Mosques.FindAsync(id);
+            var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
             if (mosque == null) return NotFound();
 
             var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);

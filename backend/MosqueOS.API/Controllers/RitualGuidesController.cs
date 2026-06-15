@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
-using MosqueOS.Infrastructure;
 
 namespace MosqueOS.API.Controllers
 {
@@ -12,14 +12,14 @@ namespace MosqueOS.API.Controllers
     [ApiController]
     public class RitualGuidesController : ControllerBase
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public RitualGuidesController(ApplicationDbContext db) => _db = db;
+        public RitualGuidesController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
 
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] RitualGuideType? type)
         {
-            var query = _db.RitualGuides.AsNoTracking().AsQueryable();
+            var query = _unitOfWork.Repository<RitualGuide>().QueryNoTracking().AsQueryable();
             if (type.HasValue) query = query.Where(g => g.Type == type);
             return Ok(await query.ToListAsync());
         }
@@ -28,7 +28,7 @@ namespace MosqueOS.API.Controllers
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Get(int id)
         {
-            var guide = await _db.RitualGuides.AsNoTracking()
+            var guide = await _unitOfWork.Repository<RitualGuide>().QueryNoTracking()
                 .Include(g => g.Steps.OrderBy(s => s.OrderIndex))
                 .ThenInclude(s => s.Dua)
                 .FirstOrDefaultAsync(g => g.Id == id);
@@ -40,8 +40,8 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> Create([FromBody] RitualGuide guide)
         {
             guide.Id = 0;
-            _db.RitualGuides.Add(guide);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<RitualGuide>().Add(guide);
+            await _unitOfWork.SaveChangesAsync();
             return CreatedAtAction(nameof(Get), new { id = guide.Id }, guide);
         }
 
@@ -51,8 +51,8 @@ namespace MosqueOS.API.Controllers
         {
             step.Id = 0;
             step.GuideId = id;
-            _db.RitualSteps.Add(step);
-            await _db.SaveChangesAsync();
+            _unitOfWork.Repository<RitualStep>().Add(step);
+            await _unitOfWork.SaveChangesAsync();
             return Ok(step);
         }
     }
