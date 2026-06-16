@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Entities;
+using MosqueOS.Infrastructure.Content;
 using System.Security.Claims;
 
 namespace MosqueOS.API.Controllers
@@ -14,8 +15,80 @@ namespace MosqueOS.API.Controllers
     public class QuranController : ControllerBase
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly IQuranTextService _quranText;
 
-        public QuranController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
+        public QuranController(IUnitOfWork unitOfWork, IQuranTextService quranText)
+        {
+            _unitOfWork = unitOfWork;
+            _quranText = quranText;
+        }
+
+        [AllowAnonymous]
+        [HttpGet("paras")]
+        public IActionResult ListParas() =>
+            Ok(_quranText.ListParas().Select(p => new
+            {
+                p.Number,
+                p.NameEn,
+                p.NameAr,
+                surahRange = p.SurahRange
+            }));
+
+        [AllowAnonymous]
+        [HttpGet("paras/{paraNumber:int}")]
+        public async Task<IActionResult> GetPara(int paraNumber, CancellationToken ct)
+        {
+            var para = await _quranText.GetParaAsync(paraNumber, ct);
+            return para == null
+                ? NotFound(new { message = "Para must be between 1 and 30." })
+                : Ok(new
+                {
+                    para.Number,
+                    para.NameEn,
+                    para.NameAr,
+                    para.SurahRange,
+                    arabic = para.Arabic,
+                    translation = para.Translation,
+                    source = para.Source
+                });
+        }
+
+        [AllowAnonymous]
+        [HttpGet("surahs/yaseen")]
+        public async Task<IActionResult> GetYaseen(CancellationToken ct)
+        {
+            var surah = await _quranText.GetYaseenAsync(ct);
+            return Ok(new
+            {
+                name = surah.Name,
+                arabic = surah.Arabic,
+                translation = surah.Translation,
+                source = surah.Source
+            });
+        }
+
+        [AllowAnonymous]
+        [HttpGet("adhkar")]
+        public IActionResult ListAdhkar() =>
+            Ok(AdhkarReadingContent.List().Select(a => new { a.Key, a.Title }));
+
+        [AllowAnonymous]
+        [HttpGet("adhkar/{key}")]
+        public IActionResult GetAdhkar(string key)
+        {
+            var item = AdhkarReadingContent.Get(key);
+            return item == null
+                ? NotFound()
+                : Ok(new
+                {
+                    item.Key,
+                    item.Title,
+                    arabic = item.Arabic,
+                    transliteration = item.Transliteration,
+                    translation = item.Translation,
+                    instruction = item.Instruction
+                });
+        }
 
         [HttpGet("my-plan")]
         public async Task<IActionResult> MyPlan()
@@ -43,7 +116,6 @@ namespace MosqueOS.API.Controllers
             });
         }
 
-        /// <summary>Start a 30-day para plan (1 para/day default).</summary>
         [HttpPost("start")]
         public async Task<IActionResult> StartPlan([FromQuery] QuranPlanType type = QuranPlanType.ThirtyDay)
         {

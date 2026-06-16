@@ -25,6 +25,18 @@ namespace MosqueOS.API.Controllers
             return Ok(await query.OrderBy(c => c.Name).ToListAsync());
         }
 
+        [Authorize]
+        [HttpGet("mine")]
+        public async Task<IActionResult> MyMemberships()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            var ids = await _unitOfWork.Repository<CommunityMember>().QueryNoTracking()
+                .Where(m => m.UserId == userId)
+                .Select(m => m.CommunityId)
+                .ToListAsync();
+            return Ok(ids);
+        }
+
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Get(int id)
         {

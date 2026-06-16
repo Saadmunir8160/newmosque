@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { ContentService } from '../../../core/services/content.service';
+import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
 import { environment } from '../../../../environments/environment';
 
 interface SocialProviders {
@@ -14,78 +15,154 @@ interface SocialProviders {
 @Component({
   selector: 'app-super-settings',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, PageHeaderComponent],
   template: `
-    <div class="set-page">
-      <header class="set-header">
-        <p class="set-badge">System</p>
-        <h1 class="set-title">Platform settings</h1>
-      </header>
+    <app-page-header badge="System" title="Platform settings"
+      subtitle="Configure tariqa defaults, maintenance banner, and view integrations." />
 
+    <div class="settings-grid">
       <article class="set-card">
-        <h2 class="set-card-title">Default tariqa content mapping (new mosques)</h2>
-        <div class="set-grid">
+        <div class="set-card__head">
+          <span class="set-icon">📿</span>
+          <div>
+            <h2 class="set-card__title">Default tariqa content mapping</h2>
+            <p class="set-card__sub">Default wird collections for new mosques</p>
+          </div>
+        </div>
+        <div class="set-grid-fields">
           <div class="set-field">
-            <label>Ba'alawi default</label>
-            <select class="set-input" [(ngModel)]="baAlawiDefault">
+            <label class="set-label">Ba'Alawi default</label>
+            <select class="set-select" [(ngModel)]="baAlawiDefault">
               <option value="">— Select collection —</option>
               <option *ngFor="let c of baAlawiCollections()" [value]="c.name">{{ c.name }}</option>
             </select>
           </div>
           <div class="set-field">
-            <label>Shadhili default</label>
-            <select class="set-input" [(ngModel)]="shadhiliDefault">
+            <label class="set-label">Shadhili default</label>
+            <select class="set-select" [(ngModel)]="shadhiliDefault">
               <option value="">— Select collection —</option>
               <option *ngFor="let c of shadhiliCollections()" [value]="c.name">{{ c.name }}</option>
             </select>
           </div>
         </div>
-        <button type="button" class="set-btn" (click)="saveTariqaMapping()">Save mapping</button>
-      </article>
-
-      <article class="set-card">
-        <h2 class="set-card-title">Global banner / maintenance notice</h2>
-        <textarea class="set-textarea" rows="3" placeholder="e.g. Scheduled maintenance on Sunday 2–4am"
-          [(ngModel)]="bannerText"></textarea>
         <div class="set-actions">
-          <button type="button" class="set-btn" (click)="saveBanner()">Save banner</button>
+          <span *ngIf="mapMsg()" class="set-toast">{{ mapMsg() }}</span>
+          <button type="button" class="btn-gold" (click)="saveTariqaMapping()">Save mapping</button>
         </div>
       </article>
 
       <article class="set-card">
-        <h2 class="set-card-title">API & integrations</h2>
-        <dl class="set-dl">
-          <div><dt>API URL</dt><dd>{{ apiUrl }}</dd></div>
-          <div><dt>Default mosque ID</dt><dd>{{ defaultMosqueId }}</dd></div>
-          <div><dt>Google login</dt><dd>{{ providers()?.google ? 'Configured' : 'Not configured' }}</dd></div>
-          <div><dt>Facebook login</dt><dd>{{ providers()?.facebook ? 'Configured' : 'Not configured' }}</dd></div>
-        </dl>
+        <div class="set-card__head">
+          <span class="set-icon">📢</span>
+          <div>
+            <h2 class="set-card__title">Global banner</h2>
+            <p class="set-card__sub">Maintenance or platform-wide notice</p>
+          </div>
+        </div>
+        <textarea class="set-textarea" rows="3" placeholder="e.g. Scheduled maintenance on Sunday 2–4am"
+          [(ngModel)]="bannerText"></textarea>
+        <div class="set-actions">
+          <span *ngIf="bannerMsg()" class="set-toast">{{ bannerMsg() }}</span>
+          <button type="button" class="btn-gold" (click)="saveBanner()">Save banner</button>
+        </div>
+      </article>
+
+      <article class="set-card set-card--wide">
+        <div class="set-card__head">
+          <span class="set-icon">🔌</span>
+          <div>
+            <h2 class="set-card__title">API & integrations</h2>
+            <p class="set-card__sub">Read-only platform configuration</p>
+          </div>
+        </div>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-label">API URL</span>
+            <span class="info-value info-value--mono">{{ apiUrl }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Default mosque ID</span>
+            <span class="info-value">{{ defaultMosqueId }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Google login</span>
+            <span class="info-value">
+              <span class="status-dot" [class.status-dot--ok]="providers()?.google"></span>
+              {{ providers()?.google ? 'Configured' : 'Not configured' }}
+            </span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Facebook login</span>
+            <span class="info-value">
+              <span class="status-dot" [class.status-dot--ok]="providers()?.facebook"></span>
+              {{ providers()?.facebook ? 'Configured' : 'Not configured' }}
+            </span>
+          </div>
+        </div>
       </article>
     </div>
   `,
   styles: [`
-    .set-page { display: flex; flex-direction: column; gap: 1rem; }
-    .set-badge { margin: 0 0 0.25rem; font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #fbbf24; }
-    .set-title { margin: 0; font-size: 1.125rem; font-weight: 600; color: #fff; }
-    .set-card { background: #064e3b; border: 1px solid #065f46; border-radius: 0.75rem; padding: 1rem 1.125rem; }
-    .set-card-title { margin: 0 0 0.75rem; font-size: 0.9375rem; font-weight: 600; color: #fff; }
-    .set-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem; }
-    @media (max-width: 640px) { .set-grid { grid-template-columns: 1fr; } }
-    .set-field label { display: block; font-size: 0.75rem; color: #6ee7b7; margin-bottom: 0.25rem; }
-    .set-input, .set-textarea {
-      width: 100%; background: #022c22; border: 1px solid #065f46; border-radius: 0.5rem;
-      padding: 0.5rem 0.75rem; color: #fff; font-size: 0.875rem;
+    .settings-grid { display: grid; gap: 0.875rem; grid-template-columns: 1fr; }
+    @media (min-width: 768px) { .settings-grid { grid-template-columns: repeat(2, 1fr); } }
+    .set-card--wide { grid-column: 1 / -1; }
+
+    .set-card {
+      padding: 1rem 1.125rem;
+      background: linear-gradient(160deg, rgba(6,78,59,0.9), rgba(2,44,34,0.98));
+      border: 1px solid rgba(212,175,55,0.22); border-radius: 0.75rem;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.15);
     }
-    .set-textarea { resize: vertical; min-height: 4rem; }
-    .set-actions { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
-    .set-btn {
-      background: #f59e0b; color: #022c22; font-weight: 700; font-size: 0.8125rem;
-      padding: 0.5rem 1rem; border-radius: 0.5rem; border: none; cursor: pointer;
+    .set-card__head {
+      display: flex; gap: 0.75rem; align-items: flex-start; margin-bottom: 1rem;
+      padding-bottom: 0.75rem; border-bottom: 1px solid rgba(212,175,55,0.1);
     }
-    .set-dl { margin: 0; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.8125rem; }
-    .set-dl div { display: flex; justify-content: space-between; gap: 1rem; }
-    .set-dl dt { color: #6ee7b7; }
-    .set-dl dd { margin: 0; color: #fff; text-align: right; word-break: break-all; }
+    .set-icon { font-size: 1.25rem; line-height: 1; flex-shrink: 0; }
+    .set-card__title { margin: 0; font-size: 0.875rem; font-weight: 700; color: #fff; }
+    .set-card__sub { margin: 0.15rem 0 0; font-size: 0.6875rem; color: rgba(167,243,208,0.65); }
+
+    .set-grid-fields { display: grid; gap: 0.75rem; grid-template-columns: 1fr; }
+    @media (min-width: 480px) { .set-grid-fields { grid-template-columns: 1fr 1fr; } }
+    .set-label {
+      display: block; margin-bottom: 0.35rem; font-size: 0.625rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em; color: rgba(212,175,55,0.85);
+    }
+    .set-select, .set-textarea {
+      width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(212,175,55,0.25); border-radius: 0.5rem;
+      padding: 0.55rem 0.65rem; font-size: 0.8125rem; color: #fff; outline: none;
+      color-scheme: dark;
+    }
+    .set-select:focus, .set-textarea:focus { border-color: #D4AF37; box-shadow: 0 0 0 3px rgba(212,175,55,0.1); }
+    .set-textarea { resize: vertical; min-height: 4.5rem; margin-bottom: 0.5rem; }
+
+    .set-actions {
+      display: flex; align-items: center; justify-content: flex-end; gap: 0.75rem; margin-top: 0.75rem;
+    }
+    .set-toast { font-size: 0.6875rem; color: #6ee7b7; margin-right: auto; }
+    .btn-gold {
+      font-size: 0.75rem; font-weight: 700; color: #022c22;
+      background: linear-gradient(180deg, #fcd34d, #D4AF37);
+      border: 1px solid rgba(212,175,55,0.55); border-radius: 0.5rem;
+      padding: 0.5rem 1rem; cursor: pointer; white-space: nowrap;
+    }
+
+    .info-grid { display: grid; gap: 0.5rem; }
+    @media (min-width: 640px) { .info-grid { grid-template-columns: repeat(2, 1fr); } }
+    .info-item {
+      display: flex; flex-direction: column; gap: 0.2rem;
+      padding: 0.625rem 0.75rem; background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(16,185,129,0.12); border-radius: 0.5rem;
+    }
+    .info-label { font-size: 0.5625rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.04em; color: rgba(212,175,55,0.7); }
+    .info-value { font-size: 0.8125rem; color: #ecfdf5; font-weight: 500;
+      display: flex; align-items: center; gap: 0.4rem; }
+    .info-value--mono { font-family: ui-monospace, monospace; font-size: 0.75rem; word-break: break-all; }
+    .status-dot {
+      width: 0.5rem; height: 0.5rem; border-radius: 50%; background: rgba(239,68,68,0.6); flex-shrink: 0;
+    }
+    .status-dot--ok { background: #10b981; }
   `]
 })
 export class SuperSettingsComponent {
@@ -100,6 +177,8 @@ export class SuperSettingsComponent {
   baAlawiDefault = localStorage.getItem('mosqueos.tariqa.baalawi') ?? '';
   shadhiliDefault = localStorage.getItem('mosqueos.tariqa.shadhili') ?? '';
   bannerText = localStorage.getItem('mosqueos.platformBanner') ?? '';
+  mapMsg = signal('');
+  bannerMsg = signal('');
 
   constructor() {
     this.content.getCollections().subscribe(list => {
@@ -115,9 +194,13 @@ export class SuperSettingsComponent {
   saveTariqaMapping(): void {
     localStorage.setItem('mosqueos.tariqa.baalawi', this.baAlawiDefault);
     localStorage.setItem('mosqueos.tariqa.shadhili', this.shadhiliDefault);
+    this.mapMsg.set('Mapping saved.');
+    setTimeout(() => this.mapMsg.set(''), 2500);
   }
 
   saveBanner(): void {
     localStorage.setItem('mosqueos.platformBanner', this.bannerText);
+    this.bannerMsg.set('Banner saved.');
+    setTimeout(() => this.bannerMsg.set(''), 2500);
   }
 }

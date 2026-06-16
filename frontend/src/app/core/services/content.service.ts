@@ -10,6 +10,7 @@ export interface ContentItem {
 }
 export interface AdhkarItem {
   id: number; title: string; arabicText: string; defaultCount: number; category?: string;
+  transliteration?: string; translation?: string;
 }
 export interface UserAdhkar {
   id: number; targetCount: number; adhkarItem?: AdhkarItem; customTitle?: string;
@@ -43,8 +44,8 @@ export class ContentService {
     return this.http.post<ContentItem>(`${this.base}/awrad/content-items`, data);
   }
 
-  getRecommendedWird(): Observable<unknown> {
-    return this.http.get(`${this.base}/awrad/recommended-now`);
+  getRecommendedWird(): Observable<{ slot: string; collection: WirdCollection; mode?: string }> {
+    return this.http.get<{ slot: string; collection: WirdCollection; mode?: string }>(`${this.base}/awrad/recommended-now`);
   }
 
   getMySchedule(): Observable<unknown[]> {
@@ -53,6 +54,10 @@ export class ContentService {
 
   markWirdComplete(collectionId: number): Observable<unknown> {
     return this.http.post(`${this.base}/awrad/collections/${collectionId}/complete`, {});
+  }
+
+  getWirdCompletedToday(): Observable<number[]> {
+    return this.http.get<number[]>(`${this.base}/awrad/completed-today`);
   }
 
   // Duas
@@ -88,6 +93,10 @@ export class ContentService {
     return this.http.post<UserAdhkar>(`${this.base}/adhkar/mine`, { adhkarItemId, targetCount });
   }
 
+  removeFromMyAdhkar(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/adhkar/mine/${id}`);
+  }
+
   createAdhkarItem(data: Partial<AdhkarItem>): Observable<AdhkarItem> {
     return this.http.post<AdhkarItem>(`${this.base}/adhkar/items`, data);
   }
@@ -114,6 +123,10 @@ export class ContentService {
 
   joinCommunity(id: number): Observable<unknown> {
     return this.http.post(`${this.base}/communities/${id}/join`, {});
+  }
+
+  getMyCommunityIds(): Observable<number[]> {
+    return this.http.get<number[]>(`${this.base}/communities/mine`);
   }
 
   // Preferences

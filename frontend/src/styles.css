@@ -14,6 +14,8 @@
     width: 100%;
     font-size: 13px;
     -webkit-text-size-adjust: 100%;
+    scrollbar-color: rgba(212, 175, 55, 0.4) #022c22;
+    scrollbar-width: thin;
   }
 
   @media (min-width: 640px) {
@@ -35,6 +37,31 @@
     line-height: 1.5;
     background-color: #022c22;
     color: #ecfdf5;
+    scrollbar-color: rgba(212, 175, 55, 0.4) #022c22;
+    scrollbar-width: thin;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: #022c22;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: rgba(212, 175, 55, 0.38);
+    border-radius: 9999px;
+    border: 2px solid #022c22;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(212, 175, 55, 0.58);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: #022c22;
   }
 
   app-root {

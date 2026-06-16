@@ -49,6 +49,14 @@ export class MosqueService {
     return this.http.get<ParticipationOpportunity[]>(`${this.base}/mosques/${mosqueId}/participation`);
   }
 
+  getMyParticipationIds(mosqueId: number): Observable<number[]> {
+    return this.http.get<number[]>(`${this.base}/mosques/${mosqueId}/participation/mine`);
+  }
+
+  registerParticipation(mosqueId: number, opportunityId: number): Observable<unknown> {
+    return this.http.post(`${this.base}/mosques/${mosqueId}/participation/${opportunityId}/register`, {});
+  }
+
   getReadingCampaigns(mosqueId: number): Observable<ReadingCampaign[]> {
     return this.http.get<ReadingCampaign[]>(`${this.base}/mosques/${mosqueId}/reading-campaigns`);
   }

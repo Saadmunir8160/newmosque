@@ -36,6 +36,9 @@ namespace MosqueOS.Infrastructure
             await EnsureUser(userManager, "google_user", "google.user@mosqueos.uk", "Google Member", "Google@123", Roles.Member);
             await EnsureUser(userManager, "facebook_user", "facebook.user@mosqueos.uk", "Facebook Member", "Facebook@123", Roles.Member);
 
+            await RepairDemoUserRolesAsync(userManager);
+            await RepairAdhkarLibraryAsync(db);
+
             // Idempotent: ensure demo owner is linked to the Bradford mosque
             var existingDemo = await db.Mosques.FirstOrDefaultAsync(m => m.Slug == "masjid-al-noor-bradford");
             if (existingDemo != null)
@@ -463,6 +466,58 @@ namespace MosqueOS.Infrastructure
                 new JourneyStage { GuideId = umrahGuide.Id, OrderIndex = 6, Title = "Completion", Description = "Exit ihram. Spend your remaining time in Makkah in prayer, tawaf, and recitation. Drink Zamzam with the intention of cure and good.", Duas = "Dua upon drinking Zamzam: Allahumma inni as'aluka 'ilman nafi'an..." });
 
             await db.SaveChangesAsync();
+        }
+
+        /// <summary>Remove broken adhkar library rows (empty title) that break the member counter UI.</summary>
+        private static async Task RepairAdhkarLibraryAsync(ApplicationDbContext db)
+        {
+            var broken = await db.AdhkarItems
+                .Where(a => string.IsNullOrWhiteSpace(a.Title))
+                .ToListAsync();
+            if (broken.Count == 0) return;
+
+            var brokenIds = broken.Select(b => b.Id).ToList();
+            var linked = await db.UserAdhkar
+                .Where(u => u.AdhkarItemId != null && brokenIds.Contains(u.AdhkarItemId.Value))
+                .ToListAsync();
+            if (linked.Count > 0)
+            {
+                var linkedIds = linked.Select(l => l.Id).ToList();
+                var logs = await db.UserAdhkarLogs.Where(l => linkedIds.Contains(l.UserAdhkarId)).ToListAsync();
+                db.UserAdhkarLogs.RemoveRange(logs);
+                db.UserAdhkar.RemoveRange(linked);
+            }
+
+            db.AdhkarItems.RemoveRange(broken);
+            await db.SaveChangesAsync();
+        }
+
+        /// <summary>Re-apply demo staff roles on every startup (idempotent).</summary>
+        private static async Task RepairDemoUserRolesAsync(UserManager<ApplicationUser> userManager)
+        {
+            var demoRoles = new (string Username, string[] Roles)[]
+            {
+                ("admin", [Roles.SuperAdmin]),
+                ("mosqueadmin", [Roles.MosqueAdmin]),
+                ("owner", [Roles.MosqueOwner]),
+                ("prayereditor", [Roles.PrayerTimesEditor]),
+                ("teacher", [Roles.Teacher]),
+                ("muqaddam", [Roles.Muqaddam, Roles.Member]),
+                ("editor", [Roles.ContentEditor]),
+                ("parent", [Roles.Parent, Roles.Member]),
+                ("member", [Roles.Member]),
+            };
+
+            foreach (var (username, roles) in demoRoles)
+            {
+                var user = await userManager.FindByNameAsync(username);
+                if (user == null) continue;
+                foreach (var role in roles)
+                {
+                    if (!await userManager.IsInRoleAsync(user, role))
+                        await userManager.AddToRoleAsync(user, role);
+                }
+            }
         }
 
         private static async Task<ApplicationUser> EnsureUser(

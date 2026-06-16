@@ -36,5 +36,6 @@ export function primaryRole(userRoles: string[]): AppRole | null {
 
 /** Human-readable label for the user's primary role. */
 export function roleDisplayName(userRoles: string[]): string {
+  if (!userRoles?.length) return '';
   return primaryRole(userRoles) ?? ROLES.Member;
 }

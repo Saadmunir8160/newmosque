@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/auth/auth.service';
 
 @Component({
@@ -397,8 +398,18 @@ export class LoginComponent implements OnInit {
         localStorage.removeItem('mosqueos_remember_username');
       }
       this.router.navigate(['/dashboard']);
-    } catch {
-      this.error.set('Invalid username or password.');
+    } catch (err) {
+      if (err instanceof HttpErrorResponse) {
+        if (err.status === 401) {
+          this.error.set('Invalid username or password.');
+        } else if (err.status === 0) {
+          this.error.set('Cannot reach the server. Start the backend API on http://localhost:5000 and try again.');
+        } else {
+          this.error.set('Login failed. Please try again in a moment.');
+        }
+      } else {
+        this.error.set('Login failed. Please try again.');
+      }
       this.password = '';
     } finally {
       this.submitting.set(false);

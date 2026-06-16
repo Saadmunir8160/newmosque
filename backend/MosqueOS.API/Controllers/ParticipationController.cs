@@ -26,6 +26,19 @@ namespace MosqueOS.API.Controllers
             return Ok(await query.OrderBy(o => o.Date).ToListAsync());
         }
 
+        [Authorize]
+        [HttpGet("mine")]
+        public async Task<IActionResult> MyRegistrations(int mosqueId)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            var ids = await _unitOfWork.Repository<ParticipationRegistration>().QueryNoTracking()
+                .Include(r => r.Opportunity)
+                .Where(r => r.UserId == userId && r.Opportunity!.MosqueId == mosqueId)
+                .Select(r => r.OpportunityId)
+                .ToListAsync();
+            return Ok(ids);
+        }
+
         [Authorize(Roles = Roles.Admins)]
         [HttpPost]
         public async Task<IActionResult> Create(int mosqueId, [FromBody] ParticipationOpportunity opportunity)

@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterOutlet, RouterModule } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
-import { navForGuest, navForRoles, navIcon, navSections, navIsSuperAdmin, navIsMosqueOwner, NavItem } from '../../core/config/nav.config';
+import { navForGuest, navForRoles, navIcon, navSections, navIsSuperAdmin, navIsMosqueOwner, navIsPrayerEditor, NavItem } from '../../core/config/nav.config';
 import {
   SUPER_ADMIN_NAV_SECTIONS,
   SUPER_ADMIN_NAV_ICONS,
@@ -13,6 +13,11 @@ import {
   OWNER_NAV_ICONS,
   ownerNavItems,
 } from '../../core/config/owner-nav.config';
+import {
+  PRAYER_EDITOR_NAV_SECTIONS,
+  PRAYER_EDITOR_NAV_ICONS,
+  prayerEditorNavItems,
+} from '../../core/config/prayer-editor-nav.config';
 
 const SIDEBAR_KEY = 'mos_sidebar_collapsed';
 const SECTIONS_KEY = 'mos_nav_sections';
@@ -86,6 +91,11 @@ const SECTIONS_KEY = 'mos_nav_sections';
         </div>
 
         <nav class="flex-1 overflow-y-auto no-scrollbar py-3 min-h-0">
+          <p *ngIf="authService.loading()" class="px-4 text-xs text-emerald-400/70">Loading menu…</p>
+          <p *ngIf="!authService.loading() && !sections().length && !authService.isGuest()"
+            class="px-4 text-xs text-amber-300/80 leading-relaxed">
+            No menu items for your account. Ask an admin to assign a role, then log in again.
+          </p>
           <!-- Expanded: grouped sections -->
           <ng-container *ngIf="!sidebarCollapsed()">
             <div *ngFor="let section of sections()" class="mb-1">
@@ -230,12 +240,18 @@ export class ShellComponent {
   isMosqueOwner = computed(() =>
     !this.authService.isGuest() && navIsMosqueOwner(this.authService.roles()));
 
+  isPrayerEditor = computed(() =>
+    !this.authService.isGuest() && navIsPrayerEditor(this.authService.roles()));
+
   sections = computed(() => {
     if (this.isSuperAdmin()) {
       return SUPER_ADMIN_NAV_SECTIONS.map(s => ({ section: s.title, items: s.items }));
     }
     if (this.isMosqueOwner()) {
       return OWNER_NAV_SECTIONS.map(s => ({ section: s.title, items: s.items }));
+    }
+    if (this.isPrayerEditor()) {
+      return PRAYER_EDITOR_NAV_SECTIONS.map(s => ({ section: s.title, items: s.items }));
     }
     const items = this.authService.isGuest()
       ? navForGuest()
@@ -246,6 +262,7 @@ export class ShellComponent {
   flatNavItems = computed(() => {
     if (this.isSuperAdmin()) return superAdminNavItems();
     if (this.isMosqueOwner()) return ownerNavItems();
+    if (this.isPrayerEditor()) return prayerEditorNavItems();
     return this.sections().flatMap(s => s.items);
   });
 
@@ -255,6 +272,9 @@ export class ShellComponent {
     }
     if (this.isMosqueOwner() && item.icon) {
       return OWNER_NAV_ICONS[item.icon] ?? navIcon(item);
+    }
+    if (this.isPrayerEditor() && item.icon) {
+      return PRAYER_EDITOR_NAV_ICONS[item.icon] ?? navIcon(item);
     }
     return navIcon(item);
   }

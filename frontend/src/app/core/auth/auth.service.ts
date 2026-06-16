@@ -23,6 +23,15 @@ export class AuthService {
     this.restoreSession();
   }
 
+  private normalizeRoles(roles: string[] | null | undefined): string[] {
+    return Array.isArray(roles) ? roles.filter(Boolean) : [];
+  }
+
+  private applyRoles(roles: string[] | null | undefined, fallback: string[] = []): void {
+    const next = this.normalizeRoles(roles);
+    this.roles.set(next.length ? next : fallback);
+  }
+
   private async restoreSession(): Promise<void> {
     const token = localStorage.getItem('mosque_os_token');
     if (!token) {
@@ -35,7 +44,7 @@ export class AuthService {
         this.http.get<UserProfile>(`${environment.apiUrl}/auth/me`)
       );
       this.user.set(profile);
-      this.roles.set(profile.roles);
+      this.applyRoles(profile.roles);
       this.isAuthenticated.set(true);
     } catch {
       this.clearSession();
@@ -53,7 +62,8 @@ export class AuthService {
     );
     localStorage.setItem('mosque_os_token', res.token);
     this.clearGuestMode();
-    this.roles.set(res.roles);
+    const loginRoles = this.normalizeRoles(res.roles);
+    this.applyRoles(loginRoles);
     this.isAuthenticated.set(true);
     this.user.set({
       id: '',
@@ -67,14 +77,14 @@ export class AuthService {
       homeMosqueId: null,
       searchRadiusKm: 0,
       interests: null,
-      roles: res.roles,
+      roles: loginRoles,
     });
     try {
       const profile = await firstValueFrom(
         this.http.get<UserProfile>(`${environment.apiUrl}/auth/me`)
       );
       this.user.set(profile);
-      this.roles.set(profile.roles);
+      this.applyRoles(profile.roles, loginRoles);
     } catch {
       // keep login response profile
     }
@@ -106,7 +116,7 @@ export class AuthService {
       this.http.get<UserProfile>(`${environment.apiUrl}/auth/me`)
     );
     this.user.set(profile);
-    this.roles.set(profile.roles);
+    this.applyRoles(profile.roles);
   }
 
   enterGuestMode(): void {

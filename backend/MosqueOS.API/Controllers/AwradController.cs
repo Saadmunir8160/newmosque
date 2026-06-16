@@ -162,6 +162,21 @@ namespace MosqueOS.API.Controllers
 
         // ---- Progress ----
 
+        /// <summary>Collection IDs the user marked complete today (UTC date).</summary>
+        [Authorize]
+        [HttpGet("completed-today")]
+        public async Task<IActionResult> CompletedToday()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var ids = await _unitOfWork.Repository<UserWirdProgress>().QueryNoTracking()
+                .Where(p => p.UserId == userId && p.Completed && p.LastCompletedAt != null
+                    && DateOnly.FromDateTime(p.LastCompletedAt.Value) == today)
+                .Select(p => p.CollectionId)
+                .ToListAsync();
+            return Ok(ids);
+        }
+
         [Authorize]
         [HttpPost("collections/{id:int}/complete")]
         public async Task<IActionResult> MarkComplete(int id)

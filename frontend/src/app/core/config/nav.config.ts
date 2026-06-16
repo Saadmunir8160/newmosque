@@ -227,23 +227,31 @@ export function navIsMosqueOwner(userRoles: string[]): boolean {
   return userRoles.includes(ROLES.MosqueOwner) && !userRoles.includes(ROLES.SuperAdmin);
 }
 
+/** Dedicated prayer-editor sidebar (not mosque admin / super admin). */
+export function navIsPrayerEditor(userRoles: string[]): boolean {
+  if (!userRoles.includes(ROLES.PrayerTimesEditor)) return false;
+  if (navIsSuperAdmin(userRoles) || navIsMosqueOwner(userRoles)) return false;
+  if (hasAny(userRoles, ADMINS)) return false;
+  return true;
+}
+
 export function navForRoles(userRoles: string[]): NavItem[] {
 
   if (navIsSuperAdmin(userRoles)) return [];
 
   if (navIsMosqueOwner(userRoles)) return [];
 
+  const roles = userRoles?.length ? userRoles : [ROLES.Member];
 
+  const editorOnly = isSinglePurpose(roles, ROLES.PrayerTimesEditor, ADMINS);
 
-  const editorOnly = isSinglePurpose(userRoles, ROLES.PrayerTimesEditor, ADMINS);
+  const teacherOnly = isSinglePurpose(roles, ROLES.Teacher, ADMINS);
 
-  const teacherOnly = isSinglePurpose(userRoles, ROLES.Teacher, ADMINS);
+  const contentOnly = isSinglePurpose(roles, ROLES.ContentEditor, ADMINS);
 
-  const contentOnly = isSinglePurpose(userRoles, ROLES.ContentEditor, ADMINS);
+  const muqaddamOnly = isSinglePurpose(roles, ROLES.Muqaddam, ADMINS);
 
-  const muqaddamOnly = isSinglePurpose(userRoles, ROLES.Muqaddam, ADMINS);
-
-  const parentOnly = isSinglePurpose(userRoles, ROLES.Parent, ADMINS);
+  const parentOnly = isSinglePurpose(roles, ROLES.Parent, ADMINS);
 
 
 
@@ -251,7 +259,7 @@ export function navForRoles(userRoles: string[]): NavItem[] {
 
     if (!item.roles?.length) return false;
 
-    if (!item.roles.some(r => userRoles.includes(r))) return false;
+    if (!item.roles.some(r => roles.includes(r))) return false;
 
 
 
@@ -278,7 +286,7 @@ export function navForRoles(userRoles: string[]): NavItem[] {
 
     // Hide duplicate Prayer Times section for editors who also have admin
 
-    if (item.section === 'Prayer Times' && hasAny(userRoles, ADMINS)) return false;
+    if (item.section === 'Prayer Times' && hasAny(roles, ADMINS)) return false;
 
 
 

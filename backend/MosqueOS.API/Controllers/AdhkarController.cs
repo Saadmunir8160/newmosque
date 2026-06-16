@@ -22,7 +22,8 @@ namespace MosqueOS.API.Controllers
         [HttpGet("items")]
         public async Task<IActionResult> GetItems([FromQuery] string? category)
         {
-            var query = _unitOfWork.Repository<AdhkarItem>().QueryNoTracking().AsQueryable();
+            var query = _unitOfWork.Repository<AdhkarItem>().QueryNoTracking()
+                .Where(a => !string.IsNullOrWhiteSpace(a.Title));
             if (!string.IsNullOrWhiteSpace(category)) query = query.Where(a => a.Category == category);
             return Ok(await query.OrderBy(a => a.Title).ToListAsync());
         }
@@ -79,6 +80,15 @@ namespace MosqueOS.API.Controllers
         {
             item.Id = 0;
             item.UserId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+
+            if (item.AdhkarItemId.HasValue)
+            {
+                var exists = await _unitOfWork.Repository<UserAdhkar>().QueryNoTracking()
+                    .AnyAsync(u => u.UserId == item.UserId && u.AdhkarItemId == item.AdhkarItemId);
+                if (exists)
+                    return Conflict(new { message = "This dhikr is already on your daily list." });
+            }
+
             _unitOfWork.Repository<UserAdhkar>().Add(item);
             await _unitOfWork.SaveChangesAsync();
             return Ok(item);

@@ -133,8 +133,17 @@ namespace MosqueOS.API.Controllers
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             var allocation = await _unitOfWork.Repository<ReadingAllocation>().Query()
-                .FirstOrDefaultAsync(a => a.Id == allocationId && a.UserId == userId);
+                .FirstOrDefaultAsync(a => a.Id == allocationId);
             if (allocation == null) return NotFound();
+
+            if (allocation.UserId != null && allocation.UserId != userId)
+                return Conflict(new { message = "This portion is assigned to another member." });
+
+            if (allocation.Status == ReadingAllocationStatus.Completed)
+                return Ok(allocation);
+
+            if (allocation.UserId == null)
+                allocation.UserId = userId;
 
             allocation.Status = ReadingAllocationStatus.Completed;
             allocation.UpdatedAt = DateTime.UtcNow;
