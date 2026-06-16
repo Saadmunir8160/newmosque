@@ -10,6 +10,8 @@ const ACTION_LABELS: Record<string, string> = {
   APPROVE_CLAIM: 'Claim approved',
   REJECT_CLAIM: 'Claim rejected',
   SEED_MOSQUE: 'Mosque listed',
+  UPDATE_MOSQUE: 'Listing updated',
+  BULK_MOSQUE_STATUS: 'Bulk status change',
   ASSIGN_MOSQUE_ADMIN: 'Admin assigned',
   PRAYER_TIME_CHANGE: 'Prayer time updated',
 };

@@ -17,6 +17,9 @@ namespace MosqueOS.Domain.Entities
         public string? LogoUrl { get; set; }
         public string? BannerUrl { get; set; }
         public string Timezone { get; set; } = "Europe/London";
+        public string? MapLocation { get; set; }
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
         public MosqueStatus Status { get; set; } = MosqueStatus.Unclaimed;
         public string? OwnerId { get; set; }
         public ApplicationUser? Owner { get; set; }

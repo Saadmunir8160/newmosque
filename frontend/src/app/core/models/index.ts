@@ -50,9 +50,14 @@ export interface Mosque {
   description?: string;
   logoUrl?: string;
   bannerUrl?: string;
+  mapLocation?: string;
+  latitude?: number;
+  longitude?: number;
   timezone: string;
   status: string;
   ownerId?: string;
+  createdAt?: string;
+  updatedAt?: string;
   settings?: MosqueSetting[];
 }
 

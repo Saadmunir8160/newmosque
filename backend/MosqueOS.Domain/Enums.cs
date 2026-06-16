@@ -1,6 +1,14 @@
 namespace MosqueOS.Domain
 {
-    public enum MosqueStatus { Unclaimed, Claimed, Active }
+    public enum MosqueStatus
+    {
+        Unclaimed = 0,
+        Claimed = 1,
+        Active = 2,
+        PendingReview = 3,
+        Suspended = 4,
+        Archived = 5
+    }
 
     public enum PublishStatus { Draft, Published, Unpublished }
 

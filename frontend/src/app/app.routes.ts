@@ -19,6 +19,8 @@ import { ROLES } from './core/constants/roles';
 // Super Admin
 import { SuperDashboardComponent } from './modules/super/dashboard/super-dashboard.component';
 import { SuperMosquesComponent } from './modules/super/mosques/super-mosques.component';
+import { SuperMosqueDetailComponent } from './modules/super/mosques/super-mosque-detail.component';
+import { SuperMosqueEditComponent } from './modules/super/mosques/super-mosque-edit.component';
 import { SuperClaimsComponent } from './modules/super/claims/super-claims.component';
 import { SuperUsersComponent } from './modules/super/users/super-users.component';
 import { SuperMosqueDataComponent } from './modules/super/mosque-data/super-mosque-data.component';
@@ -105,6 +107,8 @@ export const routes: Routes = [
       // —— Super Admin ——
       { path: 'super', component: SuperDashboardComponent, canActivate: [authGuard, roleGuard([ROLES.SuperAdmin])] },
       { path: 'super/mosques', component: SuperMosquesComponent, canActivate: [authGuard, roleGuard([ROLES.SuperAdmin])] },
+      { path: 'super/mosques/:id/edit', component: SuperMosqueEditComponent, canActivate: [authGuard, roleGuard([ROLES.SuperAdmin])] },
+      { path: 'super/mosques/:id', component: SuperMosqueDetailComponent, canActivate: [authGuard, roleGuard([ROLES.SuperAdmin])] },
       { path: 'super/claims', component: SuperClaimsComponent, canActivate: [authGuard, roleGuard([ROLES.SuperAdmin])] },
       { path: 'super/users', component: SuperUsersComponent, canActivate: [authGuard, roleGuard([ROLES.SuperAdmin])] },
       { path: 'super/mosque-data', component: SuperMosqueDataComponent, canActivate: [authGuard, roleGuard([ROLES.SuperAdmin])] },

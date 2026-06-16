@@ -1,62 +1,23 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { forkJoin, of } from 'rxjs';
-import { catchError, map, switchMap } from 'rxjs/operators';
+import { forkJoin } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
-import { AdminService } from '../../../core/services/admin.service';
-import { MosqueService } from '../../../core/services/mosque.service';
 import {
   AuditLogEntry,
+  PlatformDashboard,
   PlatformService,
-  PlatformStats,
-  PlatformUser,
 } from '../../../core/services/platform.service';
-import { TodayService } from '../../../core/services/today.service';
 import { SUPER_ADMIN_NAV_ICONS } from '../../../core/config/super-admin-nav.config';
-import { ROLES } from '../../../core/constants/roles';
-import { Mosque, TodayResponse } from '../../../core/models';
-import {
-  countdownToJamaat,
-  formatHijriDate,
-  formatTime12,
-  getActivePrayerName,
-  getPrayerSlots,
-  isRamadan,
-  resolveNextPrayer,
-  suhoorEndTime,
-} from '../../../core/utils/prayer.utils';
-import { currentDayName } from '../../../core/utils/date.utils';
-import { DashboardBadgesComponent } from '../../../shared/ui/dashboard-badges.component';
+import { Mosque } from '../../../core/models';
+import { formatMosqueStatus } from '../../../core/utils/mosque-status.util';
 
-interface PrayerRow {
-  name: string;
-  adhan: string;
-  iqamah: string;
-  adhanFmt: string;
-  iqamahFmt: string;
-  isCurrent: boolean;
-  isNext: boolean;
-}
-
-interface MarqueeItem {
-  icon: string;
-  text: string;
-  tag?: string;
-}
-
-interface SlideItem {
-  kind: string;
+interface ActionItem {
+  count: number;
   title: string;
-  body: string;
-  ref?: string;
-}
-
-interface StatCard {
-  label: string;
-  valueKey: 'activeMosques' | 'pendingClaims' | 'totalUsers' | 'openCampaigns';
+  description: string;
   route: string;
-  icon: string;
+  action: string;
   warn?: boolean;
 }
 
@@ -64,748 +25,536 @@ interface QuickAction {
   label: string;
   route: string;
   icon: string;
-  desc: string;
-}
-
-interface WorkflowStep {
-  step: number;
-  route: string;
-  title: string;
-  summary: string;
-  steps: string[];
-  statLabel?: string;
-  statKey?: keyof PlatformStats;
-  statClass?: string;
-}
-
-interface RoleCount {
-  role: string;
-  count: number;
 }
 
 @Component({
   selector: 'app-super-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule, DashboardBadgesComponent],
+  imports: [CommonModule, RouterModule],
   template: `
-    <div class="sdash">
-      <!-- 1. Header -->
-      <header class="sdash-header">
-        <div>
-          <app-dashboard-badges [useAuthRole]="true" />
-          <h1 class="sdash-title">Dashboard</h1>
-          <p class="sdash-greeting">{{ greeting() }}</p>
-          <p class="sdash-sub">Live overview · prayer times · users & mosques</p>
+    <div class="enterprise-dash" *ngIf="dashboard() as d">
+      <!-- Header -->
+      <header class="dash-header">
+        <div class="dash-header__left">
+          <p class="dash-eyebrow">Super Admin · Platform Control</p>
+          <h1 class="dash-greeting">{{ greeting() }}</h1>
+          <div class="dash-meta">
+            <span class="status-chip" [class.status-chip--warn]="d.platformStatus === 'Warning'">
+              <span class="status-dot"></span>
+              {{ d.platformStatus }}
+            </span>
+            <span class="sync-time">Last sync {{ lastSync() | date:'short' }}</span>
+          </div>
         </div>
-        <button type="button" class="sdash-refresh" (click)="refresh()" [disabled]="loading()">
-          {{ loading() ? 'Refreshing…' : 'Refresh' }}
-        </button>
+        <div class="dash-header__right">
+          <div class="notif-wrap">
+            <button type="button" class="icon-btn" (click)="toggleNotifs()" aria-label="Notifications">
+              🔔
+              <span *ngIf="d.notifications.length" class="notif-badge">{{ d.notifications.length }}</span>
+            </button>
+            <div class="notif-panel" *ngIf="showNotifs()">
+              <p class="notif-panel__title">Notification center</p>
+              <a *ngFor="let n of d.notifications" [routerLink]="n.route" class="notif-item" [attr.data-severity]="n.severity" (click)="showNotifs.set(false)">
+                <strong>{{ n.title }}</strong>
+                <span>{{ n.message }}</span>
+              </a>
+              <p *ngIf="!d.notifications.length" class="notif-empty">No alerts right now.</p>
+            </div>
+          </div>
+          <button type="button" class="btn-primary" (click)="refresh()" [disabled]="loading()">
+            {{ loading() ? 'Syncing…' : 'Refresh' }}
+          </button>
+        </div>
       </header>
 
-      <!-- 2. Stat cards -->
-      <div class="sdash-stats" *ngIf="stats() as s">
-        <a *ngFor="let card of statCards" [routerLink]="card.route"
-          class="scard" [class.scard--warn]="card.warn">
-          <span class="scard-icon">{{ card.icon }}</span>
+      <!-- Health score + KPI row -->
+      <div class="top-row">
+        <div class="health-score-card">
+          <div class="score-ring" [style.--score]="d.healthScore">
+            <span class="score-value">{{ d.healthScore }}%</span>
+          </div>
           <div>
-            <p class="scard-label">{{ card.label }}</p>
-            <p class="scard-value">{{ statValue(card.valueKey, s) }}</p>
-          </div>
-        </a>
-      </div>
-
-      <!-- 3. Needs attention -->
-      <article class="scard scard--alert" *ngIf="alerts().length">
-        <h3 class="scard-heading scard-heading--alert">Needs attention</h3>
-        <ul class="alert-list">
-          <li *ngFor="let alert of alerts()" class="alert-item">
-            <span class="alert-msg">{{ alert.message }}</span>
-            <a [routerLink]="alert.route" class="alert-action">{{ alert.action }} →</a>
-          </li>
-        </ul>
-      </article>
-
-      <!-- 4. Hero row -->
-      <div class="sdash-hero-row">
-        <article class="scard scard--hero scard--interactive">
-          <p class="hero-eyebrow">Next prayer · {{ mosqueName() }}</p>
-          <h2 class="hero-prayer">{{ nextPrayerName() }}</h2>
-          <p class="hero-countdown" aria-live="polite">{{ countdown() }}</p>
-          <p class="hero-meta">Iqāmah {{ nextJamaatFmt() }} · Adhān {{ nextAdhanFmt() }}</p>
-          <div class="hero-actions">
-            <a routerLink="/dashboard/prayer-times" class="hero-chip">Full timetable</a>
-            <button type="button" class="hero-chip hero-chip--ghost" (click)="refreshToday()">Refresh times</button>
-          </div>
-        </article>
-
-        <article class="scard scard--clock scard--interactive">
-          <p class="clock-digital" aria-live="polite">{{ liveClock() }}</p>
-          <p class="clock-gregorian">{{ gregorianDate() }}</p>
-          <p class="clock-hijri">{{ hijriDate() }}</p>
-          <div class="clock-badges">
-            <span *ngIf="isFriday()" class="clock-badge clock-badge--gold">Jumuah</span>
-            <span *ngIf="ramadan()" class="clock-badge clock-badge--ramadan">Ramadan</span>
-            <span class="clock-badge">{{ dayName() }}</span>
-          </div>
-        </article>
-      </div>
-
-      <!-- 5. Prayer timetable -->
-      <article class="scard scard--table" *ngIf="prayerRows().length">
-        <div class="table-head">
-          <h3 class="scard-heading">Prayer timetable</h3>
-          <span class="table-hint">Adhān & Iqāmah · today</span>
-        </div>
-        <div class="table-wrap">
-          <table class="ptable">
-            <thead>
-              <tr>
-                <th>Prayer</th>
-                <th>Adhān</th>
-                <th>Iqāmah</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let row of prayerRows()"
-                [class.ptable-row--current]="row.isCurrent"
-                [class.ptable-row--next]="row.isNext">
-                <td>
-                  <span class="ptable-name">{{ row.name }}</span>
-                  <span *ngIf="row.isCurrent" class="ptable-pill">Now</span>
-                  <span *ngIf="row.isNext" class="ptable-pill ptable-pill--next">Next</span>
-                </td>
-                <td>{{ row.adhanFmt }}</td>
-                <td>{{ row.iqamahFmt }}</td>
-                <td class="ptable-action">
-                  <a routerLink="/dashboard/admin/prayer-times" title="Edit">✎</a>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </article>
-
-      <!-- 6. Mini cards -->
-      <div class="sdash-mini-row">
-        <article class="scard scard--mini scard--interactive">
-          <span class="mini-icon">🌙</span>
-          <div>
-            <p class="mini-label">Suhoor ends</p>
-            <p class="mini-value">{{ suhoorFmt() }}</p>
-            <p class="mini-hint">{{ ramadan() ? 'Last intake before Fajr' : 'Ramadan-ready widget' }}</p>
-          </div>
-        </article>
-        <article class="scard scard--mini scard--interactive">
-          <span class="mini-icon">🌅</span>
-          <div>
-            <p class="mini-label">Iftar</p>
-            <p class="mini-value">{{ iftarFmt() }}</p>
-            <p class="mini-hint">At Maghrib adhān</p>
-          </div>
-        </article>
-        <article class="scard scard--mini scard--interactive">
-          <span class="mini-icon">📢</span>
-          <div>
-            <p class="mini-label">Live notices</p>
-            <p class="mini-value">{{ marqueeItems().length }}</p>
-            <p class="mini-hint">Announcements & events</p>
-          </div>
-        </article>
-        <article class="scard scard--mini scard--interactive">
-          <span class="mini-icon">📖</span>
-          <div>
-            <p class="mini-label">Daily reminders</p>
-            <p class="mini-value mini-value--sm">{{ activeSlide().kind }}</p>
-            <p class="mini-hint">Rotating quotes & notices</p>
-          </div>
-        </article>
-      </div>
-
-      <!-- 7. Marquee -->
-      <article class="scard scard--marquee" *ngIf="marqueeItems().length">
-        <div class="marquee-track" aria-label="Announcements marquee">
-          <div class="marquee-inner">
-            <span *ngFor="let item of marqueeDoubled()" class="marquee-item">
-              <span class="marquee-icon">{{ item.icon }}</span>
-              <span *ngIf="item.tag" class="marquee-tag">{{ item.tag }}</span>
-              {{ item.text }}
-            </span>
+            <p class="score-label">Platform health score</p>
+            <p class="score-hint">System · security · mosques · errors</p>
           </div>
         </div>
-      </article>
 
-      <!-- 8. Content slider -->
-      <article class="scard scard--slider scard--interactive">
-        <div class="slider-head">
-          <h3 class="scard-heading">Daily reminder</h3>
-          <div class="slider-dots">
-            <button *ngFor="let slide of slides; let i = index" type="button"
-              class="slider-dot" [class.slider-dot--active]="slideIndex() === i"
-              (click)="goToSlide(i)" [attr.aria-label]="'Slide ' + (i + 1)"></button>
-          </div>
-        </div>
-        <div class="slider-body">
-          <span class="slider-kind">{{ activeSlide().kind }}</span>
-          <h4 class="slider-title">{{ activeSlide().title }}</h4>
-          <p class="slider-text">{{ activeSlide().body }}</p>
-          <p *ngIf="activeSlide().ref" class="slider-ref">{{ activeSlide().ref }}</p>
-        </div>
-        <div class="slider-nav">
-          <button type="button" class="slider-btn" (click)="prevSlide()" aria-label="Previous">‹</button>
-          <button type="button" class="slider-btn" (click)="nextSlide()" aria-label="Next">›</button>
-        </div>
-      </article>
-
-      <!-- 9. Quick actions -->
-      <section class="sdash-section">
-        <h3 class="sdash-section-title">Quick actions</h3>
-        <div class="quick-grid">
-          <a *ngFor="let action of quickActions" [routerLink]="action.route"
-            class="scard quick-action scard--interactive">
-            <span class="quick-icon">{{ action.icon }}</span>
-            <p class="quick-label">{{ action.label }}</p>
-            <p class="quick-desc">{{ action.desc }}</p>
+        <div class="kpi-grid">
+          <a routerLink="/dashboard/super/mosques" class="kpi-card">
+            <div class="kpi-card__head">
+              <span class="kpi-icon">🕌</span>
+              <span class="kpi-trend kpi-trend--up" *ngIf="d.analytics.mosqueGrowth30d">+{{ d.analytics.mosqueGrowth30d }} / 30d</span>
+            </div>
+            <p class="kpi-label">Total mosques</p>
+            <p class="kpi-value">{{ d.stats.totalMosques }}</p>
+            <p class="kpi-sub">{{ d.stats.activeMosques }} active</p>
           </a>
+
+          <a routerLink="/dashboard/super/users" class="kpi-card">
+            <div class="kpi-card__head">
+              <span class="kpi-icon">👥</span>
+              <span class="kpi-trend kpi-trend--up" *ngIf="d.users.newUsers30d">+{{ d.users.newUsers30d }} new</span>
+            </div>
+            <p class="kpi-label">Total users</p>
+            <p class="kpi-value">{{ d.stats.totalUsers }}</p>
+            <p class="kpi-sub">{{ d.users.active }} active</p>
+          </a>
+
+          <a routerLink="/dashboard/super/claims" class="kpi-card" [class.kpi-card--warn]="d.needsAttention.pendingApprovals > 0">
+            <div class="kpi-card__head">
+              <span class="kpi-icon">📋</span>
+            </div>
+            <p class="kpi-label">Pending actions</p>
+            <p class="kpi-value">{{ d.needsAttention.pendingApprovals }}</p>
+            <p class="kpi-sub">{{ d.needsAttention.pendingClaims }} claims · {{ d.needsAttention.missingOwners }} unassigned</p>
+          </a>
+
+          <div class="kpi-card kpi-card--health">
+            <div class="kpi-card__head"><span class="kpi-icon">⚡</span></div>
+            <p class="kpi-label">System health</p>
+            <ul class="health-mini">
+              <li><span class="dot dot--ok"></span> API {{ d.systemHealth.api }}</li>
+              <li><span class="dot dot--ok"></span> DB {{ d.systemHealth.database }}</li>
+              <li><span class="dot dot--ok"></span> Storage {{ d.systemHealth.storage }}</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action center -->
+      <section class="panel" *ngIf="actionItems().length">
+        <div class="panel__head">
+          <h2 class="panel__title">Action center</h2>
+          <span class="panel__badge">{{ actionItems().length }} priorities</span>
+        </div>
+        <div class="action-grid">
+          <div *ngFor="let item of actionItems()" class="action-card" [class.action-card--warn]="item.warn && item.count > 0">
+            <div class="action-card__count">{{ item.count }}</div>
+            <div class="action-card__body">
+              <p class="action-card__title">{{ item.title }}</p>
+              <p class="action-card__desc">{{ item.description }}</p>
+            </div>
+            <a [routerLink]="item.route" class="action-card__btn">{{ item.action }}</a>
+          </div>
         </div>
       </section>
 
-      <!-- 10. Pending claims + Users by role -->
-      <div class="sdash-split-row">
-        <article class="scard">
-          <div class="table-head">
-            <h3 class="scard-heading">Pending claims</h3>
-            <a routerLink="/dashboard/super/mosques/claims" class="sdash-link-sm">View all →</a>
+      <!-- Mosque + Users -->
+      <div class="two-col">
+        <section class="panel">
+          <div class="panel__head">
+            <h2 class="panel__title">Mosque overview</h2>
+            <a routerLink="/dashboard/super/mosques" class="panel__link">Manage mosques →</a>
           </div>
-          <p *ngIf="!pendingClaims().length" class="panel-empty">No pending mosque claims.</p>
-          <div *ngFor="let m of pendingClaims()" class="claim-row">
-            <h4 class="claim-name">{{ m.name }}</h4>
-            <p class="claim-meta">{{ m.city }} · Owner: {{ m.ownerId || '—' }}</p>
-            <div class="claim-actions">
-              <button type="button" class="btn-approve" (click)="approveClaim(m.id)">Approve</button>
-              <button type="button" class="btn-reject" (click)="rejectClaim(m.id)">Reject</button>
+          <div class="stat-pills">
+            <div class="pill"><span>Total</span><strong>{{ d.mosques.total }}</strong></div>
+            <div class="pill pill--ok"><span>Active</span><strong>{{ d.mosques.active }}</strong></div>
+            <div class="pill"><span>Claimed</span><strong>{{ d.mosques.claimed }}</strong></div>
+            <div class="pill"><span>Unclaimed</span><strong>{{ d.mosques.unclaimed }}</strong></div>
+            <div class="pill"><span>Suspended</span><strong>{{ d.mosques.suspended }}</strong></div>
+          </div>
+          <div class="data-table">
+            <div class="data-table__head">
+              <span>Mosque</span><span>City</span><span>Status</span><span>Owner</span><span>Created</span>
             </div>
+            <a *ngFor="let m of d.mosques.recentAdditions" [routerLink]="['/dashboard/super/mosques', m.id]" class="data-table__row">
+              <span class="row-name">{{ m.name }}</span>
+              <span>{{ m.city }}</span>
+              <span class="row-status">{{ formatStatus(m.status) }}</span>
+              <span>{{ m.ownerName || '—' }}</span>
+              <span class="row-date">{{ m.createdAt | date:'mediumDate' }}</span>
+            </a>
           </div>
-        </article>
+        </section>
 
-        <article class="scard">
-          <div class="table-head">
-            <h3 class="scard-heading">Users by role</h3>
-            <a routerLink="/dashboard/super/users" class="sdash-link-sm">Manage →</a>
+        <section class="panel">
+          <div class="panel__head">
+            <h2 class="panel__title">Users & roles</h2>
+            <a routerLink="/dashboard/super/users" class="btn-secondary">Manage users</a>
           </div>
-          <div *ngFor="let row of roleCounts()" class="role-row">
-            <div class="role-head">
-              <span class="role-name">{{ row.role }}</span>
-              <span class="role-count">{{ row.count }}</span>
-            </div>
-            <div class="role-bar">
-              <div class="role-bar-fill" [style.width.%]="roleBarWidth(row.count)"></div>
+          <div class="user-stats">
+            <div><span class="user-stat-label">Total</span><strong>{{ d.users.total }}</strong></div>
+            <div><span class="user-stat-label">Active</span><strong class="text-ok">{{ d.users.active }}</strong></div>
+            <div><span class="user-stat-label">Blocked</span><strong [class.text-warn]="d.users.blocked">{{ d.users.blocked }}</strong></div>
+          </div>
+          <div class="role-list">
+            <div *ngFor="let row of groupedRoles(d)" class="role-item">
+              <div class="role-item__head">
+                <span>{{ row.role }}</span>
+                <span>{{ row.count }}</span>
+              </div>
+              <div class="role-bar"><div class="role-bar__fill" [style.width.%]="rolePct(row.count, d)"></div></div>
             </div>
           </div>
-          <p *ngIf="!roleCounts().length" class="panel-empty">No users found.</p>
-        </article>
+        </section>
       </div>
 
-      <!-- 11. Mosque status + Recent activity -->
-      <div class="sdash-split-row">
-        <article class="scard">
-          <h3 class="scard-heading mb-3">Mosque status</h3>
-          <div class="status-grid">
-            <div *ngFor="let row of mosqueStatusRows()" class="status-cell">
-              <p class="status-label">{{ row.label }}</p>
-              <p class="status-value">{{ row.count }}</p>
+      <!-- Analytics -->
+      <section class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">Analytics</h2>
+          <a routerLink="/dashboard/super/reports" class="panel__link">Full reports →</a>
+        </div>
+        <div class="charts-row">
+          <div class="chart-card">
+            <p class="chart-title">Mosque growth <span>30 days</span></p>
+            <div class="chart-bars">
+              <div *ngFor="let pt of d.analytics.mosqueChart || []" class="chart-bar" [style.height.%]="barHeight(pt.count, d.analytics.mosqueChart)" [title]="pt.date + ': ' + pt.count"></div>
             </div>
+            <p class="chart-footer">+{{ d.analytics.mosqueGrowth30d }} new mosques</p>
           </div>
-        </article>
+          <div class="chart-card">
+            <p class="chart-title">User growth <span>30 days</span></p>
+            <div class="chart-bars">
+              <div *ngFor="let pt of d.analytics.userChart || []" class="chart-bar chart-bar--blue" [style.height.%]="barHeight(pt.count, d.analytics.userChart)" [title]="pt.date + ': ' + pt.count"></div>
+            </div>
+            <p class="chart-footer">+{{ d.analytics.userGrowth30d }} new users</p>
+          </div>
+          <div class="chart-card">
+            <p class="chart-title">Platform activity <span>7 days</span></p>
+            <div class="chart-bars">
+              <div *ngFor="let pt of d.analytics.activityChart || []" class="chart-bar chart-bar--gold" [style.height.%]="barHeight(pt.count, d.analytics.activityChart)" [title]="pt.date + ': ' + pt.count"></div>
+            </div>
+            <p class="chart-footer">{{ d.analytics.activityLast7 }} events · {{ activityTrendLabel(d) }}</p>
+          </div>
+        </div>
+      </section>
 
-        <article class="scard scard--activity">
-          <div class="table-head">
-            <h3 class="scard-heading">Recent activity</h3>
-            <a routerLink="/dashboard/super/audit" class="sdash-link-sm">All logs →</a>
-          </div>
-          <ul class="activity-list">
-            <li *ngFor="let log of recentLogs()" class="activity-item">
-              <span class="activity-icon">{{ activityIcon(log.action) }}</span>
-              <div class="activity-body">
-                <p class="activity-title">{{ log.description || log.action }}</p>
-                <p class="activity-meta">{{ log.actorId }} · {{ log.createdAt | date:'medium' }}</p>
-              </div>
-            </li>
+      <!-- Health + Security + Content -->
+      <div class="three-col">
+        <section class="panel">
+          <h2 class="panel__title">System health</h2>
+          <ul class="health-list">
+            <li><span class="dot dot--ok"></span> API <em>{{ d.systemHealth.api }}</em></li>
+            <li><span class="dot dot--ok"></span> Database <em>{{ d.systemHealth.database }}</em></li>
+            <li><span class="dot dot--ok"></span> Storage <em>{{ d.systemHealth.storage }}</em></li>
+            <li><span class="dot dot--ok"></span> Email <em>{{ d.systemHealth.email }}</em></li>
+            <li><span class="dot dot--ok"></span> Queue <em>{{ d.systemHealth.queue }}</em></li>
+            <li><span class="dot dot--ok"></span> Backup <em>{{ d.systemHealth.backup }}</em></li>
           </ul>
-          <p *ngIf="!recentLogs().length" class="panel-empty">No recent platform activity yet.</p>
-        </article>
+        </section>
+
+        <section class="panel">
+          <div class="panel__head">
+            <h2 class="panel__title">Security</h2>
+            <a routerLink="/dashboard/super/audit" class="panel__link">Security logs →</a>
+          </div>
+          <div class="sec-grid">
+            <div class="sec-cell"><span>Sessions</span><strong>{{ d.security.activeSessions }}</strong></div>
+            <div class="sec-cell" [class.sec-cell--warn]="d.security.failedLoginAttempts > 0"><span>Failed logins</span><strong>{{ d.security.failedLoginAttempts }}</strong></div>
+            <div class="sec-cell" [class.sec-cell--warn]="d.security.blockedAccounts > 0"><span>Blocked</span><strong>{{ d.security.blockedAccounts }}</strong></div>
+            <div class="sec-cell" [class.sec-cell--warn]="d.security.suspiciousActivity > 0"><span>Suspicious</span><strong>{{ d.security.suspiciousActivity }}</strong></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel__title">Content summary</h2>
+          <div class="content-grid">
+            <div class="content-cell"><span>Announcements</span><strong>{{ d.content.announcements }}</strong></div>
+            <div class="content-cell"><span>Events</span><strong>{{ d.content.events }}</strong></div>
+            <div class="content-cell"><span>Campaigns</span><strong>{{ d.content.campaigns }}</strong></div>
+            <div class="content-cell"><span>Guides</span><strong>{{ d.content.guides }}</strong></div>
+          </div>
+          <p class="feature-title">Feature usage</p>
+          <div *ngFor="let f of topFeatures(d)" class="role-item">
+            <div class="role-item__head"><span>{{ featureLabel(f.module) }}</span><span>{{ f.count }}</span></div>
+            <div class="role-bar"><div class="role-bar__fill" [style.width.%]="featurePct(f.count, d)"></div></div>
+          </div>
+        </section>
       </div>
 
-      <!-- 12. Platform roadmap -->
-      <section class="sdash-section">
-        <h3 class="sdash-section-title">Setup guide</h3>
-        <p class="sdash-section-desc">Step-by-step tasks to configure the platform — each card opens the relevant screen.</p>
-        <div class="roadmap-list">
-          <a *ngFor="let w of workflow" [routerLink]="w.route" class="scard roadmap-card scard--interactive">
-            <div class="roadmap-inner">
-              <span class="step-num">{{ w.step }}</span>
-              <div class="roadmap-body">
-                <div class="roadmap-head">
-                  <h4 class="roadmap-title">{{ w.title }}</h4>
-                  <ng-container *ngIf="stats() as s">
-                    <span *ngIf="w.statKey" class="roadmap-stat" [class]="w.statClass || 'roadmap-stat--default'">
-                      {{ w.statLabel }}: {{ s[w.statKey!] }}
-                    </span>
-                  </ng-container>
-                </div>
-                <p class="roadmap-summary">{{ w.summary }}</p>
-                <ul class="roadmap-steps" *ngIf="w.steps.length">
-                  <li *ngFor="let line of w.steps">{{ line }}</li>
-                </ul>
-              </div>
-              <span class="roadmap-open">Open →</span>
+      <!-- Claims + Timeline -->
+      <div class="two-col">
+        <section class="panel">
+          <div class="panel__head">
+            <h2 class="panel__title">Claims overview</h2>
+            <a routerLink="/dashboard/super/claims" class="panel__link">Review all →</a>
+          </div>
+          <p *ngIf="!pendingClaims().length" class="empty">No pending mosque claims.</p>
+          <div *ngFor="let m of pendingClaims()" class="claim-item">
+            <div>
+              <p class="claim-name">{{ m.name }}</p>
+              <p class="claim-meta">{{ m.city }} · {{ m.ownerId || 'No owner ID' }}</p>
             </div>
+            <div class="claim-btns">
+              <button type="button" class="btn-ok" (click)="approveClaim(m.id)">Approve</button>
+              <button type="button" class="btn-danger" (click)="rejectClaim(m.id)">Reject</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel__head">
+            <h2 class="panel__title">Recent activity</h2>
+            <a routerLink="/dashboard/super/audit" class="panel__link">Audit logs →</a>
+          </div>
+          <div class="timeline">
+            <div *ngFor="let log of timelineLogs()" class="timeline__item">
+              <div class="timeline__dot"></div>
+              <div class="timeline__body">
+                <p class="timeline__action">{{ actionLabel(log.action) }}</p>
+                <p class="timeline__user">{{ log.description || log.actorId }}</p>
+                <p class="timeline__meta">{{ moduleLabel(log) }} · {{ log.createdAt | date:'short' }}</p>
+              </div>
+            </div>
+            <p *ngIf="!timelineLogs().length" class="empty">No recent platform activity.</p>
+          </div>
+        </section>
+      </div>
+
+      <!-- Quick actions -->
+      <section class="panel">
+        <h2 class="panel__title">Quick actions</h2>
+        <div class="quick-grid">
+          <a *ngFor="let q of quickActions" [routerLink]="q.route" class="quick-btn">
+            <span class="quick-btn__icon">{{ q.icon }}</span>
+            <span>{{ q.label }}</span>
           </a>
         </div>
       </section>
     </div>
+
+    <div *ngIf="loading() && !dashboard()" class="dash-loading">Loading platform dashboard…</div>
   `,
   styles: [`
-    .sdash { display: flex; flex-direction: column; gap: 1rem; }
-    .sdash-header {
-      display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 0.75rem;
-      margin-bottom: 0.25rem;
+    .enterprise-dash { display: flex; flex-direction: column; gap: 1.25rem; padding-bottom: 2rem; }
+
+    .dash-header {
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 1rem;
+      padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.06);
     }
-    .sdash-title { margin: 0; font-size: 1.125rem; font-weight: 600; color: #fff; }
-    .sdash-greeting { margin: 0.25rem 0 0; font-size: 0.9375rem; color: #fcd34d; font-weight: 500; }
-    .sdash-sub { margin: 0.125rem 0 0; font-size: 0.8125rem; color: #6ee7b7; opacity: 0.75; }
-    .sdash-refresh {
+    .dash-eyebrow { margin: 0; font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #6ee7b7; opacity: 0.8; }
+    .dash-greeting { margin: 0.25rem 0 0; font-size: 1.5rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
+    .dash-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 0.5rem; }
+    .status-chip {
+      display: inline-flex; align-items: center; gap: 0.375rem; font-size: 0.75rem; font-weight: 600;
+      padding: 0.25rem 0.625rem; border-radius: 9999px; background: rgba(34,197,94,0.12); color: #86efac; border: 1px solid rgba(34,197,94,0.3);
+    }
+    .status-chip--warn { background: rgba(245,158,11,0.12); color: #fcd34d; border-color: rgba(245,158,11,0.35); }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .sync-time { font-size: 0.75rem; color: #6ee7b7; opacity: 0.7; }
+    .dash-header__right { display: flex; align-items: center; gap: 0.5rem; }
+    .icon-btn {
+      position: relative; width: 2.5rem; height: 2.5rem; border-radius: 0.5rem; border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(2,44,34,0.6); cursor: pointer; font-size: 1rem;
+    }
+    .notif-badge {
+      position: absolute; top: -4px; right: -4px; min-width: 1rem; height: 1rem; border-radius: 9999px;
+      background: #ef4444; color: #fff; font-size: 0.625rem; font-weight: 700; display: flex; align-items: center; justify-content: center;
+    }
+    .notif-wrap { position: relative; }
+    .notif-panel {
+      position: absolute; right: 0; top: calc(100% + 0.5rem); width: min(20rem, 90vw); z-index: 50;
+      background: #022c22; border: 1px solid #065f46; border-radius: 0.75rem; padding: 0.75rem;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.35);
+    }
+    .notif-panel__title { margin: 0 0 0.5rem; font-size: 0.75rem; font-weight: 700; color: #a7f3d0; text-transform: uppercase; letter-spacing: 0.05em; }
+    .notif-item { display: block; padding: 0.625rem; border-radius: 0.5rem; text-decoration: none; margin-bottom: 0.375rem; border: 1px solid transparent; }
+    .notif-item strong { display: block; font-size: 0.8125rem; color: #fff; margin-bottom: 0.125rem; }
+    .notif-item span { font-size: 0.75rem; color: #6ee7b7; }
+    .notif-item[data-severity="warn"] { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.2); }
+    .notif-item[data-severity="error"] { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.2); }
+    .notif-empty { margin: 0; font-size: 0.8125rem; color: #6ee7b7; }
+
+    .btn-primary {
       font-size: 0.8125rem; font-weight: 600; color: #022c22; background: #f59e0b;
       padding: 0.5rem 1rem; border-radius: 0.5rem; border: none; cursor: pointer;
     }
-    .sdash-refresh:disabled { opacity: 0.6; cursor: wait; }
-    .sdash-link-sm { font-size: 0.75rem; color: #fbbf24; text-decoration: none; }
-    .sdash-link-sm:hover { text-decoration: underline; }
-    .sdash-section-title { margin: 0 0 0.75rem; font-size: 1rem; font-weight: 600; color: #fff; }
-    .sdash-section-desc { margin: -0.5rem 0 0.75rem; font-size: 0.8125rem; color: #6ee7b7; opacity: 0.8; }
-    .mb-3 { margin-bottom: 0.75rem; }
-
-    .scard {
-      background: #064e3b; border: 1px solid #065f46; border-radius: 0.75rem;
-      padding: 0.875rem 1rem; text-decoration: none; color: inherit; display: block;
-    }
-    .scard--interactive {
-      transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    .scard--interactive:hover {
-      border-color: rgba(245, 158, 11, 0.45);
-      transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
-    }
-    .scard--alert { border-color: rgba(245, 158, 11, 0.35); background: rgba(120, 53, 15, 0.15); }
-    .scard-heading { margin: 0; font-size: 0.9375rem; font-weight: 600; color: #fff; }
-    .scard-heading--alert { color: #fbbf24; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.75rem; }
-
-    .sdash-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
-    @media (min-width: 1024px) { .sdash-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-    .sdash-stats .scard { display: flex; align-items: center; gap: 0.75rem; }
-    .scard-icon {
-      width: 2.25rem; height: 2.25rem; border-radius: 0.5rem;
-      background: rgba(16, 185, 129, 0.12); border: 1px solid #065f46;
-      display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0;
-    }
-    .scard--warn .scard-icon { background: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.35); }
-    .scard-label { margin: 0; font-size: 0.75rem; color: #6ee7b7; opacity: 0.8; }
-    .scard-value { margin: 0.125rem 0 0; font-size: 1.5rem; font-weight: 700; color: #fff; line-height: 1; }
-    .scard--warn .scard-value { color: #fbbf24; }
-
-    .alert-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
-    .alert-item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.8125rem; }
-    .alert-msg { color: #ecfdf5; }
-    .alert-action { color: #fbbf24; font-weight: 700; text-decoration: none; flex-shrink: 0; }
-
-    .sdash-hero-row { display: grid; gap: 0.75rem; grid-template-columns: 1fr; }
-    @media (min-width: 900px) { .sdash-hero-row { grid-template-columns: 1.2fr 1fr; } }
-    .scard--hero {
-      background: linear-gradient(135deg, #064e3b 0%, #022c22 100%);
-      border-color: rgba(245, 158, 11, 0.35); padding: 1.25rem;
-    }
-    .hero-eyebrow { margin: 0; font-size: 0.75rem; color: #6ee7b7; text-transform: uppercase; letter-spacing: 0.06em; }
-    .hero-prayer {
-      margin: 0.5rem 0 0; font-family: ui-serif, Georgia, serif;
-      font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 700; color: #fff;
-    }
-    .hero-countdown {
-      margin: 0.375rem 0 0; font-family: ui-monospace, monospace;
-      font-size: clamp(2rem, 5vw, 3rem); font-weight: 700; color: #fbbf24; letter-spacing: 0.04em;
-    }
-    .hero-meta { margin: 0.5rem 0 0; font-size: 0.8125rem; color: #a7f3d0; }
-    .hero-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
-    .hero-chip {
-      font-size: 0.75rem; font-weight: 600; padding: 0.375rem 0.75rem; border-radius: 9999px;
-      background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.35);
-      text-decoration: none; cursor: pointer;
-    }
-    .hero-chip--ghost { background: transparent; color: #6ee7b7; border-color: #065f46; }
-
-    .scard--clock { padding: 1.25rem; text-align: center; }
-    .clock-digital {
-      margin: 0; font-family: ui-monospace, monospace; font-size: clamp(2rem, 4vw, 2.75rem);
-      font-weight: 700; color: #fff; letter-spacing: 0.06em;
-    }
-    .clock-gregorian { margin: 0.5rem 0 0; font-size: 0.875rem; color: #d1fae5; }
-    .clock-hijri { margin: 0.25rem 0 0; font-size: 0.8125rem; color: #6ee7b7; font-style: italic; }
-    .clock-badges { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.375rem; margin-top: 0.75rem; }
-    .clock-badge {
-      font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
-      padding: 0.2rem 0.5rem; border-radius: 9999px; border: 1px solid #065f46; color: #6ee7b7;
-    }
-    .clock-badge--gold { color: #fcd34d; border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.1); }
-    .clock-badge--ramadan { color: #c4b5fd; border-color: rgba(167, 139, 250, 0.4); background: rgba(139, 92, 246, 0.12); }
-
-    .table-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem; }
-    .table-hint { font-size: 0.75rem; color: #6ee7b7; opacity: 0.65; }
-    .table-wrap { border: 1px solid #065f46; border-radius: 0.5rem; overflow: hidden; }
-    .ptable { width: 100%; font-size: 0.8125rem; border-collapse: collapse; text-align: center; }
-    .ptable thead tr { background: rgba(6, 78, 59, 0.8); }
-    .ptable th { padding: 0.5rem 0.75rem; font-weight: 500; color: #6ee7b7; text-align: center; }
-    .ptable th:first-child { text-align: left; }
-    .ptable td { padding: 0.5rem 0.75rem; color: #d1fae5; border-top: 1px solid #065f46; }
-    .ptable td:first-child { text-align: left; }
-    .ptable-row--current { background: rgba(245, 158, 11, 0.08); }
-    .ptable-row--current td { color: #fff; }
-    .ptable-row--next { background: rgba(59, 130, 246, 0.08); }
-    .ptable-name { font-weight: 600; }
-    .ptable-pill {
-      margin-left: 0.5rem; font-size: 0.625rem; font-weight: 700; text-transform: uppercase;
-      padding: 0.125rem 0.375rem; border-radius: 9999px;
-      background: rgba(245, 158, 11, 0.2); color: #fbbf24;
-    }
-    .ptable-pill--next { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
-    .ptable-action a { color: #6ee7b7; text-decoration: none; opacity: 0.7; }
-    .ptable-action a:hover { opacity: 1; color: #fbbf24; }
-
-    .sdash-mini-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
-    @media (min-width: 900px) { .sdash-mini-row { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-    .scard--mini { display: flex; align-items: flex-start; gap: 0.625rem; }
-    .mini-icon { font-size: 1.25rem; line-height: 1; flex-shrink: 0; }
-    .mini-label { margin: 0; font-size: 0.6875rem; color: #6ee7b7; text-transform: uppercase; letter-spacing: 0.04em; }
-    .mini-value { margin: 0.125rem 0 0; font-size: 1.125rem; font-weight: 700; color: #fff; }
-    .mini-value--sm { font-size: 0.875rem; font-weight: 600; color: #fcd34d; }
-    .mini-hint { margin: 0.25rem 0 0; font-size: 0.6875rem; color: #6ee7b7; opacity: 0.65; }
-
-    .scard--marquee { padding: 0; overflow: hidden; }
-    .marquee-track {
-      mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
-      -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
-    }
-    .marquee-inner {
-      display: flex; gap: 2.5rem; width: max-content;
-      animation: sdashMarquee 40s linear infinite; padding: 0.75rem 0;
-    }
-    .marquee-inner:hover { animation-play-state: paused; }
-    @keyframes sdashMarquee {
-      from { transform: translateX(0); }
-      to { transform: translateX(-50%); }
-    }
-    .marquee-item {
-      display: inline-flex; align-items: center; gap: 0.5rem;
-      font-size: 0.8125rem; color: #d1fae5; white-space: nowrap;
-    }
-    .marquee-icon { opacity: 0.85; }
-    .marquee-tag {
-      font-size: 0.625rem; font-weight: 700; text-transform: uppercase;
-      padding: 0.125rem 0.375rem; border-radius: 9999px;
-      background: rgba(16, 185, 129, 0.2); color: #34d399;
+    .btn-primary:disabled { opacity: 0.6; cursor: wait; }
+    .btn-secondary {
+      font-size: 0.75rem; font-weight: 600; color: #fcd34d; background: transparent;
+      padding: 0.375rem 0.75rem; border-radius: 0.5rem; border: 1px solid rgba(245,158,11,0.4); text-decoration: none;
     }
 
-    .scard--slider { position: relative; padding-bottom: 2.75rem; min-height: 9rem; }
-    .slider-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
-    .slider-dots { display: flex; gap: 0.375rem; }
-    .slider-dot {
-      width: 0.5rem; height: 0.5rem; border-radius: 9999px; border: none; padding: 0;
-      background: #065f46; cursor: pointer;
+    .top-row { display: grid; gap: 1rem; }
+    @media (min-width: 1100px) { .top-row { grid-template-columns: auto 1fr; align-items: stretch; } }
+    .health-score-card {
+      display: flex; align-items: center; gap: 1rem; padding: 1rem 1.25rem;
+      background: linear-gradient(135deg, rgba(6,78,59,0.9), rgba(2,44,34,0.95));
+      border: 1px solid rgba(245,158,11,0.25); border-radius: 0.875rem; min-width: 14rem;
     }
-    .slider-dot--active { background: #f59e0b; transform: scale(1.15); }
-    .slider-kind {
-      font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #fbbf24;
+    .score-ring {
+      width: 4.5rem; height: 4.5rem; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      background: conic-gradient(#f59e0b calc(var(--score) * 1%), rgba(255,255,255,0.08) 0);
+      position: relative;
     }
-    .slider-title { margin: 0.375rem 0 0; font-size: 1rem; font-weight: 600; color: #fff; }
-    .slider-text { margin: 0.5rem 0 0; font-size: 0.875rem; color: #a7f3d0; line-height: 1.55; }
-    .slider-ref { margin: 0.5rem 0 0; font-size: 0.75rem; color: #6ee7b7; font-style: italic; }
-    .slider-nav { position: absolute; right: 1rem; bottom: 0.875rem; display: flex; gap: 0.375rem; }
-    .slider-btn {
-      width: 2rem; height: 2rem; border-radius: 0.5rem; border: 1px solid #065f46;
-      background: #022c22; color: #6ee7b7; cursor: pointer; font-size: 1.125rem; line-height: 1;
+    .score-ring::before {
+      content: ''; position: absolute; inset: 6px; border-radius: 50%; background: #022c22;
     }
-    .slider-btn:hover { border-color: #f59e0b; color: #fbbf24; }
+    .score-value { position: relative; font-size: 1rem; font-weight: 800; color: #fcd34d; }
+    .score-label { margin: 0; font-size: 0.875rem; font-weight: 600; color: #fff; }
+    .score-hint { margin: 0.25rem 0 0; font-size: 0.6875rem; color: #6ee7b7; }
 
-    .quick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
-    @media (min-width: 640px) { .quick-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-    .quick-action { padding: 1rem; }
-    .quick-icon { font-size: 1.5rem; display: block; margin-bottom: 0.5rem; }
-    .quick-label { margin: 0; font-size: 0.8125rem; font-weight: 700; color: #fff; }
-    .quick-desc { margin: 0.25rem 0 0; font-size: 0.6875rem; color: #6ee7b7; line-height: 1.35; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 0.75rem; }
+    @media (min-width: 900px) { .kpi-grid { grid-template-columns: repeat(4, minmax(0,1fr)); } }
+    .kpi-card {
+      padding: 1rem; border-radius: 0.875rem; background: rgba(6,78,59,0.55);
+      border: 1px solid rgba(255,255,255,0.06); text-decoration: none; color: inherit;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .kpi-card:hover { border-color: rgba(245,158,11,0.35); transform: translateY(-1px); }
+    .kpi-card--warn { border-color: rgba(245,158,11,0.35); }
+    .kpi-card__head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+    .kpi-icon { font-size: 1.25rem; }
+    .kpi-trend { font-size: 0.625rem; font-weight: 700; padding: 0.125rem 0.375rem; border-radius: 9999px; }
+    .kpi-trend--up { background: rgba(34,197,94,0.15); color: #86efac; }
+    .kpi-label { margin: 0; font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; color: #6ee7b7; }
+    .kpi-value { margin: 0.25rem 0 0; font-size: 1.75rem; font-weight: 800; color: #fff; line-height: 1; }
+    .kpi-sub { margin: 0.375rem 0 0; font-size: 0.75rem; color: #a7f3d0; opacity: 0.85; }
+    .health-mini { list-style: none; margin: 0.5rem 0 0; padding: 0; font-size: 0.6875rem; color: #a7f3d0; }
+    .health-mini li { display: flex; align-items: center; gap: 0.375rem; margin-bottom: 0.25rem; }
 
-    .sdash-split-row { display: grid; gap: 0.75rem; }
-    @media (min-width: 1024px) { .sdash-split-row { grid-template-columns: 1fr 1fr; } }
-    .panel-empty { margin: 0; font-size: 0.8125rem; color: #6ee7b7; }
-    .claim-row { padding-bottom: 0.75rem; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(6, 95, 70, 0.6); }
-    .claim-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .panel {
+      background: rgba(6,78,59,0.4); border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 0.875rem; padding: 1rem 1.125rem;
+    }
+    .panel__head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+    .panel__title { margin: 0; font-size: 0.9375rem; font-weight: 700; color: #fff; }
+    .panel__link { font-size: 0.75rem; color: #fbbf24; text-decoration: none; }
+    .panel__link:hover { text-decoration: underline; }
+    .panel__badge { font-size: 0.6875rem; font-weight: 600; color: #fcd34d; background: rgba(245,158,11,0.12); padding: 0.2rem 0.5rem; border-radius: 9999px; }
+
+    .action-grid { display: grid; gap: 0.75rem; }
+    @media (min-width: 768px) { .action-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width: 1100px) { .action-grid { grid-template-columns: repeat(3, 1fr); } }
+    .action-card {
+      display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem;
+      background: rgba(2,44,34,0.5); border: 1px solid rgba(255,255,255,0.05); border-radius: 0.625rem;
+    }
+    .action-card--warn { border-color: rgba(245,158,11,0.3); }
+    .action-card__count { font-size: 1.5rem; font-weight: 800; color: #fcd34d; min-width: 2rem; text-align: center; }
+    .action-card__body { flex: 1; min-width: 0; }
+    .action-card__title { margin: 0; font-size: 0.8125rem; font-weight: 600; color: #fff; }
+    .action-card__desc { margin: 0.125rem 0 0; font-size: 0.6875rem; color: #6ee7b7; }
+    .action-card__btn {
+      font-size: 0.6875rem; font-weight: 700; color: #022c22; background: #f59e0b;
+      padding: 0.375rem 0.625rem; border-radius: 0.375rem; text-decoration: none; white-space: nowrap;
+    }
+
+    .two-col { display: grid; gap: 1rem; }
+    @media (min-width: 1024px) { .two-col { grid-template-columns: 1fr 1fr; } }
+    .three-col { display: grid; gap: 1rem; }
+    @media (min-width: 900px) { .three-col { grid-template-columns: repeat(3, 1fr); } }
+
+    .stat-pills { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+    .pill {
+      padding: 0.5rem 0.75rem; border-radius: 0.5rem; background: rgba(2,44,34,0.5); border: 1px solid rgba(255,255,255,0.05);
+      font-size: 0.6875rem; color: #6ee7b7;
+    }
+    .pill strong { display: block; font-size: 1rem; color: #fff; margin-top: 0.125rem; }
+    .pill--ok strong { color: #86efac; }
+
+    .data-table { font-size: 0.75rem; }
+    .data-table__head, .data-table__row {
+      display: grid; grid-template-columns: 1.4fr 0.8fr 0.8fr 0.9fr 0.9fr; gap: 0.5rem; padding: 0.5rem 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .data-table__head { color: #6ee7b7; font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .data-table__row { text-decoration: none; color: #d1fae5; transition: background 0.15s; border-radius: 0.25rem; }
+    .data-table__row:hover { background: rgba(245,158,11,0.06); color: #fff; }
+    .row-name { font-weight: 600; color: #fff; }
+    .row-status { color: #fcd34d; }
+    .row-date { color: #6ee7b7; opacity: 0.8; }
+    @media (max-width: 700px) {
+      .data-table__head { display: none; }
+      .data-table__row { grid-template-columns: 1fr; gap: 0.125rem; padding: 0.75rem 0; }
+    }
+
+    .user-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1rem; text-align: center; }
+    .user-stat-label { display: block; font-size: 0.625rem; color: #6ee7b7; text-transform: uppercase; }
+    .user-stats strong { font-size: 1.25rem; color: #fff; }
+    .text-ok { color: #86efac !important; }
+    .text-warn { color: #fbbf24 !important; }
+
+    .role-list { display: flex; flex-direction: column; gap: 0.625rem; }
+    .role-item__head { display: flex; justify-content: space-between; font-size: 0.75rem; color: #a7f3d0; margin-bottom: 0.2rem; }
+    .role-bar { height: 4px; border-radius: 9999px; background: rgba(255,255,255,0.08); overflow: hidden; }
+    .role-bar__fill { height: 100%; background: linear-gradient(90deg, #10b981, #f59e0b); border-radius: 9999px; }
+
+    .charts-row { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+    @media (min-width: 900px) { .charts-row { grid-template-columns: repeat(3, 1fr); } }
+    .chart-card { padding: 0.75rem; background: rgba(2,44,34,0.45); border-radius: 0.625rem; border: 1px solid rgba(255,255,255,0.04); }
+    .chart-title { margin: 0 0 0.75rem; font-size: 0.8125rem; font-weight: 600; color: #fff; }
+    .chart-title span { font-weight: 400; color: #6ee7b7; font-size: 0.6875rem; }
+    .chart-bars { display: flex; align-items: flex-end; gap: 2px; height: 4.5rem; }
+    .chart-bar { flex: 1; min-height: 4px; background: #10b981; border-radius: 2px 2px 0 0; opacity: 0.85; transition: height 0.3s; }
+    .chart-bar--blue { background: #3b82f6; }
+    .chart-bar--gold { background: #f59e0b; }
+    .chart-footer { margin: 0.5rem 0 0; font-size: 0.6875rem; color: #6ee7b7; }
+
+    .health-list { list-style: none; margin: 0; padding: 0; }
+    .health-list li { display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0; font-size: 0.8125rem; color: #a7f3d0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .health-list li em { margin-left: auto; font-style: normal; color: #fff; font-weight: 600; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: #6b7280; flex-shrink: 0; }
+    .dot--ok { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.5); }
+
+    .sec-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+    .sec-cell { padding: 0.75rem; background: rgba(2,44,34,0.45); border-radius: 0.5rem; text-align: center; }
+    .sec-cell span { display: block; font-size: 0.625rem; color: #6ee7b7; text-transform: uppercase; }
+    .sec-cell strong { font-size: 1.25rem; color: #fff; }
+    .sec-cell--warn strong { color: #fbbf24; }
+
+    .content-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-bottom: 1rem; }
+    .content-cell { padding: 0.625rem; background: rgba(2,44,34,0.45); border-radius: 0.5rem; }
+    .content-cell span { display: block; font-size: 0.625rem; color: #6ee7b7; }
+    .content-cell strong { font-size: 1.125rem; color: #fff; }
+    .feature-title { margin: 0 0 0.5rem; font-size: 0.6875rem; font-weight: 600; color: #6ee7b7; text-transform: uppercase; }
+
+    .claim-item {
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem;
+      padding: 0.75rem 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
     .claim-name { margin: 0; font-size: 0.875rem; font-weight: 600; color: #fff; }
-    .claim-meta { margin: 0.25rem 0 0.5rem; font-size: 0.75rem; color: #6ee7b7; }
-    .claim-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-    .btn-approve {
-      background: #10b981; color: #022c22; font-weight: 700; padding: 0.375rem 0.875rem;
-      border-radius: 0.5rem; border: none; cursor: pointer; font-size: 0.8125rem;
-    }
-    .btn-reject {
-      background: #ef4444; color: #fff; font-weight: 700; padding: 0.375rem 0.875rem;
-      border-radius: 0.5rem; border: none; cursor: pointer; font-size: 0.8125rem;
-    }
-    .role-row { margin-bottom: 0.75rem; }
-    .role-row:last-child { margin-bottom: 0; }
-    .role-head { display: flex; justify-content: space-between; font-size: 0.8125rem; margin-bottom: 0.25rem; }
-    .role-name { color: #a7f3d0; }
-    .role-count { color: #fff; font-weight: 700; }
-    .role-bar { height: 6px; border-radius: 9999px; background: rgba(16, 185, 129, 0.25); overflow: hidden; }
-    .role-bar-fill { height: 100%; background: #10b981; border-radius: 9999px; }
+    .claim-meta { margin: 0.125rem 0 0; font-size: 0.75rem; color: #6ee7b7; }
+    .claim-btns { display: flex; gap: 0.5rem; }
+    .btn-ok { background: #10b981; color: #022c22; font-weight: 700; border: none; padding: 0.375rem 0.75rem; border-radius: 0.375rem; cursor: pointer; font-size: 0.75rem; }
+    .btn-danger { background: #ef4444; color: #fff; font-weight: 700; border: none; padding: 0.375rem 0.75rem; border-radius: 0.375rem; cursor: pointer; font-size: 0.75rem; }
 
-    .status-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; }
-    .status-cell {
-      background: #022c22; border: 1px solid #065f46; border-radius: 0.5rem;
-      padding: 0.75rem; text-align: center;
-    }
-    .status-label { margin: 0; font-size: 0.6875rem; color: #6ee7b7; text-transform: uppercase; }
-    .status-value { margin: 0.25rem 0 0; font-size: 1.25rem; font-weight: 700; color: #fff; }
+    .timeline { display: flex; flex-direction: column; gap: 0; }
+    .timeline__item { display: flex; gap: 0.75rem; padding: 0.625rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .timeline__dot { width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; margin-top: 0.375rem; flex-shrink: 0; }
+    .timeline__action { margin: 0; font-size: 0.8125rem; font-weight: 600; color: #fff; }
+    .timeline__user { margin: 0.125rem 0 0; font-size: 0.75rem; color: #a7f3d0; }
+    .timeline__meta { margin: 0.125rem 0 0; font-size: 0.6875rem; color: #6ee7b7; opacity: 0.75; }
 
-    .activity-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
-    .activity-item {
-      display: flex; align-items: flex-start; gap: 0.75rem;
-      padding: 0.625rem 0.75rem; border: 1px solid #065f46; border-radius: 0.5rem;
-      background: rgba(2, 44, 34, 0.35);
+    .quick-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+    @media (min-width: 640px) { .quick-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (min-width: 1024px) { .quick-grid { grid-template-columns: repeat(5, 1fr); } }
+    .quick-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 0.375rem; padding: 0.875rem 0.5rem;
+      background: rgba(2,44,34,0.5); border: 1px solid rgba(255,255,255,0.06); border-radius: 0.625rem;
+      text-decoration: none; color: #d1fae5; font-size: 0.6875rem; font-weight: 600; text-align: center;
+      transition: border-color 0.2s, background 0.2s;
     }
-    .activity-icon { font-size: 1rem; flex-shrink: 0; margin-top: 0.125rem; }
-    .activity-title { margin: 0; font-size: 0.8125rem; color: #ecfdf5; }
-    .activity-meta { margin: 0.25rem 0 0; font-size: 0.75rem; color: #6ee7b7; opacity: 0.7; }
+    .quick-btn:hover { border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.06); color: #fff; }
+    .quick-btn__icon { font-size: 1.25rem; }
 
-    .roadmap-list { display: flex; flex-direction: column; gap: 0.75rem; }
-    .roadmap-card { padding: 1rem 1.125rem; }
-    .roadmap-inner { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.75rem; }
-    .step-num {
-      width: 2rem; height: 2rem; border-radius: 9999px;
-      background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.45);
-      color: #fbbf24; font-weight: 700; font-size: 0.875rem;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-    }
-    .roadmap-body { flex: 1; min-width: 0; }
-    .roadmap-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.375rem; }
-    .roadmap-title { margin: 0; font-size: 1rem; font-weight: 700; color: #fff; }
-    .roadmap-stat {
-      font-size: 0.6875rem; font-weight: 700; padding: 0.125rem 0.5rem; border-radius: 9999px; border: 1px solid;
-    }
-    .roadmap-stat--default { color: #6ee7b7; border-color: #065f46; background: rgba(6, 78, 59, 0.5); }
-    .roadmap-stat--warn { color: #fbbf24; border-color: rgba(245, 158, 11, 0.45); background: rgba(120, 53, 15, 0.25); }
-    .roadmap-stat--active { color: #86efac; border-color: rgba(34, 197, 94, 0.45); background: rgba(20, 83, 45, 0.35); }
-    .roadmap-summary { margin: 0 0 0.75rem; font-size: 0.8125rem; color: #a7f3d0; }
-    .roadmap-steps { list-style: disc; margin: 0.5rem 0 0; padding: 0 0 0 1.125rem; display: flex; flex-direction: column; gap: 0.25rem; }
-    .roadmap-steps li { font-size: 0.8125rem; color: #d1fae5; line-height: 1.4; }
-    .roadmap-open {
-      flex-shrink: 0; align-self: center; font-size: 0.8125rem; font-weight: 700;
-      color: #022c22; background: #f59e0b; padding: 0.375rem 0.75rem; border-radius: 0.5rem;
-    }
+    .empty { margin: 0; font-size: 0.8125rem; color: #6ee7b7; }
+    .dash-loading { padding: 3rem; text-align: center; color: #6ee7b7; }
   `]
 })
-export class SuperDashboardComponent implements OnInit, OnDestroy {
+export class SuperDashboardComponent implements OnInit {
   private auth = inject(AuthService);
   private platform = inject(PlatformService);
-  private todayService = inject(TodayService);
-  private admin = inject(AdminService);
-  private mosqueService = inject(MosqueService);
 
-  stats = signal<PlatformStats | null>(null);
-  today = signal<TodayResponse | null>(null);
+  dashboard = signal<PlatformDashboard | null>(null);
   pendingClaims = signal<Mosque[]>([]);
-  recentLogs = signal<AuditLogEntry[]>([]);
-  users = signal<PlatformUser[]>([]);
-  mosques = signal<Mosque[]>([]);
-  mosqueName = signal('Platform mosque');
-  openCampaigns = signal(0);
+  lastSync = signal<Date>(new Date());
   loading = signal(false);
+  showNotifs = signal(false);
 
-  liveClock = signal('--:--:--');
-  gregorianDate = signal('');
-  hijriDate = signal('');
-  countdown = signal('00:00:00');
-  slideIndex = signal(0);
-
-  private clockTimer?: ReturnType<typeof setInterval>;
-  private slideTimer?: ReturnType<typeof setInterval>;
-
-  readonly icons = SUPER_ADMIN_NAV_ICONS;
-
-  readonly statCards: StatCard[] = [
-    { label: 'Active mosques', valueKey: 'activeMosques', route: '/dashboard/super/mosques', icon: SUPER_ADMIN_NAV_ICONS['mosque'] },
-    { label: 'Pending claims', valueKey: 'pendingClaims', route: '/dashboard/super/mosques/claims', icon: SUPER_ADMIN_NAV_ICONS['stamp'], warn: true },
-    { label: 'Total users', valueKey: 'totalUsers', route: '/dashboard/super/users', icon: SUPER_ADMIN_NAV_ICONS['users'] },
-    { label: 'Open campaigns', valueKey: 'openCampaigns', route: '/dashboard/admin/janaza', icon: SUPER_ADMIN_NAV_ICONS['campaigns'] },
-  ];
+  readonly formatStatus = formatMosqueStatus;
 
   readonly quickActions: QuickAction[] = [
-    { label: 'Mosques', route: '/dashboard/super/mosques', icon: SUPER_ADMIN_NAV_ICONS['mosque'], desc: 'Add & monitor listings' },
-    { label: 'Users', route: '/dashboard/super/users', icon: SUPER_ADMIN_NAV_ICONS['users'], desc: 'Browse all accounts' },
-    { label: 'Roles', route: '/dashboard/super/users', icon: '🔑', desc: 'Assign permissions' },
-    { label: 'Claims', route: '/dashboard/super/mosques/claims', icon: SUPER_ADMIN_NAV_ICONS['stamp'], desc: 'Approve ownership' },
-    { label: 'Assignment', route: '/dashboard/super/mosque-assignment', icon: '🏛️', desc: 'Link users to mosques' },
-    { label: 'Features', route: '/dashboard/super/users/features', icon: SUPER_ADMIN_NAV_ICONS['toggle'], desc: 'Toggle modules' },
-    { label: 'Reports', route: '/dashboard/super/reports', icon: '📈', desc: 'Platform metrics' },
-    { label: 'Settings', route: '/dashboard/super/settings', icon: SUPER_ADMIN_NAV_ICONS['settings'], desc: 'Configuration' },
-  ];
-
-  readonly workflow: WorkflowStep[] = [
-    {
-      step: 1,
-      route: '/dashboard/super',
-      title: 'Dashboard',
-      summary: 'Platform overview with live stats, prayer widgets, and quick actions.',
-      steps: [
-        'Review mosque, claim, and user totals',
-        'Handle pending claims and recent activity',
-        'Use quick actions to jump to any module',
-      ],
-      statLabel: 'Users',
-      statKey: 'totalUsers',
-    },
-    {
-      step: 2,
-      route: '/dashboard/super/mosques',
-      title: 'Mosque Management',
-      summary: 'Add mosque listings and monitor status across the platform.',
-      steps: [
-        'Seed new unclaimed mosque listings for rollout',
-        'Enter name, slug, address, and city details',
-        'Track Active, Unclaimed, and Claimed mosques',
-      ],
-      statLabel: 'Total',
-      statKey: 'totalMosques',
-    },
-    {
-      step: 3,
-      route: '/dashboard/super/users',
-      title: 'User Management',
-      summary: 'Browse every account on the platform.',
-      steps: [
-        'Search users by name, username, or email',
-        'View join date and current role badges',
-        'Use Role Assignment (step 4) to change permissions',
-      ],
-      statLabel: 'Users',
-      statKey: 'totalUsers',
-    },
-    {
-      step: 4,
-      route: '/dashboard/super/users',
-      title: 'Role Assignment',
-      summary: 'Grant or revoke platform roles for each user.',
-      steps: [
-        'Select a user and review their current roles',
-        'Assign Admin, Teacher, Parent, Member, etc.',
-        'Remove roles that are no longer needed',
-      ],
-    },
-    {
-      step: 5,
-      route: '/dashboard/super/mosque-assignment',
-      title: 'Mosque Assignment',
-      summary: 'Link users to mosques as admin or owner.',
-      steps: [
-        'Pick a mosque and a user from the lists',
-        'Optionally mark the user as Mosque Owner',
-        'Save — admin access applies immediately',
-      ],
-    },
-    {
-      step: 6,
-      route: '/dashboard/super/mosques/claims',
-      title: 'Claims Management',
-      summary: 'Review and resolve mosque ownership requests.',
-      steps: [
-        'Open the pending claims queue',
-        'Verify mosque and claimant details',
-        'Approve or reject with an optional reason',
-      ],
-      statLabel: 'Pending',
-      statKey: 'pendingClaims',
-      statClass: 'roadmap-stat roadmap-stat--warn',
-    },
-    {
-      step: 7,
-      route: '/dashboard/super/users/features',
-      title: 'Feature Flags',
-      summary: 'Turn modules on or off per mosque.',
-      steps: [
-        'Select the mosque to configure',
-        'Toggle Announcements, Events, Madrassah, etc.',
-        'Changes apply immediately for that mosque',
-      ],
-    },
-    {
-      step: 8,
-      route: '/dashboard/super/audit',
-      title: 'Audit Logs',
-      summary: 'Track platform changes and admin actions.',
-      steps: [
-        'Review role changes, claim decisions, and seeds',
-        'Inspect prayer time edits in the combined log',
-        'Use timestamps to trace who changed what',
-      ],
-    },
-    {
-      step: 9,
-      route: '/dashboard/super/reports',
-      title: 'Reports',
-      summary: 'Platform metrics and per-mosque data snapshots.',
-      steps: [
-        'View status breakdown across all mosques',
-        'Check announcement, event, and student counts',
-        'Export insights for stakeholders (coming soon)',
-      ],
-      statLabel: 'Active',
-      statKey: 'activeMosques',
-      statClass: 'roadmap-stat roadmap-stat--active',
-    },
-    {
-      step: 10,
-      route: '/dashboard/super/settings',
-      title: 'Settings',
-      summary: 'Platform configuration and integration status.',
-      steps: [
-        'Review API URL and default mosque ID',
-        'Check social login provider configuration',
-        'Confirm support contacts and defaults',
-      ],
-    },
-  ];
-
-  readonly slides: SlideItem[] = [
-    {
-      kind: 'Qur\'an',
-      title: 'Remember Me — I will remember you',
-      body: 'So remember Me; I will remember you. And be grateful to Me and do not deny Me.',
-      ref: 'Al-Baqarah 2:152',
-    },
-    {
-      kind: 'Hadith',
-      title: 'The best of people',
-      body: 'The best of people are those who are most beneficial to others.',
-      ref: 'Tabarani',
-    },
-    {
-      kind: 'Reminder',
-      title: 'Prayer is the first question',
-      body: 'Guard your five daily prayers — the believer\'s appointment with Allah comes before all else.',
-    },
-    {
-      kind: 'Promotion',
-      title: 'Dalail al-Khayrat circle',
-      body: 'Join the weekly wird circle every Thursday after Maghrib — open to all murids on MOS.',
-      ref: 'Content library',
-    },
+    { label: 'Add mosque', route: '/dashboard/super/mosques', icon: '➕' },
+    { label: 'Manage mosques', route: '/dashboard/super/mosques', icon: '🕌' },
+    { label: 'Manage users', route: '/dashboard/super/users', icon: '👥' },
+    { label: 'Review claims', route: '/dashboard/super/claims', icon: '📋' },
+    { label: 'Assign owner', route: '/dashboard/super/mosques', icon: '🏛️' },
+    { label: 'Feature flags', route: '/dashboard/super/features', icon: '⚙️' },
+    { label: 'Reports', route: '/dashboard/super/reports', icon: '📈' },
+    { label: 'Settings', route: '/dashboard/super/settings', icon: '🔧' },
+    { label: 'Audit logs', route: '/dashboard/super/audit', icon: '📜' },
   ];
 
   greeting = computed(() => {
@@ -815,233 +564,122 @@ export class SuperDashboardComponent implements OnInit, OnDestroy {
     return `${period}, ${name}`;
   });
 
-  ramadan = computed(() => isRamadan());
-  isFriday = computed(() => this.today()?.isFriday ?? new Date().getDay() === 5);
-  dayName = computed(() => currentDayName());
-
-  nextPrayerName = computed(() => {
-    const next = this.today()?.nextPrayer;
-    return next?.name?.replace(' (tomorrow)', '') ?? '—';
-  });
-
-  nextJamaatFmt = computed(() => {
-    const j = this.today()?.nextPrayer?.jamaat;
-    return j ? formatTime12(j) : '—';
-  });
-
-  nextAdhanFmt = computed(() => {
-    const t = this.today();
-    const next = t?.nextPrayer;
-    if (!t?.prayerTimes || !next) return '—';
-    const slot = getPrayerSlots(t.prayerTimes).find(p => p.name === next.name.replace(' (tomorrow)', ''));
-    return slot ? formatTime12(slot.start) : '—';
-  });
-
-  prayerRows = computed((): PrayerRow[] => {
-    const t = this.today();
-    if (!t?.prayerTimes) return [];
-    const active = getActivePrayerName(t.prayerTimes);
-    const nextName = t.nextPrayer?.name.replace(' (tomorrow)', '') ?? '';
-    return getPrayerSlots(t.prayerTimes).map(p => ({
-      name: p.name,
-      adhan: p.start,
-      iqamah: p.jamaat,
-      adhanFmt: formatTime12(p.start),
-      iqamahFmt: formatTime12(p.jamaat),
-      isCurrent: p.name === active,
-      isNext: p.name === nextName,
-    }));
-  });
-
-  suhoorFmt = computed(() => {
-    const fajr = this.today()?.prayerTimes?.fajrStart;
-    return fajr ? formatTime12(suhoorEndTime(fajr)) : '—';
-  });
-
-  iftarFmt = computed(() => {
-    const maghrib = this.today()?.prayerTimes?.maghribStart;
-    return maghrib ? formatTime12(maghrib) : '—';
-  });
-
-  marqueeItems = computed((): MarqueeItem[] => {
-    const items: MarqueeItem[] = [];
-    const t = this.today();
-    for (const a of t?.announcements ?? []) {
-      items.push({ icon: '📢', text: a.title, tag: a.status === 'Published' ? 'Notice' : 'Draft' });
-    }
-    if (t?.tonightEvent) {
-      items.push({ icon: '📅', text: t.tonightEvent.title, tag: t.tonightEvent.eventType || 'Event' });
-    }
-    if (this.stats()?.pendingClaims) {
-      items.push({
-        icon: '✓',
-        text: `${this.stats()!.pendingClaims} mosque claim(s) awaiting Super Admin review`,
-        tag: 'Action',
-      });
-    }
-    if (this.openCampaigns() > 0) {
-      items.push({
-        icon: '📿',
-        text: `${this.openCampaigns()} active reading campaign(s) across the platform`,
-        tag: 'Campaign',
-      });
-    }
-    items.push({
-      icon: '💝',
-      text: 'Support your masjid — donation campaigns can be published from Announcements',
-      tag: 'Campaign',
-    });
-    if (!items.length) {
-      items.push({ icon: 'ℹ️', text: 'No live announcements — publish from Oversight → Announcements / events' });
-    }
-    return items;
-  });
-
-  marqueeDoubled = computed(() => [...this.marqueeItems(), ...this.marqueeItems()]);
-  activeSlide = computed(() => this.slides[this.slideIndex()] ?? this.slides[0]);
-
-  roleCounts = computed(() => {
-    const counts = new Map<string, number>();
-    for (const role of Object.values(ROLES)) counts.set(role, 0);
-    for (const user of this.users()) {
-      for (const role of user.roles) {
-        counts.set(role, (counts.get(role) ?? 0) + 1);
-      }
-    }
-    const rows: RoleCount[] = [];
-    for (const [role, count] of counts) {
-      if (count > 0) rows.push({ role, count });
-    }
-    return rows.sort((a, b) => b.count - a.count);
-  });
-
-  mosqueStatusRows = computed(() => {
-    const mosques = this.mosques();
-    const tally = (status: string) => mosques.filter(m => m.status === status).length;
+  actionItems = computed((): ActionItem[] => {
+    const d = this.dashboard();
+    if (!d) return [];
+    const n = d.needsAttention;
     return [
-      { label: 'Active', count: tally('Active') },
-      { label: 'Claimed', count: tally('Claimed') },
-      { label: 'Unclaimed', count: tally('Unclaimed') },
-    ];
+      { count: n.unclaimedMosques, title: 'Unclaimed mosques', description: 'Listings without an assigned owner', route: '/dashboard/super/mosques', action: 'Review', warn: n.unclaimedMosques > 0 },
+      { count: n.pendingClaims, title: 'Ownership claims', description: 'Pending mosque ownership requests', route: '/dashboard/super/claims', action: 'Review', warn: true },
+      { count: n.missingOwners, title: 'Missing owners', description: 'Active mosques without an owner', route: '/dashboard/super/mosques', action: 'Assign', warn: n.missingOwners > 0 },
+      { count: n.duplicateListings ?? 0, title: 'Duplicate listings', description: 'Possible duplicate mosque records', route: '/dashboard/super/mosques', action: 'Inspect', warn: (n.duplicateListings ?? 0) > 0 },
+      { count: d.security.suspiciousActivity, title: 'Security warnings', description: 'Suspicious events in recent audit logs', route: '/dashboard/super/audit', action: 'View logs', warn: d.security.suspiciousActivity > 0 },
+    ].filter(i => i.count > 0);
   });
 
-  alerts = computed(() => {
-    const s = this.stats();
-    const items: { message: string; route: string; action: string }[] = [];
-    if (s && s.pendingClaims > 0) {
-      items.push({
-        message: `${s.pendingClaims} mosque claim${s.pendingClaims > 1 ? 's' : ''} waiting for your review`,
-        route: '/dashboard/super/mosques/claims',
-        action: 'Review claims',
-      });
-    }
-    const unclaimed = this.mosques().filter(m => m.status === 'Unclaimed').length;
-    if (unclaimed > 0) {
-      items.push({
-        message: `${unclaimed} unclaimed mosque listing${unclaimed > 1 ? 's' : ''} ready for rollout`,
-        route: '/dashboard/super/mosques',
-        action: 'View mosques',
-      });
-    }
-    return items;
+  timelineLogs = computed(() => {
+    const d = this.dashboard();
+    return d?.auditPreview?.length ? d.auditPreview : (d?.recentActivity ?? []).slice(0, 8);
   });
 
-  ngOnInit(): void {
-    this.tickClock();
-    this.clockTimer = setInterval(() => this.tickClock(), 1000);
-    this.slideTimer = setInterval(() => this.nextSlide(), 8000);
-    this.refresh();
-  }
+  ngOnInit(): void { this.refresh(); }
 
-  ngOnDestroy(): void {
-    if (this.clockTimer) clearInterval(this.clockTimer);
-    if (this.slideTimer) clearInterval(this.slideTimer);
-  }
-
-  statValue(key: StatCard['valueKey'], stats: PlatformStats): number {
-    if (key === 'openCampaigns') return this.openCampaigns();
-    return stats[key];
-  }
-
-  refreshToday(): void {
-    this.todayService.getToday().subscribe(d => {
-      if (!d.nextPrayer && d.prayerTimes) {
-        d.nextPrayer = resolveNextPrayer(d.prayerTimes);
-      }
-      this.today.set(d);
-      this.tickCountdown();
-    });
-  }
+  toggleNotifs(): void { this.showNotifs.update(v => !v); }
 
   refresh(): void {
     this.loading.set(true);
     forkJoin({
-      stats: this.platform.getStats(),
+      dashboard: this.platform.getDashboard(),
       claims: this.platform.getPendingClaims(),
-      logs: this.platform.getAuditLogs(8),
-      users: this.platform.getUsers(),
-      mosques: this.admin.getAllMosques(),
-      today: this.todayService.getToday(),
-    }).pipe(
-      switchMap(({ stats, claims, logs, users, mosques, today }) => {
-        if (!mosques.length) {
-          return of({ stats, claims, logs, users, mosques, today, openCampaigns: 0 });
-        }
-        return forkJoin(
-          mosques.map(m =>
-            this.mosqueService.getReadingCampaigns(m.id).pipe(
-              map(campaigns => campaigns.filter(c => c.isActive).length),
-              catchError(() => of(0))
-            )
-          )
-        ).pipe(
-          map(counts => ({
-            stats,
-            claims,
-            logs,
-            users,
-            mosques,
-            today,
-            openCampaigns: counts.reduce((a, b) => a + b, 0),
-          }))
-        );
-      })
-    ).subscribe({
-      next: ({ stats, claims, logs, users, mosques, today, openCampaigns }) => {
-        if (!today.nextPrayer && today.prayerTimes) {
-          today.nextPrayer = resolveNextPrayer(today.prayerTimes);
-        }
-        this.stats.set(stats);
-        this.pendingClaims.set(claims.slice(0, 3));
-        this.recentLogs.set(logs);
-        this.users.set(users);
-        this.mosques.set(mosques);
-        this.today.set(today);
-        this.openCampaigns.set(openCampaigns);
-        const mosque = mosques.find(m => m.id === today.mosqueId);
-        this.mosqueName.set(mosque?.name ?? 'Default mosque');
-        this.tickCountdown();
+    }).subscribe({
+      next: ({ dashboard, claims }) => {
+        this.dashboard.set(dashboard);
+        this.pendingClaims.set(claims.slice(0, 4));
+        this.lastSync.set(dashboard.syncedAt ? new Date(dashboard.syncedAt) : new Date());
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
     });
   }
 
-  goToSlide(i: number): void {
-    this.slideIndex.set(i % this.slides.length);
+  groupedRoles(d: PlatformDashboard): { role: string; count: number }[] {
+    const priority = ['Super Admin', 'Mosque Owner', 'Mosque Admin', 'Teacher', 'Member'];
+    const rows = [...d.users.byRole];
+    const sorted = rows.sort((a, b) => {
+      const ai = priority.indexOf(a.role);
+      const bi = priority.indexOf(b.role);
+      if (ai >= 0 && bi >= 0) return ai - bi;
+      if (ai >= 0) return -1;
+      if (bi >= 0) return 1;
+      return b.count - a.count;
+    });
+    const top = sorted.filter(r => priority.includes(r.role));
+    const other = sorted.filter(r => !priority.includes(r.role));
+    const otherCount = other.reduce((s, r) => s + r.count, 0);
+    if (otherCount > 0) top.push({ role: 'Other roles', count: otherCount });
+    return top.slice(0, 7);
   }
 
-  nextSlide(): void {
-    this.slideIndex.update(i => (i + 1) % this.slides.length);
-  }
-
-  prevSlide(): void {
-    this.slideIndex.update(i => (i - 1 + this.slides.length) % this.slides.length);
-  }
-
-  roleBarWidth(count: number): number {
-    const max = Math.max(...this.roleCounts().map(r => r.count), 1);
+  rolePct(count: number, d: PlatformDashboard): number {
+    const max = Math.max(...d.users.byRole.map(r => r.count), 1);
     return Math.round((count / max) * 100);
+  }
+
+  topFeatures(d: PlatformDashboard) {
+    const keys = ['PrayerTimes', 'Events', 'Janaza', 'Communities'];
+    const usage = d.analytics.featureUsage;
+    const picked = keys.map(k => usage.find(f => f.module === k) ?? { module: k, count: 0 });
+    return picked.sort((a, b) => b.count - a.count);
+  }
+
+  featurePct(count: number, d: PlatformDashboard): number {
+    const max = Math.max(...this.topFeatures(d).map(f => f.count), 1);
+    return Math.round((count / max) * 100);
+  }
+
+  featureLabel(module: string): string {
+    const map: Record<string, string> = {
+      PrayerTimes: 'Prayer times',
+      Events: 'Events',
+      Janaza: 'Donations / Janaza',
+      Communities: 'Community',
+    };
+    return map[module] ?? module;
+  }
+
+  barHeight(count: number, series: { count: number }[]): number {
+    const max = Math.max(...series.map(p => p.count), 1);
+    return Math.max(8, Math.round((count / max) * 100));
+  }
+
+  activityTrendLabel(d: PlatformDashboard): string {
+    const diff = d.analytics.activityLast7 - d.analytics.activityPrev7;
+    if (diff > 0) return `↑ ${diff} vs prior week`;
+    if (diff < 0) return `↓ ${Math.abs(diff)} vs prior week`;
+    return 'steady vs prior week';
+  }
+
+  actionLabel(action: string): string {
+    const map: Record<string, string> = {
+      APPROVE_CLAIM: 'Approved mosque claim',
+      REJECT_CLAIM: 'Rejected mosque claim',
+      ASSIGN_ROLE: 'Changed user role',
+      REMOVE_ROLE: 'Removed user role',
+      ASSIGN_MOSQUE_ADMIN: 'Assigned mosque admin',
+      SEED_MOSQUE: 'Added mosque listing',
+      UPDATE_MOSQUE: 'Updated mosque listing',
+      BULK_MOSQUE_STATUS: 'Bulk status update',
+    };
+    return map[action] ?? action.replace(/_/g, ' ').toLowerCase();
+  }
+
+  moduleLabel(log: AuditLogEntry): string {
+    if (log.targetType) return log.targetType;
+    const a = log.action.toLowerCase();
+    if (a.includes('role')) return 'Users';
+    if (a.includes('claim') || a.includes('mosque')) return 'Mosques';
+    if (a.includes('feature') || a.includes('module')) return 'Features';
+    return 'Platform';
   }
 
   approveClaim(id: number): void {
@@ -1050,30 +688,5 @@ export class SuperDashboardComponent implements OnInit, OnDestroy {
 
   rejectClaim(id: number): void {
     this.platform.rejectClaim(id).subscribe(() => this.refresh());
-  }
-
-  activityIcon(action: string): string {
-    const a = action.toLowerCase();
-    if (a.includes('claim')) return '✓';
-    if (a.includes('prayer')) return '⏰';
-    if (a.includes('role')) return '👥';
-    if (a.includes('mosque') || a.includes('seed')) return '⌂';
-    if (a.includes('content') || a.includes('publish')) return '📖';
-    return '↺';
-  }
-
-  private tickClock(): void {
-    const now = new Date();
-    this.liveClock.set(
-      now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
-    );
-    this.gregorianDate.set(now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
-    this.hijriDate.set(formatHijriDate(now));
-    this.tickCountdown();
-  }
-
-  private tickCountdown(): void {
-    const jamaat = this.today()?.nextPrayer?.jamaat;
-    this.countdown.set(jamaat ? countdownToJamaat(jamaat) : '00:00:00');
   }
 }

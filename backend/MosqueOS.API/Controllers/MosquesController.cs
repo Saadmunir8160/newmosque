@@ -110,6 +110,9 @@ namespace MosqueOS.API.Controllers
             mosque.Description = updated.Description;
             mosque.LogoUrl = updated.LogoUrl;
             mosque.BannerUrl = updated.BannerUrl;
+            mosque.MapLocation = updated.MapLocation;
+            mosque.Latitude = updated.Latitude;
+            mosque.Longitude = updated.Longitude;
             mosque.UpdatedAt = DateTime.UtcNow;
 
             await _unitOfWork.SaveChangesAsync();
