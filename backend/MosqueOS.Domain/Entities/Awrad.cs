@@ -11,6 +11,9 @@ namespace MosqueOS.Domain.Entities
         public string? AudioUrl { get; set; }
         public string? SourceRef { get; set; }
         public ContentItemType Type { get; set; } = ContentItemType.Dhikr;
+        public ContentPublishStatus Status { get; set; } = ContentPublishStatus.Published;
+        public DateTime? PublishedAt { get; set; }
+        public string? PublishedById { get; set; }
     }
 
     public class WirdCollection : BaseEntity
@@ -20,6 +23,9 @@ namespace MosqueOS.Domain.Entities
         public WirdCollectionType Type { get; set; } = WirdCollectionType.Daily;
         public string? RecommendedTime { get; set; }
         public string? Description { get; set; }
+        public ContentPublishStatus Status { get; set; } = ContentPublishStatus.Published;
+        public DateTime? PublishedAt { get; set; }
+        public string? PublishedById { get; set; }
 
         public ICollection<WirdStep> Steps { get; set; } = new List<WirdStep>();
     }

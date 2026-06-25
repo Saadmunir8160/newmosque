@@ -1,34 +1,128 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { AdminService } from '../../../core/services/admin.service';
 import { MadrassahService, MadrassahDashboard } from '../../../core/services/madrassah.service';
+import { MosqueContextService } from '../../../core/services/mosque-context.service';
 import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
-import { CardComponent } from '../../../shared/ui/card.component';
 
 @Component({
   selector: 'app-admin-madrassah',
   standalone: true,
-  imports: [CommonModule, PageHeaderComponent, CardComponent],
+  imports: [CommonModule, FormsModule, PageHeaderComponent],
   template: `
-    <app-page-header badge="Mosque Admin" title="Madrassah Overview" />
-    <div class="grid md:grid-cols-4 gap-4 mb-8" *ngIf="dash() as d">
-      <app-card><p class="text-stat-label">Students</p><p class="text-3xl font-bold text-white">{{ d.totalStudents }}</p></app-card>
-      <app-card><p class="text-stat-label">Classes</p><p class="text-3xl font-bold text-white">{{ d.totalClasses }}</p></app-card>
-      <app-card><p class="text-stat-label">Attendance</p><p class="text-3xl font-bold text-amber-400">{{ d.attendanceRate }}%</p></app-card>
-      <app-card><p class="text-stat-label">Unpaid Fees</p><p class="text-3xl font-bold text-red-400">{{ d.unpaidFees }}</p></app-card>
+    <div class="mos-dash">
+      <app-page-header badge="Mosque Admin" title="Madrassah" subtitle="Classes, students, and attendance overview" />
+
+      <label class="mos-form-search">
+        <span class="mos-form-search__icon" aria-hidden="true">⌕</span>
+        <input
+          class="mos-form-input"
+          type="search"
+          placeholder="Search classes…"
+          [(ngModel)]="search"
+          (ngModelChange)="loadClasses()"
+        />
+      </label>
+
+      <div class="mos-kpi-grid" *ngIf="dash() as d">
+        <article class="mos-kpi">
+          <span class="mos-kpi__icon">👨‍🎓</span>
+          <p class="mos-kpi__label">Students</p>
+          <p class="mos-kpi__value">{{ d.totalStudents }}</p>
+        </article>
+        <article class="mos-kpi">
+          <span class="mos-kpi__icon">📚</span>
+          <p class="mos-kpi__label">Classes</p>
+          <p class="mos-kpi__value">{{ d.totalClasses }}</p>
+        </article>
+        <article class="mos-kpi">
+          <span class="mos-kpi__icon">✓</span>
+          <p class="mos-kpi__label">Attendance</p>
+          <p class="mos-kpi__value mos-stat-value--accent">{{ d.attendanceRate }}%</p>
+        </article>
+        <article class="mos-kpi mos-kpi--warn">
+          <span class="mos-kpi__icon">£</span>
+          <p class="mos-kpi__label">Unpaid fees</p>
+          <p class="mos-kpi__value mos-stat-value--danger">{{ d.unpaidFees }}</p>
+        </article>
+      </div>
+
+      <section class="mos-dash-panel">
+        <h3 class="mos-dash-panel__title">Add class</h3>
+        <div class="mos-form-grid">
+          <label class="mos-form-field">
+            <span class="mos-form-label">Class name</span>
+            <input class="mos-form-input" placeholder="Qur'an Level 1 (Boys)" [(ngModel)]="classForm.name">
+          </label>
+          <label class="mos-form-field">
+            <span class="mos-form-label">Schedule</span>
+            <input class="mos-form-input" placeholder="Mon–Thu 17:00–18:30" [(ngModel)]="classForm.schedule">
+          </label>
+        </div>
+        <button type="button" class="mos-dash-btn mos-dash-btn--accent" (click)="createClass()">Create class</button>
+      </section>
+
+      <section *ngFor="let c of classes()" class="mos-dash-panel">
+        <h4 class="mos-class-title">{{ c.name }}</h4>
+        <p class="mos-class-meta">{{ c.schedule || 'No schedule' }} · {{ c.enrolments?.length || 0 }} students</p>
+      </section>
+
+      <p *ngIf="!classes().length" class="mos-dash-empty">No classes yet. Create your first class above.</p>
     </div>
-    <app-card *ngFor="let c of classes()">
-      <h4 class="text-white font-bold">{{ c.name }}</h4>
-      <p class="text-emerald-300 text-sm">{{ c.schedule }} · {{ c.enrolments?.length || 0 }} students</p>
-    </app-card>
-  `
+  `,
+  styles: [`
+    .mos-form-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.875rem;
+      margin-bottom: 1rem;
+    }
+    @media (min-width: 640px) {
+      .mos-form-grid { grid-template-columns: 1fr 1fr; }
+    }
+    .mos-form-field { display: flex; flex-direction: column; gap: 0.35rem; }
+    .mos-class-title {
+      margin: 0;
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: var(--mos-text-primary);
+    }
+    .mos-class-meta {
+      margin: 0.25rem 0 0;
+      font-size: 0.8125rem;
+      color: var(--mos-text-secondary);
+    }
+  `]
 })
 export class AdminMadrassahComponent implements OnInit {
   private madrassah = inject(MadrassahService);
+  private admin = inject(AdminService);
+  private mosqueCtx = inject(MosqueContextService);
   dash = signal<MadrassahDashboard | null>(null);
   classes = signal<import('../../../core/services/madrassah.service').MadrassahClass[]>([]);
+  search = '';
+  classForm = { name: '', schedule: '' };
+  mosqueId = 1;
 
   ngOnInit(): void {
-    this.madrassah.getDashboard().subscribe(d => this.dash.set(d));
-    this.madrassah.getClasses().subscribe(c => this.classes.set(c));
+    this.mosqueCtx.resolve().then(id => {
+      this.mosqueId = id;
+      this.madrassah.getDashboard(id).subscribe(d => this.dash.set(d));
+      this.loadClasses();
+    });
+  }
+
+  loadClasses(): void {
+    this.madrassah.getClasses(this.mosqueId, this.search).subscribe(c => this.classes.set(c));
+  }
+
+  createClass(): void {
+    if (!this.classForm.name.trim()) return;
+    this.admin.createMadrassahClass(this.mosqueId, this.classForm).subscribe(() => {
+      this.classForm = { name: '', schedule: '' };
+      this.madrassah.getDashboard(this.mosqueId).subscribe(d => this.dash.set(d));
+      this.loadClasses();
+    });
   }
 }

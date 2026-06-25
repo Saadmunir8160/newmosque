@@ -14,7 +14,7 @@ import { AuthService } from '../../../core/auth/auth.service';
       padding: 2rem 1rem;
       padding-top: max(2rem, env(safe-area-inset-top));
       padding-bottom: max(5.5rem, calc(env(safe-area-inset-bottom) + 3rem));
-      background: linear-gradient(165deg, #065f46 0%, #022c22 45%, #011a14 100%);
+      background: linear-gradient(165deg, #F8FAFC 0%, #0F172A 45%, #011a14 100%);
       position: relative; overflow: hidden;
     }
     .splash::before {
@@ -46,7 +46,7 @@ import { AuthService } from '../../../core/auth/auth.service';
     .btn-stack { display: flex; flex-direction: column; gap: 14px; width: 100%; }
     .btn-login {
       width: 100%; padding: 15px; border-radius: 14px; border: none; cursor: pointer;
-      background: #fff; color: #022c22; font-size: 1rem; font-weight: 700;
+      background: #fff; color: #0F172A; font-size: 1rem; font-weight: 700;
       box-shadow: 0 8px 24px rgba(0,0,0,0.2); transition: transform 0.15s;
     }
     .btn-login:hover { transform: translateY(-2px); }
@@ -97,6 +97,6 @@ export class AuthWelcomeComponent {
 
   browseAsGuest(): void {
     this.authService.enterGuestMode();
-    this.router.navigate(['/dashboard']);
+    this.router.navigate(['/dashboard/guest']);
   }
 }

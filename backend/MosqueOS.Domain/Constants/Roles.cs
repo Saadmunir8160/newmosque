@@ -11,11 +11,12 @@ namespace MosqueOS.Domain.Constants
         public const string ContentEditor = "Content Editor";
         public const string Parent = "Parent";
         public const string Member = "Member";
+        public const string Guest = "Guest";
 
         public static readonly string[] All =
         {
             SuperAdmin, MosqueOwner, MosqueAdmin, PrayerTimesEditor,
-            Teacher, Muqaddam, ContentEditor, Parent, Member
+            Teacher, Muqaddam, ContentEditor, Parent, Member, Guest
         };
 
         // Composite role lists for [Authorize(Roles = ...)] (spec section 6.2)

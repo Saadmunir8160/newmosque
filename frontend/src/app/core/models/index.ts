@@ -19,6 +19,8 @@ export interface UserProfile {
   searchRadiusKm: number;
   interests: string | null;
   roles: string[];
+  permissions?: string[];
+  emailConfirmed?: boolean;
 }
 
 export interface MosqueSetting {
@@ -36,6 +38,13 @@ export interface MosqueStaffMember {
   roles: string[];
 }
 
+export interface MosqueLeadership {
+  name: string;
+  role: string;
+  bio?: string;
+  photoUrl?: string;
+}
+
 export interface Mosque {
   id: number;
   name: string;
@@ -47,18 +56,57 @@ export interface Mosque {
   phone?: string;
   email?: string;
   website?: string;
+  facebookUrl?: string;
+  instagramUrl?: string;
+  youtubeUrl?: string;
+  twitterUrl?: string;
+  shortDescription?: string;
   description?: string;
+  facilities?: string[];
   logoUrl?: string;
   bannerUrl?: string;
+  establishedYear?: number;
+  capacity?: number;
+  vision?: string;
+  history?: string;
+  parkingInfo?: string;
+  gallery?: string[];
+  services?: string[];
+  leadership?: MosqueLeadership[];
+  statsOverride?: { members?: number; weeklyAttendance?: number; eventsHosted?: number; yearsOfService?: number };
   mapLocation?: string;
   latitude?: number;
   longitude?: number;
   timezone: string;
   status: string;
   ownerId?: string;
+  allowClaimRequests?: boolean;
+  requireManualApproval?: boolean;
+  publicProfileEnabled?: boolean;
   createdAt?: string;
   updatedAt?: string;
   settings?: MosqueSetting[];
+}
+
+export interface ClaimSubmissionDetails {
+  claimId: number;
+  claimReference: string;
+  reviewStatus: string;
+  submittedAt: string;
+  expectedReviewTime: string;
+}
+
+export interface MyClaimListItem {
+  claimId: number;
+  claimReference: string;
+  mosqueId: number;
+  mosqueName: string;
+  mosqueSlug?: string;
+  status: string;
+  reviewStatus: string;
+  submittedDate: string;
+  lastUpdated?: string;
+  rejectionReason?: string;
 }
 
 export interface PrayerTimesDaily {
@@ -75,6 +123,8 @@ export interface PrayerTimesDaily {
   maghribJamaat: string;
   ishaStart: string;
   ishaJamaat: string;
+  status?: string;
+  publishedAt?: string;
 }
 
 export interface JumuahTime {
@@ -118,6 +168,8 @@ export interface MosqueEvent {
   status: string;
 }
 
+export type JanazaStatus = 'Draft' | 'Published' | 'Unpublished';
+
 export interface JanazaAnnouncement {
   id: number;
   mosqueId: number;
@@ -128,6 +180,11 @@ export interface JanazaAnnouncement {
   location: string;
   burialLocation?: string;
   notes?: string;
+  status?: JanazaStatus;
+  postedByName?: string;
+  postedByInitials?: string;
+  createdAt?: string;
+  publishedAt?: string;
 }
 
 export interface ReadingCampaign {
@@ -144,6 +201,9 @@ export interface Dua {
   transliteration?: string;
   translation?: string;
   category: string;
+  status?: string;
+  sourceName?: string;
+  sourceRef?: string;
 }
 
 export interface WirdCollection {
@@ -153,6 +213,7 @@ export interface WirdCollection {
   type: string;
   recommendedTime?: string;
   description?: string;
+  status?: string;
 }
 
 export interface ParticipationOpportunity {

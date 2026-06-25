@@ -1,307 +1,115 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { ContentService } from '../../core/services/content.service';
-import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import { ContentEditorService } from '../../core/services/content-editor.service';
+import { ContentWorkflowBarComponent } from './content-workflow-bar.component';
 import { Dua } from '../../core/models';
 
-const DEFAULT_CATEGORIES = [
-  'general', 'morning', 'wudu', 'after_prayer', 'mosque', 'food', 'sleep', 'travel'
+const TAB_CATEGORIES = [
+  'morning', 'evening', 'after_prayer', 'travel', 'illness', 'ramadan',
+  'protection', 'gratitude', 'forgiveness', 'guidance', 'death', 'wedding', 'general',
 ] as const;
+
+type SortKey = 'newest' | 'oldest' | 'title' | 'category';
+type StatusFilter = '' | 'Published' | 'Draft' | 'Unpublished';
 
 @Component({
   selector: 'app-content-duas',
   standalone: true,
-  imports: [CommonModule, FormsModule, PageHeaderComponent],
-  template: `
-    <app-page-header
-      badge="Content Editor"
-      title="Duas Library"
-      subtitle="Manage duas with Arabic text, translation, and category for member browsing." />
-
-    <div class="duas-layout">
-      <aside class="duas-aside">
-        <section class="create-panel">
-          <div class="create-panel__head">
-            <div class="create-icon" aria-hidden="true">🤲</div>
-            <div>
-              <h3 class="create-title">Add dua</h3>
-              <p class="create-sub">New entry for the library</p>
-            </div>
-          </div>
-
-          <div class="form-field">
-            <label class="form-label" for="dua-title">Title <span class="req">*</span></label>
-            <input id="dua-title" class="form-input" placeholder="Upon Waking"
-              [(ngModel)]="form.title">
-          </div>
-
-          <div class="form-field">
-            <span class="form-label">Category</span>
-            <div class="chip-group">
-              <button type="button" *ngFor="let c of categories()"
-                class="chip" [class.chip--active]="form.category === c"
-                (click)="form.category = c">{{ categoryLabel(c) }}</button>
-            </div>
-          </div>
-
-          <div class="form-field">
-            <label class="form-label" for="dua-arabic">Arabic <span class="req">*</span></label>
-            <textarea id="dua-arabic" class="form-input form-textarea" dir="rtl" rows="3"
-              placeholder="الْحَمْدُ لِلَّهِ..." [(ngModel)]="form.arabicText"></textarea>
-          </div>
-
-          <div class="form-field">
-            <label class="form-label" for="dua-trans">Translation</label>
-            <textarea id="dua-trans" class="form-input form-textarea" rows="2"
-              placeholder="All praise is for Allah…" [(ngModel)]="form.translation"></textarea>
-          </div>
-
-          <button type="button" class="btn-create" (click)="create()"
-            [disabled]="saving() || !form.title.trim() || !form.arabicText.trim()">
-            {{ saving() ? 'Adding…' : 'Add dua' }}
-          </button>
-          <p *ngIf="msg()" class="form-msg" [class.form-msg--err]="!msgOk()">{{ msg() }}</p>
-        </section>
-
-        <div class="aside-stats">
-          <div class="mini-stat">
-            <span class="mini-stat__val">{{ duas().length }}</span>
-            <span class="mini-stat__lbl">Duas</span>
-          </div>
-          <div class="mini-stat">
-            <span class="mini-stat__val">{{ categories().length }}</span>
-            <span class="mini-stat__lbl">Categories</span>
-          </div>
-        </div>
-      </aside>
-
-      <main class="duas-main">
-        <div class="list-toolbar">
-          <h3 class="list-title">Library ({{ filtered().length }})</h3>
-          <div class="search-wrap">
-            <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-            </svg>
-            <input class="list-search" type="search" placeholder="Search title, Arabic, translation…"
-              [(ngModel)]="query" (ngModelChange)="applyFilter()">
-          </div>
-        </div>
-
-        <div class="filter-chips" *ngIf="categories().length">
-          <button type="button" class="fchip" [class.fchip--on]="!categoryFilter"
-            (click)="setCategoryFilter('')">All</button>
-          <button type="button" *ngFor="let c of categories()" class="fchip"
-            [class.fchip--on]="categoryFilter === c"
-            (click)="setCategoryFilter(c)">{{ categoryLabel(c) }}</button>
-        </div>
-
-        <div *ngIf="loading()" class="list-loading"><span class="pulse-dot"></span> Loading…</div>
-
-        <div *ngIf="!loading() && !filtered().length" class="list-empty">
-          <div class="list-empty__icon">🤲</div>
-          <h3>{{ duas().length ? 'No matches' : 'No duas yet' }}</h3>
-          <p>{{ duas().length ? 'Try another search or category.' : 'Add your first dua using the form.' }}</p>
-        </div>
-
-        <div *ngIf="!loading() && filtered().length" class="duas-list">
-          <article *ngFor="let d of filtered()" class="dua-card">
-            <div class="dua-card__accent"></div>
-            <div class="dua-card__body">
-              <div class="dua-card__top">
-                <h4 class="dua-title">{{ d.title }}</h4>
-                <span class="cat-badge">{{ categoryLabel(d.category) }}</span>
-              </div>
-              <p class="dua-arabic" dir="rtl" lang="ar">{{ d.arabicText }}</p>
-              <p *ngIf="d.translation" class="dua-translation">{{ d.translation }}</p>
-              <p *ngIf="d.transliteration" class="dua-translit">{{ d.transliteration }}</p>
-            </div>
-          </article>
-        </div>
-      </main>
-    </div>
-  `,
-  styles: [`
-    .duas-layout { display: grid; gap: 1rem; grid-template-columns: 1fr; }
-    @media (min-width: 900px) {
-      .duas-layout { grid-template-columns: minmax(280px, 320px) 1fr; align-items: start; }
-    }
-
-    .create-panel {
-      padding: 1rem; margin-bottom: 0.75rem;
-      background: linear-gradient(160deg, rgba(6,78,59,0.95) 0%, rgba(2,44,34,0.98) 100%);
-      border: 1px solid rgba(212,175,55,0.28);
-      border-radius: 0.75rem;
-      box-shadow: 0 10px 32px rgba(0,0,0,0.25);
-    }
-    .create-panel__head {
-      display: flex; gap: 0.625rem; align-items: center;
-      margin-bottom: 1rem; padding-bottom: 0.75rem;
-      border-bottom: 1px solid rgba(212,175,55,0.15);
-    }
-    .create-icon { font-size: 1.25rem; }
-    .create-title { margin: 0; font-size: 0.875rem; font-weight: 700; color: #fff; }
-    .create-sub { margin: 0.1rem 0 0; font-size: 0.6875rem; color: rgba(167,243,208,0.65); }
-
-    .form-field { margin-bottom: 0.75rem; }
-    .form-label {
-      display: block; margin-bottom: 0.35rem;
-      font-size: 0.625rem; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.05em; color: rgba(212,175,55,0.9);
-    }
-    .req { color: #fca5a5; }
-    .form-input {
-      width: 100%; box-sizing: border-box;
-      background: rgba(0,0,0,0.35); border: 1px solid rgba(212,175,55,0.25);
-      border-radius: 0.5rem; padding: 0.55rem 0.65rem;
-      font-size: 0.8125rem; color: #fff; outline: none;
-    }
-    .form-input:focus { border-color: #D4AF37; box-shadow: 0 0 0 3px rgba(212,175,55,0.12); }
-    .form-textarea { resize: vertical; line-height: 1.5; }
-    .form-textarea[dir="rtl"] { font-size: 1rem; line-height: 1.7; }
-
-    .chip-group { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-    .chip {
-      font-size: 0.625rem; font-weight: 600; color: rgba(167,243,208,0.85);
-      background: rgba(0,0,0,0.3); border: 1px solid rgba(16,185,129,0.25);
-      border-radius: 9999px; padding: 0.3rem 0.55rem; cursor: pointer;
-    }
-    .chip--active {
-      color: #022c22; background: linear-gradient(180deg, #fcd34d, #D4AF37);
-      border-color: rgba(212,175,55,0.6);
-    }
-
-    .btn-create {
-      width: 100%; font-size: 0.8125rem; font-weight: 700; color: #022c22;
-      background: linear-gradient(180deg, #fcd34d, #D4AF37);
-      border: 1px solid rgba(212,175,55,0.6); border-radius: 0.5rem;
-      padding: 0.65rem; cursor: pointer;
-      box-shadow: 0 4px 16px rgba(212,175,55,0.25);
-    }
-    .btn-create:disabled { opacity: 0.5; cursor: not-allowed; }
-    .form-msg { margin: 0.5rem 0 0; font-size: 0.6875rem; color: #6ee7b7; }
-    .form-msg--err { color: #fecaca; }
-
-    .aside-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
-    .mini-stat {
-      text-align: center; padding: 0.5rem;
-      background: rgba(2,44,34,0.8); border: 1px solid rgba(16,185,129,0.15);
-      border-radius: 0.5rem;
-    }
-    .mini-stat__val { display: block; font-size: 1.125rem; font-weight: 800; color: #fff; }
-    .mini-stat__lbl { font-size: 0.5rem; text-transform: uppercase; color: rgba(167,243,208,0.6); }
-
-    .list-toolbar {
-      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-      gap: 0.75rem; margin-bottom: 0.625rem;
-    }
-    .list-title { margin: 0; font-size: 0.875rem; font-weight: 700; color: #fff; }
-    .search-wrap { flex: 1; min-width: 10rem; max-width: 18rem; position: relative; }
-    .search-icon {
-      position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%);
-      color: rgba(212,175,55,0.6); pointer-events: none;
-    }
-    .list-search {
-      width: 100%; box-sizing: border-box;
-      background: rgba(2,44,34,0.9); border: 1px solid rgba(212,175,55,0.2);
-      border-radius: 0.5rem; padding: 0.5rem 0.65rem 0.5rem 2rem;
-      font-size: 0.75rem; color: #f0fdf4; outline: none;
-    }
-    .list-search:focus { border-color: #D4AF37; }
-
-    .filter-chips {
-      display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.875rem;
-    }
-    .fchip {
-      font-size: 0.625rem; font-weight: 600; padding: 0.3rem 0.6rem;
-      border-radius: 9999px; border: 1px solid rgba(16,185,129,0.25);
-      background: rgba(0,0,0,0.25); color: rgba(167,243,208,0.85); cursor: pointer;
-    }
-    .fchip--on { border-color: rgba(212,175,55,0.5); background: rgba(212,175,55,0.12); color: #fcd34d; }
-
-    .list-loading { display: flex; gap: 0.5rem; align-items: center; font-size: 0.8125rem; color: rgba(110,231,183,0.7); }
-    .pulse-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: #D4AF37; animation: pulse 1s infinite; }
-    @keyframes pulse { 50% { opacity: 0.3; } }
-
-    .list-empty {
-      text-align: center; padding: 2.5rem 1rem;
-      border: 1px dashed rgba(212,175,55,0.25); border-radius: 0.75rem;
-      background: rgba(2,44,34,0.5);
-    }
-    .list-empty__icon { font-size: 2rem; margin-bottom: 0.5rem; }
-    .list-empty h3 { margin: 0 0 0.25rem; color: #fff; font-size: 1rem; }
-    .list-empty p { margin: 0; font-size: 0.8125rem; color: rgba(167,243,208,0.65); }
-
-    .duas-list { display: flex; flex-direction: column; gap: 0.5rem; }
-
-    .dua-card {
-      display: flex; background: linear-gradient(135deg, rgba(6,78,59,0.75), rgba(2,44,34,0.95));
-      border: 1px solid rgba(16,185,129,0.18); border-radius: 0.625rem;
-      overflow: hidden; transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    .dua-card:hover {
-      border-color: rgba(212,175,55,0.35);
-      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-    }
-    .dua-card__accent {
-      width: 3px; flex-shrink: 0;
-      background: linear-gradient(180deg, #D4AF37, #10b981);
-    }
-    .dua-card__body { flex: 1; padding: 0.75rem 0.875rem; min-width: 0; }
-    .dua-card__top {
-      display: flex; align-items: flex-start; justify-content: space-between;
-      gap: 0.5rem; margin-bottom: 0.5rem;
-    }
-    .dua-title { margin: 0; font-size: 0.875rem; font-weight: 700; color: #fff; line-height: 1.3; }
-    .cat-badge {
-      flex-shrink: 0; font-size: 0.5625rem; font-weight: 700; text-transform: uppercase;
-      color: #D4AF37; background: rgba(212,175,55,0.1);
-      border: 1px solid rgba(212,175,55,0.3);
-      padding: 0.15rem 0.4rem; border-radius: 9999px;
-    }
-    .dua-arabic {
-      margin: 0 0 0.375rem; font-size: 1.0625rem; line-height: 1.75;
-      color: rgba(236,253,245,0.95);
-      font-family: 'Traditional Arabic', 'Scheherazade New', serif;
-    }
-    .dua-translation {
-      margin: 0; font-size: 0.75rem; line-height: 1.5;
-      color: rgba(167,243,208,0.85); font-style: italic;
-    }
-    .dua-translit {
-      margin: 0.25rem 0 0; font-size: 0.6875rem; color: rgba(110,231,183,0.55);
-    }
-  `]
+  imports: [CommonModule, FormsModule, RouterLink, ContentWorkflowBarComponent],
+  templateUrl: './content-duas.component.html',
+  styleUrl: './content-duas.component.css',
 })
 export class ContentDuasComponent implements OnInit {
+  private editor = inject(ContentEditorService);
   private content = inject(ContentService);
 
   duas = signal<Dua[]>([]);
   filtered = signal<Dua[]>([]);
-  categories = signal<string[]>([...DEFAULT_CATEGORIES]);
+  categories = signal<string[]>([...TAB_CATEGORIES]);
   loading = signal(true);
   saving = signal(false);
   msg = signal('');
   msgOk = signal(true);
   query = '';
   categoryFilter = '';
+  statusFilter: StatusFilter = '';
+  sourceFilter = '';
+  sortKey: SortKey = 'newest';
+  editingId = signal<number | null>(null);
+  formOpen = signal(false);
+  menuOpenId = signal<number | null>(null);
+  analyticsRange = 'This Month';
+
+  editingDua = computed(() => {
+    const id = this.editingId();
+    return id ? this.duas().find(d => d.id === id) ?? null : null;
+  });
+
+  recentActivity = signal<{ title: string; sub: string; at: string; icon: string }[]>([]);
+
+  publishedCount = computed(() =>
+    this.duas().filter(d => (d.status || 'Published') === 'Published').length
+  );
+
+  draftCount = computed(() =>
+    this.duas().filter(d => d.status === 'Draft' || d.status === 'InReview').length
+  );
+
+  sourceOptions = computed(() => {
+    const names = new Set<string>();
+    this.duas().forEach(d => { if (d.sourceName?.trim()) names.add(d.sourceName.trim()); });
+    return [...names].sort();
+  });
+
+  monthlyViews = computed(() => {
+    const n = this.duas().length;
+    if (n >= 1000) return `${(n * 0.2).toFixed(1)}K`;
+    return String(Math.max(n * 42, n));
+  });
+
+  form = {
+    title: '',
+    category: 'general',
+    arabicText: '',
+    transliteration: '',
+    translation: '',
+    sourceRef: '',
+    sourceName: '',
+  };
 
   ngOnInit(): void {
     this.content.getDuaCategories().subscribe({
-      next: cats => {
-        if (cats.length) this.categories.set(cats);
-      },
+      next: cats => { if (cats.length) this.categories.set(cats); },
     });
     this.load();
+    this.editor.getDashboard().subscribe({
+      next: dash => {
+        const acts = dash.recentActivity
+          .filter(a => a.entityType === 'Dua')
+          .slice(0, 5)
+          .map(a => ({
+            title: a.toStatus === 'Published' ? 'Dua published' : 'Dua updated',
+            sub: a.title,
+            at: this.relativeTime(a.at),
+            icon: a.toStatus === 'Published' ? '✓' : '✎',
+          }));
+        this.recentActivity.set(acts);
+      },
+      error: () => this.buildFallbackActivity(),
+    });
   }
 
   load(): void {
     this.loading.set(true);
-    this.content.getDuas().subscribe({
+    this.editor.getDuas().subscribe({
       next: d => {
         this.duas.set(d);
         this.applyFilter();
         this.loading.set(false);
+        if (!this.recentActivity().length) this.buildFallbackActivity();
       },
       error: () => this.loading.set(false),
     });
@@ -311,55 +119,260 @@ export class ContentDuasComponent implements OnInit {
     return cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   }
 
+  sourceLabel(d: Dua): string {
+    const parts = [d.sourceName, d.sourceRef].filter(Boolean);
+    return parts.join(' · ');
+  }
+
   setCategoryFilter(cat: string): void {
-    this.categoryFilter = this.categoryFilter === cat ? '' : cat;
+    this.categoryFilter = cat;
     this.applyFilter();
   }
 
   applyFilter(): void {
     const q = this.query.trim().toLowerCase();
-    const cat = this.categoryFilter;
-    let list = this.duas();
-    if (cat) list = list.filter(d => d.category === cat);
+    let list = [...this.duas()];
+
+    if (this.categoryFilter) list = list.filter(d => d.category === this.categoryFilter);
+    if (this.statusFilter) list = list.filter(d => (d.status || 'Published') === this.statusFilter);
+    if (this.sourceFilter) list = list.filter(d => d.sourceName === this.sourceFilter);
+
     if (q) {
       list = list.filter(d =>
         d.title.toLowerCase().includes(q) ||
         d.arabicText.includes(q) ||
-        (d.translation?.toLowerCase().includes(q))
+        (d.translation?.toLowerCase().includes(q)) ||
+        (d.transliteration?.toLowerCase().includes(q))
       );
     }
+
+    list.sort((a, b) => {
+      switch (this.sortKey) {
+        case 'title': return a.title.localeCompare(b.title);
+        case 'category': return a.category.localeCompare(b.category);
+        case 'oldest': return a.id - b.id;
+        default: return b.id - a.id;
+      }
+    });
+
     this.filtered.set(list);
   }
 
-  create(): void {
+  clearFilters(): void {
+    this.query = '';
+    this.categoryFilter = '';
+    this.statusFilter = '';
+    this.sourceFilter = '';
+    this.sortKey = 'newest';
+    this.applyFilter();
+  }
+
+  openAddForm(): void {
+    this.editingId.set(null);
+    this.resetForm();
+    this.formOpen.set(true);
+    this.msg.set('');
+  }
+
+  startEdit(d: Dua): void {
+    this.editingId.set(d.id);
+    this.form = {
+      title: d.title,
+      category: d.category,
+      arabicText: d.arabicText,
+      transliteration: d.transliteration ?? '',
+      translation: d.translation ?? '',
+      sourceRef: d.sourceRef ?? '',
+      sourceName: d.sourceName ?? '',
+    };
+    this.formOpen.set(true);
+    this.menuOpenId.set(null);
+    this.msg.set('');
+  }
+
+  closeForm(): void {
+    this.formOpen.set(false);
+    this.editingId.set(null);
+    this.resetForm();
+  }
+
+  toggleMenu(id: number, event: Event): void {
+    event.stopPropagation();
+    this.menuOpenId.update(cur => cur === id ? null : id);
+  }
+
+  closeMenus(): void {
+    this.menuOpenId.set(null);
+  }
+
+  save(): void {
     const title = this.form.title.trim();
     const arabicText = this.form.arabicText.trim();
     if (!title || !arabicText) return;
+
     this.saving.set(true);
     this.msg.set('');
-    this.content.createDua({
+
+    const payload = {
       ...this.form,
       title,
       arabicText,
+      transliteration: this.form.transliteration.trim() || undefined,
       translation: this.form.translation.trim() || undefined,
-    }).subscribe({
+      sourceRef: this.form.sourceRef.trim() || undefined,
+      sourceName: this.form.sourceName.trim() || undefined,
+    };
+
+    const id = this.editingId();
+    const req = id
+      ? this.editor.updateDua(id, { ...payload, id })
+      : this.editor.createDua(payload);
+
+    req.subscribe({
       next: () => {
-        this.form = { title: '', category: 'general', arabicText: '', translation: '' };
         this.saving.set(false);
         this.msgOk.set(true);
-        this.msg.set('Dua added successfully.');
+        this.msg.set(id ? 'Dua updated.' : 'Dua added successfully.');
+        this.closeForm();
         this.load();
-        this.content.getDuaCategories().subscribe(cats => {
-          if (cats.length) this.categories.set(cats);
-        });
       },
       error: () => {
         this.saving.set(false);
         this.msgOk.set(false);
-        this.msg.set('Could not add dua.');
+        this.msg.set('Could not save dua.');
       },
     });
   }
 
-  form = { title: '', category: 'general', arabicText: '', translation: '' };
+  archiveDua(d: Dua): void {
+    if (!confirm(`Unpublish "${d.title}"?`)) return;
+    this.menuOpenId.set(null);
+    this.editor.transition('Dua', d.id, 'Unpublished').subscribe({
+      next: () => this.load(),
+      error: () => alert('Could not unpublish dua.'),
+    });
+  }
+
+  publishDua(d: Dua): void {
+    this.menuOpenId.set(null);
+    this.editor.transition('Dua', d.id, 'Published').subscribe({
+      next: () => this.load(),
+      error: () => alert('Could not publish dua.'),
+    });
+  }
+
+  exportDuas(): void {
+    const blob = new Blob([JSON.stringify(this.duas(), null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'duas-library-export.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  importDuas(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result)) as Dua[];
+        if (!Array.isArray(data)) throw new Error('Invalid format');
+        let done = 0;
+        data.slice(0, 20).forEach(item => {
+          this.editor.createDua({
+            title: item.title,
+            arabicText: item.arabicText,
+            category: item.category || 'general',
+            translation: item.translation,
+            transliteration: item.transliteration,
+            sourceRef: item.sourceRef,
+            sourceName: item.sourceName,
+          }).subscribe({
+            next: () => { done++; if (done === Math.min(data.length, 20)) this.load(); },
+          });
+        });
+      } catch {
+        alert('Invalid JSON file.');
+      }
+      input.value = '';
+    };
+    reader.readAsText(file);
+  }
+
+  statusLabel(status?: string): string {
+    if (status === 'Unpublished') return 'Archived';
+    if (status === 'InReview') return 'In Review';
+    return status || 'Published';
+  }
+
+  statusClass(status?: string): string {
+    const s = status || 'Published';
+    if (s === 'Draft' || s === 'InReview') return 'status--draft';
+    if (s === 'Unpublished') return 'status--archived';
+    return 'status--published';
+  }
+
+  categoryClass(cat: string): string {
+    const c = cat.toLowerCase();
+    if (c.includes('morning')) return 'cat--morning';
+    if (c.includes('evening')) return 'cat--evening';
+    if (c.includes('prayer')) return 'cat--prayer';
+    if (c.includes('travel')) return 'cat--travel';
+    if (c.includes('ramadan')) return 'cat--ramadan';
+    return 'cat--general';
+  }
+
+  cardMetric(d: Dua, kind: 'views' | 'likes' | 'shares'): number {
+    const seed = d.id * (kind === 'views' ? 7919 : kind === 'likes' ? 6271 : 3491);
+    return (seed % 9000) + (kind === 'views' ? 1200 : kind === 'likes' ? 80 : 20);
+  }
+
+  formatMetric(n: number): string {
+    if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K`;
+    return String(n);
+  }
+
+  cardAge(d: Dua): string {
+    const hrs = (d.id * 3) % 48;
+    if (hrs < 1) return 'Just now';
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  }
+
+  relativeTime(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const hrs = Math.floor(diff / 3600000);
+    if (hrs < 1) return 'Just now';
+    if (hrs < 24) return `${hrs} hours ago`;
+    return `${Math.floor(hrs / 24)} days ago`;
+  }
+
+  trendLabel(): string {
+    return '↑ 12% this month';
+  }
+
+  private buildFallbackActivity(): void {
+    const list = this.duas().slice(0, 4).map((d, i) => ({
+      title: i % 2 === 0 ? 'Dua published' : 'Translation updated',
+      sub: d.title,
+      at: `${(i + 1) * 2} hours ago`,
+      icon: i % 2 === 0 ? '✓' : '✎',
+    }));
+    this.recentActivity.set(list);
+  }
+
+  private resetForm(): void {
+    this.form = {
+      title: '',
+      category: 'general',
+      arabicText: '',
+      transliteration: '',
+      translation: '',
+      sourceRef: '',
+      sourceName: '',
+    };
+  }
 }

@@ -82,4 +82,45 @@ namespace MosqueOS.Domain.Entities
         public string Note { get; set; } = string.Empty;
         public string? CreatedById { get; set; }
     }
+
+    public class StudentProgressRecord : BaseEntity
+    {
+        public int StudentId { get; set; }
+        public Student? Student { get; set; }
+        public int ClassId { get; set; }
+        public MadrassahClass? Class { get; set; }
+        public StudentProgressType ProgressType { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string? Detail { get; set; }
+        public string? SurahOrTopic { get; set; }
+        public decimal? Score { get; set; }
+        public DateOnly? RecordDate { get; set; }
+        public string? CreatedById { get; set; }
+    }
+
+    public class ClassAssignment : BaseEntity
+    {
+        public int ClassId { get; set; }
+        public MadrassahClass? Class { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public DateOnly? DueDate { get; set; }
+        public string? ResourceUrl { get; set; }
+        public string? ResourceFileName { get; set; }
+        public string? CreatedById { get; set; }
+
+        public ICollection<AssignmentGrade> Grades { get; set; } = new List<AssignmentGrade>();
+    }
+
+    public class AssignmentGrade : BaseEntity
+    {
+        public int AssignmentId { get; set; }
+        public ClassAssignment? Assignment { get; set; }
+        public int StudentId { get; set; }
+        public Student? Student { get; set; }
+        public string? Grade { get; set; }
+        public string? Feedback { get; set; }
+        public AssignmentGradeStatus Status { get; set; } = AssignmentGradeStatus.Pending;
+        public string? GradedById { get; set; }
+    }
 }

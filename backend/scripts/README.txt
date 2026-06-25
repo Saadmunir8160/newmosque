@@ -25,7 +25,17 @@ VERIFY DATA
   SELECT UserName FROM AspNetUsers;
 
 START API (creates tables + seed on first run)
-  cd MosqueOS\backend
-  dotnet run --project MosqueOS.API --urls http://localhost:5000
+  cd MosqueOS\backend\scripts
+  .\run-api.ps1
 
-If old API is running, stop it first (Task Manager → MosqueOS.API).
+  Or manually:
+  cd MosqueOS\backend\MosqueOS.API
+  dotnet run --urls http://localhost:5000
+
+BUILD (auto-stops running API on Windows to avoid MSB3027 file-lock errors)
+  cd MosqueOS\backend\MosqueOS.API
+  dotnet build
+
+STOP API manually
+  cd MosqueOS\backend\scripts
+  .\stop-api.ps1

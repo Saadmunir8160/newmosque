@@ -1,0 +1,224 @@
+<div class="mp-page">
+  <div *ngIf="toast()" class="mp-toast" [class.mp-toast--ok]="toastOk()" [class.mp-toast--err]="!toastOk()" role="status">
+    {{ toast() }}
+  </div>
+  <nav class="mp-breadcrumb" aria-label="Breadcrumb">
+    <a routerLink="/dashboard/super">Dashboard</a>
+    <span class="mp-breadcrumb__sep">›</span>
+    <span class="mp-breadcrumb__current">Mosque listings</span>
+  </nav>
+
+  <header class="mp-header">
+    <div>
+      <h1 class="mp-title">Mosque Listings</h1>
+      <p class="mp-sub">Create and manage mosque listings, public profiles, and ownership claims.</p>
+    </div>
+    <div class="mp-header__actions">
+      <button type="button" class="mp-btn mp-btn--ghost" (click)="load()" [disabled]="loading()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Refresh
+      </button>
+      <a routerLink="/dashboard/super/claims" class="mp-btn mp-btn--ghost">Claims queue</a>
+      <button type="button" class="mp-btn" (click)="openSeed()">+ Add Mosque</button>
+    </div>
+  </header>
+
+  <section *ngIf="summary()" class="mp-kpi-row mp-kpi-row--5" aria-label="Listing summary">
+    <button type="button" class="mp-kpi" [class.mp-kpi--active]="!statusFilter" (click)="filterByStatus('')">
+      <p class="mp-kpi__label">Total shown</p>
+      <p class="mp-kpi__value">{{ listings().length }}</p>
+    </button>
+    <button type="button" class="mp-kpi" [class.mp-kpi--active]="statusFilter === 'Unclaimed'" (click)="filterByStatus('Unclaimed')">
+      <p class="mp-kpi__label">Unclaimed</p>
+      <p class="mp-kpi__value mp-kpi__value--amber">{{ summary()!.unclaimed }}</p>
+    </button>
+    <button type="button" class="mp-kpi" [class.mp-kpi--active]="statusFilter === 'ClaimPending'" (click)="filterByStatus('ClaimPending')">
+      <p class="mp-kpi__label">Claim pending</p>
+      <p class="mp-kpi__value mp-kpi__value--amber">{{ summary()!.claimPending }}</p>
+    </button>
+    <button type="button" class="mp-kpi" [class.mp-kpi--active]="statusFilter === 'Claimed'" (click)="filterByStatus('Claimed')">
+      <p class="mp-kpi__label">Claimed</p>
+      <p class="mp-kpi__value">{{ summary()!.claimed }}</p>
+    </button>
+    <button type="button" class="mp-kpi" [class.mp-kpi--active]="statusFilter === 'Active'" (click)="filterByStatus('Active')">
+      <p class="mp-kpi__label">Active</p>
+      <p class="mp-kpi__value mp-kpi__value--green">{{ summary()!.active }}</p>
+    </button>
+  </section>
+
+  <section class="mp-panel">
+    <div class="mp-filters">
+      <div class="mp-search-wrap">
+        <svg class="mp-search-wrap__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="mp-input mp-input--search" [(ngModel)]="searchQ" (keyup.enter)="applyFilters()" placeholder="Search name, city, slug…" aria-label="Search mosques">
+      </div>
+      <select class="mp-input" [(ngModel)]="statusFilter" (change)="applyFilters()" aria-label="Filter by status">
+        <option value="">All statuses</option>
+        <option value="Unclaimed">Unclaimed</option>
+        <option value="ClaimPending">Claim Pending</option>
+        <option value="Claimed">Claimed</option>
+        <option value="Active">Active</option>
+        <option value="PendingReview">Pending Review</option>
+        <option value="Suspended">Suspended</option>
+      </select>
+      <label class="mp-check">
+        <input type="checkbox" [(ngModel)]="missingOwnerOnly" (change)="applyFilters()">
+        Missing owner
+      </label>
+      <select class="mp-input" [(ngModel)]="sortBy" (change)="applyFilters()" aria-label="Sort order">
+        <option value="">Newest first</option>
+        <option value="completeness">Profile completeness</option>
+      </select>
+      <button type="button" class="mp-btn mp-btn--ghost mp-btn--sm" (click)="applyFilters()">Apply</button>
+      <div class="mp-view-toggle" role="group" aria-label="View mode">
+        <button
+          type="button"
+          class="mp-view-btn"
+          [class.mp-view-btn--active]="viewMode() === 'grid'"
+          (click)="setViewMode('grid')"
+          aria-label="Grid view"
+          title="Grid view">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+        </button>
+        <button
+          type="button"
+          class="mp-view-btn"
+          [class.mp-view-btn--active]="viewMode() === 'list'"
+          (click)="setViewMode('list')"
+          aria-label="List view"
+          title="List view">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1" fill="currentColor" stroke="none"/></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <p *ngIf="error()" class="mp-alert mp-alert--error" role="alert">{{ error() }}</p>
+
+  <div *ngIf="loading()" class="mp-state-loading">
+    <span class="mp-pulse"></span> Loading mosque listings…
+  </div>
+
+  <div *ngIf="!loading() && !listings().length && !error()" class="mp-empty">
+    <span class="mp-empty__icon">🕌</span>
+    <h3>No mosques found</h3>
+    <p>No listings match your current filters. Try adjusting search or seed a new unclaimed mosque.</p>
+    <button type="button" class="mp-btn" (click)="openSeed()">+ Seed first mosque</button>
+  </div>
+
+  <div class="mp-grid" *ngIf="!loading() && listings().length && viewMode() === 'grid'">
+    <article *ngFor="let m of listings()" class="mp-card">
+      <div class="mp-card__top">
+        <div class="mp-card__avatar" aria-hidden="true">{{ mosqueInitial(m.name) }}</div>
+        <div class="mp-card__info">
+          <div style="display:flex;justify-content:space-between;gap:0.5rem;align-items:flex-start">
+            <h2 class="mp-card__name">{{ m.name }}</h2>
+            <span class="mp-status" [ngClass]="statusClass(m.status)">{{ formatStatus(m.status) }}</span>
+          </div>
+          <p class="mp-card__meta">{{ m.city }}<span *ngIf="m.postcode"> · {{ m.postcode }}</span></p>
+          <p class="mp-card__slug">/{{ m.slug }}</p>
+        </div>
+      </div>
+
+      <div class="mp-card__body">
+        <p class="mp-card__owner" *ngIf="m.ownerName">Owner: <strong>{{ m.ownerName }}</strong></p>
+        <p class="mp-card__warn" *ngIf="!m.ownerName">⚠ No owner assigned</p>
+        <p class="mp-card__warn" *ngIf="m.isDuplicate">⚠ Possible duplicate</p>
+
+        <div class="mp-card__progress" *ngIf="m.profileCompleteness != null">
+          <div class="mp-card__progress-label">
+            <span>Profile completeness</span>
+            <span>{{ m.profileCompleteness }}%</span>
+          </div>
+          <div class="mp-card__progress-bar">
+            <div class="mp-card__progress-fill" [style.width.%]="m.profileCompleteness"></div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="mp-card__foot">
+        <a [routerLink]="['/dashboard/super/mosques', m.id]" class="mp-btn mp-btn--sm">Details</a>
+        <a
+          [routerLink]="['/mosque', resolvePublicSlug(m)]"
+          [queryParams]="publicPreviewQuery(m)"
+          target="_blank"
+          rel="noopener"
+          class="mp-btn mp-btn--ghost mp-btn--sm"
+          [title]="publicLinkTitle(m.status)">
+          {{ isPublicVisible(m.status) ? 'Public' : 'Preview' }}
+        </a>
+        <a [routerLink]="['/dashboard/admin/mosque']" [queryParams]="{ mosqueId: m.id }" class="mp-btn mp-btn--ghost mp-btn--sm">Edit</a>
+        <button *ngIf="m.status === 'Claimed'" type="button" class="mp-btn mp-btn--success mp-btn--sm" (click)="activate(m.id)">Activate</button>
+      </footer>
+    </article>
+  </div>
+
+  <div class="mp-panel mp-panel--flush" *ngIf="!loading() && listings().length && viewMode() === 'list'">
+    <div class="mp-table-wrap">
+      <table class="mp-table">
+        <thead>
+          <tr>
+            <th scope="col">Mosque</th>
+            <th scope="col">Location</th>
+            <th scope="col">Status</th>
+            <th scope="col">Owner</th>
+            <th scope="col">Profile</th>
+            <th scope="col" class="mp-table__actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let m of listings()">
+            <td>
+              <div class="mp-table__mosque">
+                <span class="mp-table__avatar" aria-hidden="true">{{ mosqueInitial(m.name) }}</span>
+                <div>
+                  <p class="mp-table__name">{{ m.name }}</p>
+                  <p class="mp-table__slug">/{{ m.slug }}</p>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="mp-table__meta">{{ m.city }}<span *ngIf="m.postcode"> · {{ m.postcode }}</span></span>
+            </td>
+            <td>
+              <span class="mp-status" [ngClass]="statusClass(m.status)">{{ formatStatus(m.status) }}</span>
+              <p class="mp-table__warn" *ngIf="m.isDuplicate">Possible duplicate</p>
+            </td>
+            <td>
+              <span *ngIf="m.ownerName">{{ m.ownerName }}</span>
+              <span class="mp-table__warn" *ngIf="!m.ownerName">No owner</span>
+            </td>
+            <td>
+              <div class="mp-table__progress" *ngIf="m.profileCompleteness != null; else noCompleteness">
+                <div class="mp-card__progress-bar">
+                  <div class="mp-card__progress-fill" [style.width.%]="m.profileCompleteness"></div>
+                </div>
+                <span class="mp-table__pct">{{ m.profileCompleteness }}%</span>
+              </div>
+              <ng-template #noCompleteness>—</ng-template>
+            </td>
+            <td class="mp-table__actions">
+              <a [routerLink]="['/dashboard/super/mosques', m.id]" class="mp-btn mp-btn--sm">Details</a>
+              <a
+                [routerLink]="['/mosque', resolvePublicSlug(m)]"
+                [queryParams]="publicPreviewQuery(m)"
+                target="_blank"
+                rel="noopener"
+                class="mp-btn mp-btn--ghost mp-btn--sm"
+                [title]="publicLinkTitle(m.status)">
+                {{ isPublicVisible(m.status) ? 'Public' : 'Preview' }}
+              </a>
+              <a [routerLink]="['/dashboard/admin/mosque']" [queryParams]="{ mosqueId: m.id }" class="mp-btn mp-btn--ghost mp-btn--sm">Edit</a>
+              <button *ngIf="m.status === 'Claimed'" type="button" class="mp-btn mp-btn--success mp-btn--sm" (click)="activate(m.id)">Activate</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <app-add-mosque-drawer
+    [open]="showSeed()"
+    (closed)="closeSeed()"
+    (saved)="onMosqueCreated($event)" />
+</div>

@@ -56,7 +56,7 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
     .card__title { margin: 0; font-size: 1rem; font-weight: 700; color: #fff; }
     .card__desc { margin: 0.4rem 0 0; font-size: 0.8125rem; line-height: 1.55; color: rgba(167,243,208,0.85); max-width: 36rem; }
     .btn-register {
-      font-size: 0.8125rem; font-weight: 700; color: #022c22;
+      font-size: 0.8125rem; font-weight: 700; color: #0F172A;
       background: linear-gradient(180deg, #fcd34d, #D4AF37); border: none;
       border-radius: 0.5rem; padding: 0.5rem 1rem; cursor: pointer; white-space: nowrap;
     }

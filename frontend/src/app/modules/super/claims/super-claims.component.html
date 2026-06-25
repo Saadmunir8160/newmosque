@@ -1,0 +1,108 @@
+<div class="sc-page">
+  <nav class="sc-breadcrumb" aria-label="Breadcrumb">
+    <a routerLink="/dashboard/super">Dashboard</a>
+    <span aria-hidden="true">›</span>
+    <span>Claims</span>
+    <span aria-hidden="true">›</span>
+    <span class="sc-breadcrumb__current">Pending claims</span>
+  </nav>
+
+  <header class="sc-header">
+    <div>
+      <h1>Pending Claims</h1>
+      <p>Review ownership requests, verify documents, and approve or reject claims.</p>
+    </div>
+    <button type="button" class="sc-btn sc-btn--ghost" (click)="load()" [disabled]="loading()">Refresh</button>
+  </header>
+
+  <section class="sc-kpis">
+    <article class="sc-kpi">
+      <p class="sc-kpi__label">Pending</p>
+      <p class="sc-kpi__value">{{ pendingCount() }}</p>
+    </article>
+    <article class="sc-kpi">
+      <p class="sc-kpi__label">Showing</p>
+      <p class="sc-kpi__value sc-kpi__value--sm">{{ filteredClaims().length }} claim(s)</p>
+    </article>
+  </section>
+
+  <div *ngIf="toast()" class="sc-toast" [class.sc-toast--ok]="toastOk()" [class.sc-toast--err]="!toastOk()">{{ toast() }}</div>
+  <p *ngIf="error()" class="sc-alert sc-alert--error" role="alert">{{ error() }}</p>
+
+  <div class="sc-toolbar">
+    <input
+      class="sc-search"
+      type="search"
+      placeholder="Search reference, mosque, applicant…"
+      [ngModel]="search()"
+      (ngModelChange)="onSearchChange($event)"
+      aria-label="Search claims">
+    <select class="sc-select" [ngModel]="statusFilter()" (ngModelChange)="onStatusFilterChange($event)" aria-label="Filter by status">
+      <option value="Pending">Pending only</option>
+      <option value="All">All claims</option>
+    </select>
+  </div>
+
+  <div *ngIf="loading()" class="sc-loading" role="status">
+    <span class="sc-spinner" aria-hidden="true"></span>
+    Loading claims…
+  </div>
+
+  <div *ngIf="!loading() && !filteredClaims().length" class="sc-empty">
+    <span class="sc-empty__icon" aria-hidden="true">✅</span>
+    <h2>All clear</h2>
+    <p>No claims match your filters right now.</p>
+  </div>
+
+  <div *ngIf="!loading() && filteredClaims().length" class="sc-table-wrap">
+    <table class="sc-table">
+      <thead>
+        <tr>
+          <th><button type="button" class="sc-th" (click)="toggleSort('claimReference')">Claim reference{{ sortIndicator('claimReference') }}</button></th>
+          <th><button type="button" class="sc-th" (click)="toggleSort('mosqueName')">Mosque name{{ sortIndicator('mosqueName') }}</button></th>
+          <th><button type="button" class="sc-th" (click)="toggleSort('claimantName')">Requested by{{ sortIndicator('claimantName') }}</button></th>
+          <th>Role</th>
+          <th><button type="button" class="sc-th" (click)="toggleSort('submittedAt')">Submitted{{ sortIndicator('submittedAt') }}</button></th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let c of pagedClaims()">
+          <td data-label="Reference"><code class="sc-ref">{{ c.claimReference || ('#' + c.claimId) }}</code></td>
+          <td data-label="Mosque">{{ c.mosqueName }}</td>
+          <td data-label="Requested by">{{ c.claimantName }}</td>
+          <td data-label="Role">{{ c.position || '—' }}</td>
+          <td data-label="Submitted">{{ formatDate(c.submittedAt) }}</td>
+          <td data-label="Status"><span [class]="statusBadge(c.status)">{{ c.status || 'Pending' }}</span></td>
+          <td data-label="Actions" class="sc-actions">
+            <button type="button" class="sc-link" (click)="openClaim(c.claimId)">View</button>
+            <button
+              *ngIf="(c.status ?? 'Pending').toLowerCase() === 'pending'"
+              type="button"
+              class="sc-link sc-link--ok"
+              (click)="openClaim(c.claimId)">Approve</button>
+            <button
+              *ngIf="(c.status ?? 'Pending').toLowerCase() === 'pending'"
+              type="button"
+              class="sc-link sc-link--err"
+              (click)="openClaim(c.claimId)">Reject</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <nav *ngIf="!loading() && filteredClaims().length > pageSize" class="sc-pagination" aria-label="Claims pagination">
+    <button type="button" class="sc-btn sc-btn--ghost" (click)="goPage(page() - 1)" [disabled]="page() <= 1">Previous</button>
+    <span>Page {{ page() }} of {{ totalPages() }}</span>
+    <button type="button" class="sc-btn sc-btn--ghost" (click)="goPage(page() + 1)" [disabled]="page() >= totalPages()">Next</button>
+  </nav>
+
+  <app-super-claim-review-drawer
+    [open]="drawerOpen()"
+    [claimId]="selectedClaimId()"
+    (closed)="closeDrawer()"
+    (approved)="onClaimApproved()"
+    (rejected)="onClaimRejected()" />
+</div>

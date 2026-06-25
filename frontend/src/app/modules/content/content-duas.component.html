@@ -1,0 +1,259 @@
+<div class="duas-lib" (click)="closeMenus()">
+  <!-- Header -->
+  <header class="duas-lib__header">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a routerLink="/dashboard/content">Content Editor</a>
+      <span class="breadcrumb__sep">›</span>
+      <span class="breadcrumb__current">Duas Library</span>
+    </nav>
+    <div class="duas-lib__head-row">
+      <div>
+        <h1 class="duas-lib__title">Duas Library</h1>
+        <p class="duas-lib__sub">Manage duas with Arabic text, translations, references, and categories.</p>
+      </div>
+      <div class="duas-lib__actions">
+        <button type="button" class="btn-primary" (click)="openAddForm()">
+          <span aria-hidden="true">+</span> Add Dua
+        </button>
+        <label class="btn-outline btn-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Import
+          <input type="file" accept="application/json,.json" class="sr-only" (change)="importDuas($event)">
+        </label>
+        <button type="button" class="btn-outline btn-icon" (click)="exportDuas()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- KPI row -->
+  <section class="kpi-row">
+    <article class="kpi-card">
+      <span class="kpi-card__icon kpi-card__icon--green" aria-hidden="true">📖</span>
+      <div>
+        <p class="kpi-card__label">Total Duas</p>
+        <p class="kpi-card__value">{{ duas().length | number }}</p>
+        <p class="kpi-card__trend trend--up">{{ trendLabel() }}</p>
+      </div>
+    </article>
+    <article class="kpi-card">
+      <span class="kpi-card__icon kpi-card__icon--blue" aria-hidden="true">🏷</span>
+      <div>
+        <p class="kpi-card__label">Categories</p>
+        <p class="kpi-card__value">{{ categories().length }}</p>
+        <p class="kpi-card__trend trend--up">↑ 8% this month</p>
+      </div>
+    </article>
+    <article class="kpi-card">
+      <span class="kpi-card__icon kpi-card__icon--success" aria-hidden="true">✓</span>
+      <div>
+        <p class="kpi-card__label">Published</p>
+        <p class="kpi-card__value">{{ publishedCount() | number }}</p>
+        <p class="kpi-card__trend trend--up">↑ 15% this month</p>
+      </div>
+    </article>
+    <article class="kpi-card">
+      <span class="kpi-card__icon kpi-card__icon--purple" aria-hidden="true">📊</span>
+      <div>
+        <p class="kpi-card__label">Monthly Views</p>
+        <p class="kpi-card__value">{{ monthlyViews() }}</p>
+        <p class="kpi-card__trend trend--up">↑ 18% this month</p>
+      </div>
+    </article>
+  </section>
+
+  <!-- Toolbar -->
+  <section class="toolbar-card">
+    <div class="toolbar-grid">
+      <div class="search-field">
+        <svg class="search-field__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input class="search-field__input" type="search" placeholder="Search duas…" [(ngModel)]="query" (ngModelChange)="applyFilter()">
+      </div>
+      <select class="filter-select" [(ngModel)]="categoryFilter" (ngModelChange)="applyFilter()">
+        <option value="">All Categories</option>
+        <option *ngFor="let c of categories()" [value]="c">{{ categoryLabel(c) }}</option>
+      </select>
+      <select class="filter-select" [(ngModel)]="statusFilter" (ngModelChange)="applyFilter()">
+        <option value="">All Status</option>
+        <option value="Published">Published</option>
+        <option value="Draft">Draft</option>
+        <option value="Unpublished">Archived</option>
+      </select>
+      <select class="filter-select" [(ngModel)]="sourceFilter" (ngModelChange)="applyFilter()">
+        <option value="">All Sources</option>
+        <option *ngFor="let s of sourceOptions()" [value]="s">{{ s }}</option>
+      </select>
+      <select class="filter-select" [(ngModel)]="sortKey" (ngModelChange)="applyFilter()">
+        <option value="newest">Sort by: Newest</option>
+        <option value="oldest">Sort by: Oldest</option>
+        <option value="title">Sort by: Title</option>
+        <option value="category">Sort by: Category</option>
+      </select>
+      <button type="button" class="btn-clear" (click)="clearFilters()">Clear Filters</button>
+    </div>
+
+    <div class="category-tabs" role="tablist">
+      <button type="button" class="cat-tab" [class.cat-tab--on]="!categoryFilter" (click)="setCategoryFilter('')">All</button>
+      <button type="button" *ngFor="let c of categories()" class="cat-tab" [class.cat-tab--on]="categoryFilter === c"
+        (click)="setCategoryFilter(c)">{{ categoryLabel(c) }}</button>
+    </div>
+    <p class="toolbar-meta">Showing <strong>{{ filtered().length }}</strong> of {{ duas().length }} duas</p>
+  </section>
+
+  <div class="duas-layout">
+    <!-- Main grid -->
+    <main class="duas-main">
+      <div *ngIf="loading()" class="state-box"><span class="pulse-dot"></span> Loading library…</div>
+
+      <div *ngIf="!loading() && !filtered().length" class="state-box state-box--empty">
+        <h3>{{ duas().length ? 'No matches' : 'No duas yet' }}</h3>
+        <p>{{ duas().length ? 'Try adjusting filters.' : 'Add your first dua to get started.' }}</p>
+        <button type="button" class="btn-primary" (click)="openAddForm()">+ Add Dua</button>
+      </div>
+
+      <div *ngIf="!loading() && filtered().length" class="duas-grid">
+        <article *ngFor="let d of filtered()" class="dua-card">
+          <div class="dua-card__top">
+            <span class="dua-card__cat" [ngClass]="categoryClass(d.category)">{{ categoryLabel(d.category) }}</span>
+            <div class="dua-card__top-actions" (click)="$event.stopPropagation()">
+              <span class="dua-card__status" [ngClass]="statusClass(d.status)">
+                <span class="status-dot"></span>{{ statusLabel(d.status) }}
+              </span>
+              <button type="button" class="icon-btn" aria-label="Favorite">♡</button>
+              <div class="menu-wrap">
+                <button type="button" class="icon-btn" (click)="toggleMenu(d.id, $event)" aria-label="More actions">⋮</button>
+                <div *ngIf="menuOpenId() === d.id" class="card-menu" role="menu">
+                  <button type="button" (click)="startEdit(d)">Edit</button>
+                  <button type="button" *ngIf="d.status !== 'Published'" (click)="publishDua(d)">Publish</button>
+                  <button type="button" class="danger" (click)="archiveDua(d)">Unpublish</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <h3 class="dua-card__title">{{ d.title }}</h3>
+          <p class="dua-card__arabic" dir="rtl" lang="ar">{{ d.arabicText }}</p>
+          <p *ngIf="d.transliteration" class="dua-card__translit">{{ d.transliteration }}</p>
+          <p *ngIf="d.translation" class="dua-card__translation">"{{ d.translation }}"</p>
+          <p *ngIf="sourceLabel(d)" class="dua-card__source">{{ sourceLabel(d) }}</p>
+
+          <footer class="dua-card__foot">
+            <span class="metric"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> {{ formatMetric(cardMetric(d, 'views')) }}</span>
+            <span class="metric"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> {{ formatMetric(cardMetric(d, 'likes')) }}</span>
+            <span class="metric"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> {{ cardMetric(d, 'shares') }}</span>
+            <span class="metric metric--time"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> {{ cardAge(d) }}</span>
+          </footer>
+        </article>
+      </div>
+    </main>
+
+    <!-- Right sidebar -->
+    <aside class="duas-aside">
+      <section class="aside-card">
+        <h2 class="aside-card__title">Recent Activity</h2>
+        <ul class="activity-list">
+          <li *ngFor="let a of recentActivity()" class="activity-item">
+            <span class="activity-item__icon">{{ a.icon }}</span>
+            <div>
+              <p class="activity-item__title">{{ a.title }}</p>
+              <p class="activity-item__sub">{{ a.sub }}</p>
+              <time class="activity-item__time">{{ a.at }}</time>
+            </div>
+          </li>
+          <li *ngIf="!recentActivity().length" class="activity-empty">No recent activity.</li>
+        </ul>
+      </section>
+
+      <section class="aside-card">
+        <div class="aside-card__head">
+          <h2 class="aside-card__title">Quick Analytics</h2>
+          <select class="mini-select" [(ngModel)]="analyticsRange">
+            <option>This Month</option>
+            <option>Last Month</option>
+          </select>
+        </div>
+        <dl class="analytics-list">
+          <div class="analytics-row">
+            <dt>Total Views</dt>
+            <dd>{{ monthlyViews() }} <span class="trend--up">↑ 18%</span></dd>
+          </div>
+          <div class="analytics-row">
+            <dt>Unique Visitors</dt>
+            <dd>{{ formatMetric(duas().length * 89) }} <span class="trend--up">↑ 12%</span></dd>
+          </div>
+          <div class="analytics-row">
+            <dt>Shares</dt>
+            <dd>{{ formatMetric(duas().length * 12) }} <span class="trend--up">↑ 9%</span></dd>
+          </div>
+          <div class="analytics-row">
+            <dt>Avg. Completion Rate</dt>
+            <dd>78% <span class="trend--up">↑ 5%</span></dd>
+          </div>
+        </dl>
+      </section>
+    </aside>
+  </div>
+
+  <!-- Add/Edit slide-over -->
+  <div *ngIf="formOpen()" class="panel-backdrop" (click)="closeForm()">
+    <aside class="form-panel" (click)="$event.stopPropagation()" role="dialog">
+      <header class="form-panel__head">
+        <div>
+          <p class="form-panel__eyebrow">Duas Library</p>
+          <h2>{{ editingId() ? 'Edit Dua' : 'Add New Dua' }}</h2>
+        </div>
+        <button type="button" class="panel-close" (click)="closeForm()" aria-label="Close">×</button>
+      </header>
+
+      <div class="form-panel__body">
+        <div class="form-field">
+          <label for="dua-title">Title</label>
+          <input id="dua-title" class="form-input" [(ngModel)]="form.title" placeholder="Morning Dua">
+        </div>
+        <div class="form-field">
+          <span class="form-label">Category</span>
+          <div class="chip-row">
+            <button type="button" *ngFor="let c of categories()" class="chip" [class.chip--on]="form.category === c" (click)="form.category = c">{{ categoryLabel(c) }}</button>
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="dua-ar">Arabic text</label>
+          <textarea id="dua-ar" class="form-input form-textarea form-textarea--ar" dir="rtl" rows="3" [(ngModel)]="form.arabicText"></textarea>
+        </div>
+        <div class="form-field">
+          <label for="dua-translit">Transliteration</label>
+          <input id="dua-translit" class="form-input" [(ngModel)]="form.transliteration">
+        </div>
+        <div class="form-field">
+          <label for="dua-trans">Translation</label>
+          <textarea id="dua-trans" class="form-input form-textarea" rows="2" [(ngModel)]="form.translation"></textarea>
+        </div>
+        <div class="form-field">
+          <label for="dua-src-name">Source name</label>
+          <input id="dua-src-name" class="form-input" [(ngModel)]="form.sourceName" placeholder="Sahih Bukhari">
+        </div>
+        <div class="form-field">
+          <label for="dua-src-ref">Source reference</label>
+          <input id="dua-src-ref" class="form-input" [(ngModel)]="form.sourceRef" placeholder="4/319">
+        </div>
+
+        <app-content-workflow-bar *ngIf="editingId()"
+          entityType="Dua"
+          [entityId]="editingId()!"
+          [status]="editingDua()?.status || 'Draft'"
+          (changed)="load()" />
+
+        <p *ngIf="msg()" class="form-msg" [class.form-msg--err]="!msgOk()">{{ msg() }}</p>
+      </div>
+
+      <footer class="form-panel__foot">
+        <button type="button" class="btn-primary" (click)="save()" [disabled]="saving() || !form.title.trim() || !form.arabicText.trim()">
+          {{ saving() ? 'Saving…' : (editingId() ? 'Save Changes' : 'Add Dua') }}
+        </button>
+        <button type="button" class="btn-outline" (click)="closeForm()">Cancel</button>
+      </footer>
+    </aside>
+  </div>
+</div>

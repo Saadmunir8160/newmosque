@@ -1,261 +1,677 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ContentService, AdhkarItem } from '../../core/services/content.service';
+import { ContentEditorService } from '../../core/services/content-editor.service';
+import { ContentWorkflowBarComponent } from './content-workflow-bar.component';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import { AdhkarItem } from '../../core/services/content.service';
 
 const COUNT_PRESETS = [33, 34, 99, 100] as const;
+type StatusFilter = 'all' | 'Published' | 'Draft' | 'InReview' | 'Approved' | 'Unpublished';
 
 @Component({
   selector: 'app-content-adhkar',
   standalone: true,
-  imports: [CommonModule, FormsModule, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, PageHeaderComponent, ContentWorkflowBarComponent],
   template: `
-    <app-page-header
-      badge="Content Editor"
-      title="Adhkar Library"
-      subtitle="Manage dhikr items for the platform — title, Arabic text, and default count." />
+    <div class="adhkar-dash">
+      <app-page-header
+        badge="Content Editor"
+        title="Adhkar Library"
+        subtitle="Manage dhikr items for the platform — title, Arabic text, and default count." />
 
-    <div class="adhkar-layout">
-      <aside class="adhkar-aside">
-        <section class="create-panel">
-          <div class="create-panel__head">
-            <div class="create-icon" aria-hidden="true">📿</div>
-            <div>
-              <h3 class="create-title">Add adhkar item</h3>
-              <p class="create-sub">New entry for member dhikr lists</p>
-            </div>
+      <!-- Stats -->
+      <div class="adhkar-stats">
+        <article class="stat-card">
+          <span class="stat-card__icon">📿</span>
+          <div>
+            <p class="stat-card__label">Total items</p>
+            <p class="stat-card__value">{{ items().length }}</p>
           </div>
-
-          <div class="form-field">
-            <label class="form-label" for="adhkar-title">Title <span class="req">*</span></label>
-            <input id="adhkar-title" class="form-input" placeholder="e.g. SubhanAllah"
-              [(ngModel)]="form.title">
+        </article>
+        <article class="stat-card">
+          <span class="stat-card__icon">✓</span>
+          <div>
+            <p class="stat-card__label">Published</p>
+            <p class="stat-card__value">{{ publishedCount() }}</p>
           </div>
-
-          <div class="form-field">
-            <label class="form-label" for="adhkar-arabic">Arabic text <span class="req">*</span></label>
-            <textarea id="adhkar-arabic" class="form-input form-textarea" dir="rtl"
-              placeholder="سبحان الله" [(ngModel)]="form.arabicText"></textarea>
+        </article>
+        <article class="stat-card">
+          <span class="stat-card__icon">◎</span>
+          <div>
+            <p class="stat-card__label">In review</p>
+            <p class="stat-card__value">{{ inReviewCount() }}</p>
           </div>
-
-          <div class="form-field">
-            <span class="form-label">Default count</span>
-            <div class="count-row">
-              <input class="form-input form-input--count" type="number" min="1"
-                [(ngModel)]="form.defaultCount">
-              <div class="count-presets">
-                <button type="button" *ngFor="let n of countPresets" class="preset-chip"
-                  [class.preset-chip--active]="form.defaultCount === n"
-                  (click)="form.defaultCount = n">×{{ n }}</button>
-              </div>
-            </div>
+        </article>
+        <article class="stat-card stat-card--gold">
+          <span class="stat-card__icon">×</span>
+          <div>
+            <p class="stat-card__label">Avg count</p>
+            <p class="stat-card__value">{{ avgCount() }}</p>
           </div>
+        </article>
+      </div>
 
-          <button type="button" class="btn-create" (click)="create()"
-            [disabled]="saving() || !form.title.trim() || !form.arabicText.trim()">
-            {{ saving() ? 'Adding…' : 'Add adhkar item' }}
-          </button>
-          <p *ngIf="msg()" class="form-msg" [class.form-msg--err]="!msgOk()">{{ msg() }}</p>
-        </section>
-
-        <div class="aside-stats">
-          <div class="mini-stat">
-            <span class="mini-stat__val">{{ items().length }}</span>
-            <span class="mini-stat__lbl">Items</span>
-          </div>
-          <div class="mini-stat">
-            <span class="mini-stat__val">{{ avgCount() }}</span>
-            <span class="mini-stat__lbl">Avg count</span>
-          </div>
-        </div>
-      </aside>
-
-      <main class="adhkar-main">
-        <div class="list-toolbar">
-          <h3 class="list-title">Library ({{ filtered().length }})</h3>
-          <div class="search-wrap">
-            <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <!-- Search & filters -->
+      <section class="toolbar-card">
+        <div class="toolbar-card__row">
+          <div class="search-field">
+            <svg class="search-field__icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" aria-hidden="true">
               <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
             </svg>
-            <input class="list-search" type="search" placeholder="Search title or Arabic…"
+            <input class="search-field__input" type="search" placeholder="Search title or Arabic…"
               [(ngModel)]="query" (ngModelChange)="applyFilter()">
           </div>
+          <div class="filter-chips" role="group" aria-label="Filter by status">
+            <button type="button" *ngFor="let f of statusFilters" class="filter-chip"
+              [class.filter-chip--on]="statusFilter() === f.id"
+              (click)="setStatusFilter(f.id)">
+              {{ f.label }}
+            </button>
+          </div>
         </div>
+        <p class="toolbar-card__meta">
+          Showing <strong>{{ filtered().length }}</strong> of {{ items().length }} adhkar items
+        </p>
+      </section>
 
-        <div *ngIf="loading()" class="list-loading"><span class="pulse-dot"></span> Loading…</div>
+      <div class="adhkar-body">
+        <!-- Add form -->
+        <aside class="adhkar-aside">
+          <section class="form-card">
+            <div class="form-card__head">
+              <div class="form-card__icon" aria-hidden="true">📿</div>
+              <div>
+                <h3 class="form-card__title">Add adhkar item</h3>
+                <p class="form-card__sub">New entry for member dhikr lists</p>
+              </div>
+            </div>
 
-        <div *ngIf="!loading() && !filtered().length" class="list-empty">
-          <div class="list-empty__icon">📿</div>
-          <h3>{{ items().length ? 'No matches' : 'No adhkar items yet' }}</h3>
-          <p>{{ items().length ? 'Try a different search.' : 'Add your first item using the form.' }}</p>
-        </div>
+            <div class="form-field">
+              <label class="form-label" for="adhkar-title">Title <span class="req">*</span></label>
+              <input id="adhkar-title" class="form-input" placeholder="e.g. SubhanAllah"
+                [(ngModel)]="form.title">
+            </div>
 
-        <div *ngIf="!loading() && filtered().length" class="adhkar-list">
-          <article *ngFor="let a of filtered()" class="adhkar-card">
-            <div class="adhkar-card__accent"></div>
-            <div class="adhkar-card__body">
-              <div class="adhkar-card__top">
-                <h4 class="adhkar-title">{{ a.title }}</h4>
+            <div class="form-field">
+              <label class="form-label" for="adhkar-arabic">Arabic text <span class="req">*</span></label>
+              <textarea id="adhkar-arabic" class="form-input form-textarea" dir="rtl" lang="ar"
+                placeholder="سبحان الله" [(ngModel)]="form.arabicText"></textarea>
+            </div>
+
+            <div class="form-field">
+              <span class="form-label">Default count</span>
+              <div class="count-row">
+                <input class="form-input form-input--count" type="number" min="1"
+                  [(ngModel)]="form.defaultCount">
+                <div class="count-presets">
+                  <button type="button" *ngFor="let n of countPresets" class="preset-chip"
+                    [class.preset-chip--active]="form.defaultCount === n"
+                    (click)="form.defaultCount = n">×{{ n }}</button>
+                </div>
+              </div>
+            </div>
+
+            <button type="button" class="btn-primary" (click)="create()"
+              [disabled]="saving() || !form.title.trim() || !form.arabicText.trim()">
+              {{ saving() ? 'Adding…' : 'Add adhkar item' }}
+            </button>
+            <p *ngIf="msg()" class="form-msg" [class.form-msg--err]="!msgOk()">{{ msg() }}</p>
+          </section>
+        </aside>
+
+        <!-- Library grid -->
+        <main class="adhkar-main">
+          <div *ngIf="loading()" class="state-card">
+            <span class="pulse-dot"></span> Loading library…
+          </div>
+
+          <div *ngIf="!loading() && !filtered().length" class="state-card state-card--empty">
+            <div class="state-card__icon">📿</div>
+            <h3>{{ items().length ? 'No matches' : 'No adhkar items yet' }}</h3>
+            <p>{{ items().length ? 'Try a different search or filter.' : 'Add your first item using the form.' }}</p>
+          </div>
+
+          <div *ngIf="!loading() && filtered().length" class="adhkar-grid">
+            <article *ngFor="let a of filtered()" class="item-card">
+              <div class="item-card__header">
+                <h4 class="item-card__title">{{ a.title }}</h4>
                 <span class="count-badge">×{{ a.defaultCount }}</span>
               </div>
-              <p class="adhkar-arabic" dir="rtl" lang="ar">{{ a.arabicText }}</p>
-              <span *ngIf="a.category" class="category-chip">{{ a.category }}</span>
-            </div>
-          </article>
-        </div>
-      </main>
+
+              <div class="item-card__arabic-wrap">
+                <p class="item-card__arabic" dir="rtl" lang="ar">{{ a.arabicText }}</p>
+              </div>
+
+              <div class="item-card__footer">
+                <span *ngIf="a.category" class="category-chip">{{ a.category }}</span>
+                <span *ngIf="!a.category" class="category-chip category-chip--muted">General</span>
+              </div>
+
+              <app-content-workflow-bar
+                class="item-card__workflow"
+                entityType="Adhkar"
+                [entityId]="a.id"
+                [status]="a.status || 'Published'"
+                (changed)="load()" />
+            </article>
+          </div>
+        </main>
+      </div>
     </div>
   `,
   styles: [`
-    .adhkar-layout {
-      display: grid; gap: 1rem; grid-template-columns: 1fr;
+    :host {
+      --adhkar-primary: #0F4C3A;
+      --adhkar-primary-hover: #0D3D2F;
+      --adhkar-primary-soft: #E8F5F0;
+      --adhkar-gold: #D4AF37;
+      --adhkar-gold-soft: #FBF6E8;
+      --adhkar-surface: #FFFFFF;
+      --adhkar-bg: #F4F7F5;
+      --adhkar-border: #E2E8E6;
+      --adhkar-text: #0F172A;
+      --adhkar-muted: #64748B;
+      --adhkar-radius: 12px;
+      --adhkar-shadow: 0 1px 3px rgba(15, 76, 58, 0.06), 0 4px 16px rgba(15, 76, 58, 0.05);
+      --adhkar-shadow-hover: 0 8px 24px rgba(15, 76, 58, 0.1), 0 2px 8px rgba(15, 76, 58, 0.06);
+      display: block;
+    }
+
+    .adhkar-dash {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      padding-bottom: 24px;
+    }
+
+    :host ::ng-deep app-page-header .text-mos-primary {
+      color: var(--adhkar-primary) !important;
+    }
+
+    /* Stats */
+    .adhkar-stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+    @media (min-width: 768px) {
+      .adhkar-stats { grid-template-columns: repeat(4, 1fr); }
+    }
+
+    .stat-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      background: var(--adhkar-surface);
+      border: 1px solid var(--adhkar-border);
+      border-radius: var(--adhkar-radius);
+      box-shadow: var(--adhkar-shadow);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s;
+    }
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--adhkar-shadow-hover);
+      border-color: rgba(15, 76, 58, 0.2);
+    }
+    .stat-card--gold .stat-card__icon {
+      background: var(--adhkar-gold-soft);
+      color: var(--adhkar-gold);
+      border-color: rgba(212, 175, 55, 0.35);
+    }
+    .stat-card__icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      background: var(--adhkar-primary-soft);
+      color: var(--adhkar-primary);
+      border: 1px solid rgba(15, 76, 58, 0.12);
+      flex-shrink: 0;
+    }
+    .stat-card__label {
+      margin: 0;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--adhkar-muted);
+    }
+    .stat-card__value {
+      margin: 4px 0 0;
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--adhkar-primary);
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+
+    /* Toolbar */
+    .toolbar-card {
+      padding: 16px;
+      background: var(--adhkar-surface);
+      border: 1px solid var(--adhkar-border);
+      border-radius: var(--adhkar-radius);
+      box-shadow: var(--adhkar-shadow);
+    }
+    .toolbar-card__row {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
     @media (min-width: 900px) {
-      .adhkar-layout { grid-template-columns: minmax(260px, 300px) 1fr; align-items: start; }
+      .toolbar-card__row {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+      }
+    }
+    .toolbar-card__meta {
+      margin: 16px 0 0;
+      font-size: 0.8125rem;
+      color: var(--adhkar-muted);
+    }
+    .toolbar-card__meta strong {
+      color: var(--adhkar-primary);
+      font-weight: 700;
     }
 
-    .create-panel {
-      padding: 1rem; margin-bottom: 0.75rem;
-      background: linear-gradient(160deg, rgba(6,78,59,0.95) 0%, rgba(2,44,34,0.98) 100%);
-      border: 1px solid rgba(212,175,55,0.28);
-      border-radius: 0.75rem;
-      box-shadow: 0 10px 32px rgba(0,0,0,0.25);
+    .search-field {
+      position: relative;
+      flex: 1;
+      max-width: 100%;
     }
-    .create-panel__head {
-      display: flex; gap: 0.625rem; align-items: center;
-      margin-bottom: 1rem; padding-bottom: 0.75rem;
-      border-bottom: 1px solid rgba(212,175,55,0.15);
+    @media (min-width: 900px) {
+      .search-field { max-width: 320px; }
     }
-    .create-icon { font-size: 1.25rem; line-height: 1; }
-    .create-title { margin: 0; font-size: 0.875rem; font-weight: 700; color: #fff; }
-    .create-sub { margin: 0.1rem 0 0; font-size: 0.6875rem; color: rgba(167,243,208,0.65); }
+    .search-field__icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--adhkar-muted);
+      pointer-events: none;
+    }
+    .search-field__input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px 10px 36px;
+      font-size: 0.875rem;
+      color: var(--adhkar-text);
+      background: var(--adhkar-bg);
+      border: 1px solid var(--adhkar-border);
+      border-radius: var(--adhkar-radius);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-field__input:focus {
+      border-color: var(--adhkar-primary);
+      box-shadow: 0 0 0 3px rgba(15, 76, 58, 0.12);
+      background: var(--adhkar-surface);
+    }
 
-    .form-field { margin-bottom: 0.75rem; }
+    .filter-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .filter-chip {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      border: 1px solid var(--adhkar-border);
+      background: var(--adhkar-bg);
+      color: var(--adhkar-muted);
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.15s;
+    }
+    .filter-chip:hover {
+      border-color: rgba(15, 76, 58, 0.25);
+      color: var(--adhkar-primary);
+    }
+    .filter-chip--on {
+      background: var(--adhkar-primary);
+      border-color: var(--adhkar-primary);
+      color: #fff;
+    }
+
+    /* Body layout */
+    .adhkar-body {
+      display: grid;
+      gap: 24px;
+      grid-template-columns: 1fr;
+      align-items: start;
+    }
+    @media (min-width: 1100px) {
+      .adhkar-body { grid-template-columns: 300px 1fr; }
+    }
+
+    /* Form card */
+    .form-card {
+      padding: 16px;
+      background: var(--adhkar-surface);
+      border: 1px solid var(--adhkar-border);
+      border-radius: var(--adhkar-radius);
+      box-shadow: var(--adhkar-shadow);
+      position: sticky;
+      top: 16px;
+    }
+    .form-card__head {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--adhkar-border);
+    }
+    .form-card__icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.125rem;
+      background: linear-gradient(135deg, var(--adhkar-primary) 0%, #157A5C 100%);
+      flex-shrink: 0;
+    }
+    .form-card__title {
+      margin: 0;
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: var(--adhkar-text);
+    }
+    .form-card__sub {
+      margin: 4px 0 0;
+      font-size: 0.75rem;
+      color: var(--adhkar-muted);
+    }
+
+    .form-field { margin-bottom: 16px; }
     .form-label {
-      display: block; margin-bottom: 0.35rem;
-      font-size: 0.625rem; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.05em; color: rgba(212,175,55,0.9);
+      display: block;
+      margin-bottom: 8px;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--adhkar-primary);
     }
-    .req { color: #fca5a5; }
+    .req { color: #DC2626; }
     .form-input {
-      width: 100%; box-sizing: border-box;
-      background: rgba(0,0,0,0.35); border: 1px solid rgba(212,175,55,0.25);
-      border-radius: 0.5rem; padding: 0.55rem 0.65rem;
-      font-size: 0.8125rem; color: #fff; outline: none;
+      width: 100%;
+      box-sizing: border-box;
+      background: var(--adhkar-bg);
+      border: 1px solid var(--adhkar-border);
+      border-radius: var(--adhkar-radius);
+      padding: 10px 12px;
+      font-size: 0.875rem;
+      color: var(--adhkar-text);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
     }
-    .form-input:focus { border-color: #D4AF37; box-shadow: 0 0 0 3px rgba(212,175,55,0.12); }
-    .form-textarea { min-height: 4rem; resize: vertical; line-height: 1.6; font-size: 1rem; }
-    .form-input--count { max-width: 5rem; text-align: center; font-weight: 700; }
+    .form-input:focus {
+      border-color: var(--adhkar-primary);
+      box-shadow: 0 0 0 3px rgba(15, 76, 58, 0.12);
+      background: var(--adhkar-surface);
+    }
+    .form-textarea {
+      min-height: 88px;
+      resize: vertical;
+      line-height: 1.8;
+      font-size: 1.25rem;
+      font-family: 'Traditional Arabic', 'Scheherazade New', 'Noto Naskh Arabic', serif;
+      color: var(--adhkar-primary);
+      font-weight: 600;
+    }
+    .form-input--count {
+      max-width: 72px;
+      text-align: center;
+      font-weight: 700;
+      color: var(--adhkar-primary);
+    }
 
-    .count-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-    .count-presets { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+    .count-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .count-presets { display: flex; flex-wrap: wrap; gap: 8px; }
     .preset-chip {
-      font-size: 0.6875rem; font-weight: 600; color: rgba(167,243,208,0.85);
-      background: rgba(0,0,0,0.3); border: 1px solid rgba(16,185,129,0.25);
-      border-radius: 9999px; padding: 0.3rem 0.55rem; cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--adhkar-muted);
+      background: var(--adhkar-bg);
+      border: 1px solid var(--adhkar-border);
+      border-radius: 9999px;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.15s;
     }
-    .preset-chip--active, .preset-chip:hover {
-      color: #022c22; background: linear-gradient(180deg, #6ee7b7, #10b981);
-      border-color: #10b981;
+    .preset-chip:hover { border-color: var(--adhkar-gold); color: var(--adhkar-primary); }
+    .preset-chip--active {
+      color: var(--adhkar-text);
+      background: var(--adhkar-gold-soft);
+      border-color: var(--adhkar-gold);
+      box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
     }
 
-    .btn-create {
-      width: 100%; margin-top: 0.25rem;
-      font-size: 0.8125rem; font-weight: 700; color: #022c22;
-      background: linear-gradient(180deg, #fcd34d, #D4AF37);
-      border: 1px solid rgba(212,175,55,0.6); border-radius: 0.5rem;
-      padding: 0.65rem; cursor: pointer;
-      box-shadow: 0 4px 16px rgba(212,175,55,0.25);
+    .btn-primary {
+      width: 100%;
+      margin-top: 8px;
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: #fff;
+      background: linear-gradient(135deg, var(--adhkar-primary) 0%, #157A5C 100%);
+      border: none;
+      border-radius: var(--adhkar-radius);
+      padding: 12px 16px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(15, 76, 58, 0.22);
+      transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
     }
-    .btn-create:disabled { opacity: 0.5; cursor: not-allowed; }
-    .form-msg { margin: 0.5rem 0 0; font-size: 0.6875rem; color: #6ee7b7; }
-    .form-msg--err { color: #fecaca; }
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(15, 76, 58, 0.28);
+    }
+    .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+    .form-msg { margin: 8px 0 0; font-size: 0.75rem; font-weight: 600; color: #16A34A; }
+    .form-msg--err { color: #DC2626; }
 
-    .aside-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
-    .mini-stat {
-      text-align: center; padding: 0.5rem;
-      background: rgba(2,44,34,0.8); border: 1px solid rgba(16,185,129,0.15);
-      border-radius: 0.5rem;
+    /* 3-column grid */
+    .adhkar-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
     }
-    .mini-stat__val { display: block; font-size: 1.125rem; font-weight: 800; color: #fff; }
-    .mini-stat__lbl { font-size: 0.5rem; text-transform: uppercase; color: rgba(167,243,208,0.6); }
+    @media (min-width: 640px) {
+      .adhkar-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (min-width: 1100px) {
+      .adhkar-grid { grid-template-columns: repeat(3, 1fr); }
+    }
 
-    .list-toolbar {
-      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-      gap: 0.75rem; margin-bottom: 0.875rem;
+    .item-card {
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      background: var(--adhkar-surface);
+      border: 1px solid var(--adhkar-border);
+      border-radius: var(--adhkar-radius);
+      box-shadow: var(--adhkar-shadow);
+      transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s;
+      min-height: 200px;
     }
-    .list-title { margin: 0; font-size: 0.875rem; font-weight: 700; color: #fff; }
-    .search-wrap { flex: 1; min-width: 10rem; max-width: 16rem; position: relative; }
-    .search-icon {
-      position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%);
-      color: rgba(212,175,55,0.6); pointer-events: none;
+    .item-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--adhkar-shadow-hover);
+      border-color: rgba(212, 175, 55, 0.45);
     }
-    .list-search {
-      width: 100%; box-sizing: border-box;
-      background: rgba(2,44,34,0.9); border: 1px solid rgba(212,175,55,0.2);
-      border-radius: 0.5rem; padding: 0.5rem 0.65rem 0.5rem 2rem;
-      font-size: 0.75rem; color: #f0fdf4; outline: none;
+    .item-card__header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 16px;
     }
-    .list-search:focus { border-color: #D4AF37; }
-
-    .list-loading { display: flex; gap: 0.5rem; align-items: center; font-size: 0.8125rem; color: rgba(110,231,183,0.7); }
-    .pulse-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: #D4AF37; animation: pulse 1s infinite; }
-    @keyframes pulse { 50% { opacity: 0.3; } }
-
-    .list-empty {
-      text-align: center; padding: 2.5rem 1rem;
-      border: 1px dashed rgba(212,175,55,0.25); border-radius: 0.75rem;
-      background: rgba(2,44,34,0.5);
+    .item-card__title {
+      margin: 0;
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: var(--adhkar-text);
+      line-height: 1.3;
     }
-    .list-empty__icon { font-size: 2rem; margin-bottom: 0.5rem; }
-    .list-empty h3 { margin: 0 0 0.25rem; color: #fff; font-size: 1rem; }
-    .list-empty p { margin: 0; font-size: 0.8125rem; color: rgba(167,243,208,0.65); }
-
-    .adhkar-list { display: flex; flex-direction: column; gap: 0.5rem; }
-
-    .adhkar-card {
-      position: relative; display: flex;
-      background: linear-gradient(135deg, rgba(6,78,59,0.75), rgba(2,44,34,0.95));
-      border: 1px solid rgba(16,185,129,0.18); border-radius: 0.625rem;
-      overflow: hidden; transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    .adhkar-card:hover {
-      border-color: rgba(212,175,55,0.35);
-      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-    }
-    .adhkar-card__accent {
-      width: 3px; flex-shrink: 0;
-      background: linear-gradient(180deg, #D4AF37, #10b981);
-    }
-    .adhkar-card__body { flex: 1; padding: 0.75rem 0.875rem; min-width: 0; }
-    .adhkar-card__top {
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 0.5rem; margin-bottom: 0.375rem;
-    }
-    .adhkar-title { margin: 0; font-size: 0.875rem; font-weight: 700; color: #fff; }
     .count-badge {
-      flex-shrink: 0; font-size: 0.6875rem; font-weight: 800; color: #D4AF37;
-      background: rgba(212,175,55,0.12); border: 1px solid rgba(212,175,55,0.35);
-      padding: 0.15rem 0.45rem; border-radius: 9999px;
+      flex-shrink: 0;
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: var(--adhkar-primary);
+      background: var(--adhkar-primary-soft);
+      border: 1px solid rgba(15, 76, 58, 0.15);
+      padding: 4px 10px;
+      border-radius: 9999px;
     }
-    .adhkar-arabic {
-      margin: 0; font-size: 1.125rem; line-height: 1.7; color: rgba(236,253,245,0.95);
-      font-family: 'Traditional Arabic', 'Scheherazade New', serif;
+
+    .item-card__arabic-wrap {
+      flex: 1;
+      padding: 16px;
+      margin-bottom: 16px;
+      background: linear-gradient(180deg, var(--adhkar-gold-soft) 0%, var(--adhkar-primary-soft) 100%);
+      border: 1px solid rgba(212, 175, 55, 0.2);
+      border-radius: var(--adhkar-radius);
+      border-right: 3px solid var(--adhkar-gold);
+    }
+    .item-card__arabic {
+      margin: 0;
+      font-size: 1.5rem;
+      line-height: 1.85;
+      font-weight: 600;
+      color: var(--adhkar-primary);
+      font-family: 'Traditional Arabic', 'Scheherazade New', 'Noto Naskh Arabic', serif;
+      text-align: right;
+    }
+
+    .item-card__footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
     }
     .category-chip {
-      display: inline-block; margin-top: 0.35rem;
-      font-size: 0.5625rem; font-weight: 600; text-transform: uppercase;
-      color: rgba(167,243,208,0.7); background: rgba(0,0,0,0.2);
-      border: 1px solid rgba(16,185,129,0.2); border-radius: 9999px;
-      padding: 0.1rem 0.4rem;
+      font-size: 0.625rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--adhkar-primary);
+      background: var(--adhkar-primary-soft);
+      border: 1px solid rgba(15, 76, 58, 0.12);
+      border-radius: 9999px;
+      padding: 4px 10px;
     }
+    .category-chip--muted { color: var(--adhkar-muted); background: var(--adhkar-bg); }
+
+    .item-card__workflow { margin-top: auto; }
+
+    /* Workflow bar — light card variant */
+    :host ::ng-deep .item-card .workflow-bar {
+      padding-top: 8px;
+      border-top: 1px solid var(--adhkar-border);
+      margin-top: 0;
+    }
+    :host ::ng-deep .item-card .status-pill {
+      font-size: 0.625rem;
+      border-radius: 9999px;
+      padding: 3px 8px;
+    }
+    :host ::ng-deep .item-card .status-pill[data-status="Published"] {
+      color: #166534;
+      background: #DCFCE7;
+      border-color: rgba(22, 163, 74, 0.25);
+    }
+    :host ::ng-deep .item-card .status-pill[data-status="Draft"] {
+      color: #475569;
+      background: #F1F5F9;
+      border-color: #E2E8F0;
+    }
+    :host ::ng-deep .item-card .status-pill[data-status="InReview"] {
+      color: #92400E;
+      background: #FEF3C7;
+      border-color: rgba(217, 119, 6, 0.25);
+    }
+    :host ::ng-deep .item-card .status-pill[data-status="Approved"] {
+      color: #0F4C3A;
+      background: #E8F5F0;
+      border-color: rgba(15, 76, 58, 0.2);
+    }
+    :host ::ng-deep .item-card .wf-btn {
+      font-size: 0.6875rem;
+      padding: 4px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--adhkar-border);
+      background: var(--adhkar-bg);
+      color: var(--adhkar-primary);
+      font-weight: 600;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    :host ::ng-deep .item-card .wf-btn:hover:not(:disabled) {
+      background: var(--adhkar-primary-soft);
+      border-color: rgba(15, 76, 58, 0.25);
+    }
+    :host ::ng-deep .item-card .wf-msg {
+      color: var(--adhkar-muted);
+      font-size: 0.6875rem;
+    }
+    :host ::ng-deep .item-card .wf-msg--err { color: #DC2626; }
+
+    /* Empty / loading */
+    .state-card {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 48px 24px;
+      font-size: 0.875rem;
+      color: var(--adhkar-muted);
+      background: var(--adhkar-surface);
+      border: 1px dashed var(--adhkar-border);
+      border-radius: var(--adhkar-radius);
+    }
+    .state-card--empty {
+      flex-direction: column;
+      text-align: center;
+    }
+    .state-card__icon { font-size: 2.5rem; margin-bottom: 8px; }
+    .state-card h3 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--adhkar-text);
+    }
+    .state-card p { margin: 0; font-size: 0.875rem; color: var(--adhkar-muted); }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--adhkar-gold);
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse { 50% { opacity: 0.35; } }
   `]
 })
 export class ContentAdhkarComponent implements OnInit {
-  private content = inject(ContentService);
+  private editor = inject(ContentEditorService);
 
   readonly countPresets = COUNT_PRESETS;
+  readonly statusFilters: { id: StatusFilter; label: string }[] = [
+    { id: 'all', label: 'All' },
+    { id: 'Published', label: 'Published' },
+    { id: 'Draft', label: 'Draft' },
+    { id: 'InReview', label: 'In review' },
+    { id: 'Approved', label: 'Approved' },
+  ];
 
   items = signal<AdhkarItem[]>([]);
   filtered = signal<AdhkarItem[]>([]);
@@ -264,6 +680,15 @@ export class ContentAdhkarComponent implements OnInit {
   msg = signal('');
   msgOk = signal(true);
   query = '';
+  statusFilter = signal<StatusFilter>('all');
+
+  publishedCount = computed(() =>
+    this.items().filter(a => (a.status || 'Published') === 'Published').length
+  );
+
+  inReviewCount = computed(() =>
+    this.items().filter(a => a.status === 'InReview').length
+  );
 
   avgCount = computed(() => {
     const list = this.items();
@@ -277,7 +702,7 @@ export class ContentAdhkarComponent implements OnInit {
 
   load(): void {
     this.loading.set(true);
-    this.content.getAdhkarItems().subscribe({
+    this.editor.getAdhkar().subscribe({
       next: i => {
         this.items.set(i);
         this.applyFilter();
@@ -287,17 +712,28 @@ export class ContentAdhkarComponent implements OnInit {
     });
   }
 
+  setStatusFilter(id: StatusFilter): void {
+    this.statusFilter.set(id);
+    this.applyFilter();
+  }
+
   applyFilter(): void {
     const q = this.query.trim().toLowerCase();
-    const list = this.items();
-    if (!q) {
-      this.filtered.set(list);
-      return;
+    const status = this.statusFilter();
+    let list = this.items();
+
+    if (status !== 'all') {
+      list = list.filter(a => (a.status || 'Published') === status);
     }
-    this.filtered.set(list.filter(a =>
-      a.title.toLowerCase().includes(q) ||
-      a.arabicText.includes(q)
-    ));
+
+    if (q) {
+      list = list.filter(a =>
+        a.title.toLowerCase().includes(q) ||
+        a.arabicText.includes(q)
+      );
+    }
+
+    this.filtered.set(list);
   }
 
   create(): void {
@@ -306,7 +742,7 @@ export class ContentAdhkarComponent implements OnInit {
     if (!title || !arabicText) return;
     this.saving.set(true);
     this.msg.set('');
-    this.content.createAdhkarItem({ ...this.form, title, arabicText }).subscribe({
+    this.editor.createAdhkar({ ...this.form, title, arabicText }).subscribe({
       next: () => {
         this.form = { title: '', arabicText: '', defaultCount: 33 };
         this.saving.set(false);

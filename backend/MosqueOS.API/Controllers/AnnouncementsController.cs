@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.API.Filters;
+using MosqueOS.API.Services;
 using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
@@ -11,21 +13,40 @@ namespace MosqueOS.API.Controllers
 {
     [Route("api/v1/mosques/{mosqueId:int}/announcements")]
     [ApiController]
+    [RequireMosqueModule("Announcements")]
     public class AnnouncementsController : ControllerBase
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly MosqueAccessService _mosqueAccess;
 
-        public AnnouncementsController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
+        public AnnouncementsController(IUnitOfWork unitOfWork, MosqueAccessService mosqueAccess)
+        {
+            _unitOfWork = unitOfWork;
+            _mosqueAccess = mosqueAccess;
+        }
 
         /// <summary>Public: published announcements only. Admins see all via ?all=true.</summary>
         [HttpGet]
-        public async Task<IActionResult> GetAll(int mosqueId, [FromQuery] bool all = false)
+        public async Task<IActionResult> GetAll(
+            int mosqueId, [FromQuery] bool all = false,
+            [FromQuery] string? search = null, [FromQuery] PublishStatus? status = null)
         {
             var query = _unitOfWork.Repository<Announcement>().QueryNoTracking().Where(a => a.MosqueId == mosqueId);
 
-            var isAdmin = User.IsInRole(Roles.SuperAdmin) || User.IsInRole(Roles.MosqueAdmin);
+            var isAdmin = User.IsInRole(Roles.SuperAdmin) || User.IsInRole(Roles.MosqueAdmin)
+                || User.IsInRole(Roles.MosqueOwner);
             if (!all || !isAdmin)
                 query = query.Where(a => a.Status == PublishStatus.Published);
+            else if (status.HasValue)
+                query = query.Where(a => a.Status == status);
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim();
+                query = query.Where(a => a.Title.Contains(term)
+                    || (a.Summary != null && a.Summary.Contains(term))
+                    || (a.Body != null && a.Body.Contains(term)));
+            }
 
             return Ok(await query
                 .OrderByDescending(a => a.IsFeatured)
@@ -41,10 +62,11 @@ namespace MosqueOS.API.Controllers
             return item == null ? NotFound() : Ok(item);
         }
 
-        [Authorize(Roles = Roles.Admins)]
+        [Authorize(Roles = Roles.ContentManagers)]
         [HttpPost]
         public async Task<IActionResult> Create(int mosqueId, [FromBody] Announcement input)
         {
+            if (await MosqueAccessHelper.RequireAccessAsync(_mosqueAccess, User, mosqueId) is { } denied) return denied;
             input.Id = 0;
             input.MosqueId = mosqueId;
             input.CreatedById = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -56,10 +78,11 @@ namespace MosqueOS.API.Controllers
             return CreatedAtAction(nameof(Get), new { mosqueId, id = input.Id }, input);
         }
 
-        [Authorize(Roles = Roles.Admins)]
+        [Authorize(Roles = Roles.ContentManagers)]
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update(int mosqueId, int id, [FromBody] Announcement input)
         {
+            if (await MosqueAccessHelper.RequireAccessAsync(_mosqueAccess, User, mosqueId) is { } denied) return denied;
             var item = await _unitOfWork.Repository<Announcement>().Query()
                 .FirstOrDefaultAsync(a => a.Id == id && a.MosqueId == mosqueId);
             if (item == null) return NotFound();
@@ -89,6 +112,7 @@ namespace MosqueOS.API.Controllers
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int mosqueId, int id)
         {
+            if (await MosqueAccessHelper.RequireAccessAsync(_mosqueAccess, User, mosqueId) is { } denied) return denied;
             var item = await _unitOfWork.Repository<Announcement>().Query()
                 .FirstOrDefaultAsync(a => a.Id == id && a.MosqueId == mosqueId);
             if (item == null) return NotFound();
@@ -100,6 +124,7 @@ namespace MosqueOS.API.Controllers
 
         private async Task<IActionResult> SetStatus(int mosqueId, int id, PublishStatus status)
         {
+            if (await MosqueAccessHelper.RequireAccessAsync(_mosqueAccess, User, mosqueId) is { } denied) return denied;
             var item = await _unitOfWork.Repository<Announcement>().Query()
                 .FirstOrDefaultAsync(a => a.Id == id && a.MosqueId == mosqueId);
             if (item == null) return NotFound();

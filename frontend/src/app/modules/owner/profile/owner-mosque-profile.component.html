@@ -1,0 +1,117 @@
+<div *ngIf="loading()" class="omp-state" role="status">
+  <span class="omp-spinner" aria-hidden="true"></span>
+  Loading mosque profile…
+</div>
+
+<div *ngIf="!loading() && !mosque()" class="omp-alert omp-alert--warn">
+  No mosque linked yet. Complete claim approval to manage your mosque profile.
+</div>
+
+<div *ngIf="!loading() && mosque() as m">
+  <div *ngIf="toast()" class="omp-toast" [class.omp-toast--ok]="toastOk()" [class.omp-toast--err]="!toastOk()">{{ toast() }}</div>
+
+  <div *ngIf="!canEdit()" class="omp-alert omp-alert--warn" role="alert">{{ lockMessage() }}</div>
+
+  <div class="omp-form" [class.omp-form--locked]="!canEdit()">
+    <section class="omp-section">
+      <h2>Basic information</h2>
+      <div class="omp-grid">
+        <label class="omp-field omp-field--full">
+          <span>Mosque name <em>*</em></span>
+          <input class="omp-input" [(ngModel)]="m.name" [disabled]="!canEdit() || saving()">
+          <small *ngIf="fieldErrors()['name']" class="omp-error">{{ fieldErrors()['name'] }}</small>
+        </label>
+        <label class="omp-field">
+          <span>Phone</span>
+          <input class="omp-input" [(ngModel)]="m.phone" [disabled]="!canEdit() || saving()">
+        </label>
+        <label class="omp-field">
+          <span>Email</span>
+          <input class="omp-input" type="email" [(ngModel)]="m.email" [disabled]="!canEdit() || saving()">
+        </label>
+        <label class="omp-field omp-field--full">
+          <span>Website</span>
+          <input class="omp-input" [(ngModel)]="m.website" placeholder="https://" [disabled]="!canEdit() || saving()">
+        </label>
+      </div>
+    </section>
+
+    <section class="omp-section">
+      <h2>Address</h2>
+      <div class="omp-grid">
+        <label class="omp-field omp-field--full">
+          <span>Address</span>
+          <input class="omp-input" [(ngModel)]="m.address" [disabled]="!canEdit() || saving()">
+        </label>
+        <label class="omp-field">
+          <span>City <em>*</em></span>
+          <input class="omp-input" [(ngModel)]="m.city" [disabled]="!canEdit() || saving()">
+          <small *ngIf="fieldErrors()['city']" class="omp-error">{{ fieldErrors()['city'] }}</small>
+        </label>
+        <label class="omp-field">
+          <span>Postcode</span>
+          <input class="omp-input" [(ngModel)]="m.postcode" [disabled]="!canEdit() || saving()">
+        </label>
+        <label class="omp-field">
+          <span>Country</span>
+          <select class="omp-input" [(ngModel)]="m.country" [disabled]="!canEdit() || saving()">
+            <option *ngFor="let c of countries" [value]="c">{{ c }}</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section class="omp-section">
+      <h2>Description</h2>
+      <label class="omp-field omp-field--full">
+        <span>About your mosque</span>
+        <textarea class="omp-input omp-textarea" rows="6" [(ngModel)]="m.description" [disabled]="!canEdit() || saving()"></textarea>
+      </label>
+    </section>
+
+    <section class="omp-section">
+      <h2>Branding</h2>
+      <div class="omp-media">
+        <div class="omp-media__card">
+          <p>Logo</p>
+          <img *ngIf="logoPreview()" [src]="logoPreview()!" alt="Logo preview" class="omp-media__preview">
+          <label class="omp-upload" *ngIf="canEdit()">
+            Replace logo
+            <input type="file" accept="image/*" (change)="onLogoSelected($event)" [disabled]="saving()">
+          </label>
+        </div>
+        <div class="omp-media__card">
+          <p>Banner</p>
+          <img *ngIf="bannerPreview()" [src]="bannerPreview()!" alt="Banner preview" class="omp-media__preview omp-media__preview--banner">
+          <label class="omp-upload" *ngIf="canEdit()">
+            Replace banner
+            <input type="file" accept="image/*" (change)="onBannerSelected($event)" [disabled]="saving()">
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <section class="omp-section">
+      <h2>Settings</h2>
+      <label class="omp-field">
+        <span>Timezone</span>
+        <select class="omp-input" [(ngModel)]="m.timezone" [disabled]="!canEdit() || saving()">
+          <option *ngFor="let tz of timezones" [value]="tz">{{ tz }}</option>
+        </select>
+      </label>
+    </section>
+  </div>
+
+  <footer class="omp-footer">
+    <button type="button" class="omp-btn omp-btn--ghost" (click)="cancel()" [disabled]="saving() || !canEdit()">Cancel</button>
+    <button type="button" class="omp-btn omp-btn--primary" (click)="save()" [disabled]="saving() || !canEdit()">
+      <span *ngIf="saving()" class="omp-spinner omp-spinner--sm" aria-hidden="true"></span>
+      {{ saving() ? 'Saving…' : 'Save Changes' }}
+    </button>
+  </footer>
+
+  <p *ngIf="m.slug && canEdit()" class="omp-hint">
+    Public page: <a [routerLink]="['/mosque', m.slug]" target="_blank" rel="noopener">/mosque/{{ m.slug }}</a>
+    — updates appear immediately after save.
+  </p>
+</div>

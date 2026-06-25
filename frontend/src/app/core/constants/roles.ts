@@ -8,7 +8,8 @@ export const ROLES = {
   Muqaddam: 'Muqaddam',
   ContentEditor: 'Content Editor',
   Parent: 'Parent',
-  Member: 'Member'
+  Member: 'Member',
+  Guest: 'Guest'
 } as const;
 
 export type AppRole = (typeof ROLES)[keyof typeof ROLES];

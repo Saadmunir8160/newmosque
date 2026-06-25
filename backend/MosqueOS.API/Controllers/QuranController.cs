@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.API.Models.Common;
+using MosqueOS.API.Models.Quran;
 using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Entities;
@@ -26,12 +28,12 @@ namespace MosqueOS.API.Controllers
         [AllowAnonymous]
         [HttpGet("paras")]
         public IActionResult ListParas() =>
-            Ok(_quranText.ListParas().Select(p => new
+            Ok(_quranText.ListParas().Select(p => new QuranParaListItemResponse
             {
-                p.Number,
-                p.NameEn,
-                p.NameAr,
-                surahRange = p.SurahRange
+                Number = p.Number,
+                NameEn = p.NameEn,
+                NameAr = p.NameAr,
+                SurahRange = p.SurahRange
             }));
 
         [AllowAnonymous]
@@ -40,16 +42,16 @@ namespace MosqueOS.API.Controllers
         {
             var para = await _quranText.GetParaAsync(paraNumber, ct);
             return para == null
-                ? NotFound(new { message = "Para must be between 1 and 30." })
-                : Ok(new
+                ? NotFound(new ApiMessageResponse { Message = "Para must be between 1 and 30." })
+                : Ok(new QuranParaDetailResponse
                 {
-                    para.Number,
-                    para.NameEn,
-                    para.NameAr,
-                    para.SurahRange,
-                    arabic = para.Arabic,
-                    translation = para.Translation,
-                    source = para.Source
+                    Number = para.Number,
+                    NameEn = para.NameEn,
+                    NameAr = para.NameAr,
+                    SurahRange = para.SurahRange,
+                    Arabic = para.Arabic,
+                    Translation = para.Translation,
+                    Source = para.Source
                 });
         }
 
@@ -58,19 +60,23 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> GetYaseen(CancellationToken ct)
         {
             var surah = await _quranText.GetYaseenAsync(ct);
-            return Ok(new
+            return Ok(new QuranSurahYaseenResponse
             {
-                name = surah.Name,
-                arabic = surah.Arabic,
-                translation = surah.Translation,
-                source = surah.Source
+                Name = surah.Name,
+                Arabic = surah.Arabic,
+                Translation = surah.Translation,
+                Source = surah.Source
             });
         }
 
         [AllowAnonymous]
         [HttpGet("adhkar")]
         public IActionResult ListAdhkar() =>
-            Ok(AdhkarReadingContent.List().Select(a => new { a.Key, a.Title }));
+            Ok(AdhkarReadingContent.List().Select(a => new AdhkarReadingListItemResponse
+            {
+                Key = a.Key,
+                Title = a.Title
+            }));
 
         [AllowAnonymous]
         [HttpGet("adhkar/{key}")]
@@ -79,14 +85,14 @@ namespace MosqueOS.API.Controllers
             var item = AdhkarReadingContent.Get(key);
             return item == null
                 ? NotFound()
-                : Ok(new
+                : Ok(new AdhkarReadingDetailResponse
                 {
-                    item.Key,
-                    item.Title,
-                    arabic = item.Arabic,
-                    transliteration = item.Transliteration,
-                    translation = item.Translation,
-                    instruction = item.Instruction
+                    Key = item.Key,
+                    Title = item.Title,
+                    Arabic = item.Arabic,
+                    Transliteration = item.Transliteration,
+                    Translation = item.Translation,
+                    Instruction = item.Instruction
                 });
         }
 
@@ -100,19 +106,19 @@ namespace MosqueOS.API.Controllers
                 .OrderByDescending(p => p.StartDate)
                 .FirstOrDefaultAsync();
 
-            if (plan == null) return NotFound(new { message = "No active plan. Start one with POST /start." });
+            if (plan == null) return NotFound(new ApiMessageResponse { Message = "No active plan. Start one with POST /start." });
 
             var completed = plan.Progress.Count(p => p.Completed);
             var daysIn = DateOnly.FromDateTime(DateTime.UtcNow).DayNumber - plan.StartDate.DayNumber + 1;
             var todaysPara = Math.Clamp(daysIn, 1, 30);
 
-            return Ok(new
+            return Ok(new QuranPlanSummaryResponse
             {
-                plan,
-                completedParas = completed,
-                totalParas = 30,
-                todaysPara,
-                todayCompleted = plan.Progress.FirstOrDefault(p => p.ParaNumber == todaysPara)?.Completed ?? false
+                Plan = plan,
+                CompletedParas = completed,
+                TotalParas = 30,
+                TodaysPara = todaysPara,
+                TodayCompleted = plan.Progress.FirstOrDefault(p => p.ParaNumber == todaysPara)?.Completed ?? false
             });
         }
 
@@ -138,7 +144,7 @@ namespace MosqueOS.API.Controllers
         [HttpPost("paras/{paraNumber:int}/complete")]
         public async Task<IActionResult> CompletePara(int paraNumber)
         {
-            if (paraNumber is < 1 or > 30) return BadRequest(new { message = "Para must be 1-30." });
+            if (paraNumber is < 1 or > 30) return BadRequest(new ApiMessageResponse { Message = "Para must be 1-30." });
 
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
             var plan = await _unitOfWork.Repository<QuranPlan>().Query()
@@ -154,11 +160,11 @@ namespace MosqueOS.API.Controllers
             progress.UpdatedAt = DateTime.UtcNow;
 
             await _unitOfWork.SaveChangesAsync();
-            return Ok(new
+            return Ok(new QuranCompleteParaResponse
             {
-                paraNumber,
-                completedParas = plan.Progress.Count(p => p.Completed),
-                totalParas = 30
+                ParaNumber = paraNumber,
+                CompletedParas = plan.Progress.Count(p => p.Completed),
+                TotalParas = 30
             });
         }
     }

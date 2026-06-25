@@ -1,0 +1,159 @@
+<div class="mp-page">
+  <nav class="mp-breadcrumb" aria-label="Breadcrumb">
+    <a routerLink="/dashboard/super">Dashboard</a>
+    <span class="mp-breadcrumb__sep">›</span>
+    <a routerLink="/dashboard/super/mosques">Mosque listings</a>
+    <span class="mp-breadcrumb__sep">›</span>
+    <span class="mp-breadcrumb__current">{{ detail()?.mosque?.name || 'Detail' }}</span>
+  </nav>
+
+  <div *ngIf="loading()" class="mp-state-loading">
+    <span class="mp-pulse"></span> Loading mosque details…
+  </div>
+
+  <p *ngIf="error()" class="mp-alert mp-alert--error" role="alert">{{ error() }}</p>
+
+  <ng-container *ngIf="detail() as d">
+    <section class="mp-hero">
+      <div class="mp-hero__top">
+        <div>
+          <h1 class="mp-hero__title">{{ d.mosque.name }}</h1>
+          <p class="mp-hero__sub">{{ d.mosque.city }} · <code style="font-size:0.8em;color:var(--mp-secondary)">/{{ d.mosque.slug }}</code></p>
+          <div class="mp-hero__completeness">
+            <div class="mp-ring" [style.--pct]="profileCompleteness()">
+              <div class="mp-ring__inner">{{ profileCompleteness() }}%</div>
+            </div>
+            <div>
+              <p style="margin:0;font-size:0.8125rem;font-weight:700;color:var(--mp-text)">Profile completeness</p>
+              <p style="margin:0.15rem 0 0;font-size:0.75rem;color:var(--mp-muted)">{{ completenessHint() }}</p>
+            </div>
+          </div>
+        </div>
+        <span class="mp-status" [ngClass]="statusClass(d.mosque.status)">{{ formatStatus(d.mosque.status) }}</span>
+      </div>
+    </section>
+
+    <div class="mp-toolbar">
+      <a [routerLink]="['/dashboard/admin/mosque']" [queryParams]="{ mosqueId: d.mosque.id }" class="mp-btn">Edit mosque</a>
+      <a
+        [routerLink]="['/mosque', resolvePublicSlug(d.mosque)]"
+        [queryParams]="publicPreviewQuery(d.mosque)"
+        target="_blank"
+        rel="noopener"
+        class="mp-btn mp-btn--ghost">
+        {{ isPublicVisible(d.mosque.status) ? 'Public profile' : 'Admin preview' }}
+      </a>
+      <button *ngIf="d.mosque.status === 'Claimed'" type="button" class="mp-btn mp-btn--success" (click)="activate(d.mosque.id)">Activate mosque</button>
+      <a routerLink="/dashboard/super/claims" class="mp-btn mp-btn--ghost" *ngIf="d.pendingClaim">Review claim</a>
+    </div>
+
+    <div *ngIf="d.isDuplicate" class="mp-alert mp-alert--warn">
+      Possible duplicate listing: {{ d.duplicateReason || 'Similar mosque found in directory.' }}
+    </div>
+
+    <div *ngIf="d.pendingClaim as c" class="mp-alert mp-alert--info">
+      Pending ownership claim from <strong>{{ claimLabel(c) }}</strong>
+      · {{ c.claimReference || ('#' + c.claimId) }}
+      <a routerLink="/dashboard/super/claims" class="mp-link" style="margin-left:0.5rem">Review in queue →</a>
+    </div>
+
+    <div class="mp-layout">
+      <div style="display:grid;gap:0.875rem">
+        <section class="mp-panel">
+          <div class="mp-panel__head">
+            <h2>Contact & location</h2>
+          </div>
+          <div style="padding:1rem 1.25rem">
+            <ul class="mp-info-list">
+              <li>
+                <span class="mp-info-list__icon">📍</span>
+                <div>
+                  <span class="mp-info-list__label">Address</span>
+                  {{ d.mosque.address || '—' }}<span *ngIf="d.mosque.postcode">, {{ d.mosque.postcode }}</span>
+                </div>
+              </li>
+              <li *ngIf="d.mosque.phone">
+                <span class="mp-info-list__icon">📞</span>
+                <div>
+                  <span class="mp-info-list__label">Phone</span>
+                  {{ d.mosque.phone }}
+                </div>
+              </li>
+              <li *ngIf="d.mosque.email">
+                <span class="mp-info-list__icon">✉️</span>
+                <div>
+                  <span class="mp-info-list__label">Email</span>
+                  {{ d.mosque.email }}
+                </div>
+              </li>
+              <li *ngIf="d.mosque.website">
+                <span class="mp-info-list__icon">🌐</span>
+                <div>
+                  <span class="mp-info-list__label">Website</span>
+                  {{ d.mosque.website }}
+                </div>
+              </li>
+              <li *ngIf="d.mosque.description">
+                <span class="mp-info-list__icon">📝</span>
+                <div>
+                  <span class="mp-info-list__label">Description</span>
+                  {{ d.mosque.description }}
+                </div>
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="mp-panel" *ngIf="d.audit?.length">
+          <div class="mp-panel__head">
+            <h2>Recent audit</h2>
+          </div>
+          <div style="padding:0.5rem 1.25rem 1rem">
+            <ul class="mp-audit">
+              <li *ngFor="let row of d.audit">
+                <span class="mp-audit__dot"></span>
+                <div>
+                  <div class="mp-audit__action">{{ row.action }}</div>
+                  <div class="mp-audit__time">{{ row.createdAt | date:'medium' }}</div>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </section>
+      </div>
+
+      <aside style="display:grid;gap:0.875rem;align-content:start">
+        <section class="mp-panel">
+          <div class="mp-panel__head">
+            <h2>Ownership</h2>
+          </div>
+          <div style="padding:1rem 1.25rem">
+            <ng-container *ngIf="d.owner as o">
+              <p style="margin:0;font-size:0.9375rem;font-weight:700;color:var(--mp-text)">{{ o.name }}</p>
+              <p style="margin:0.25rem 0 0;font-size:0.8125rem;color:var(--mp-muted)">{{ o.email }}</p>
+            </ng-container>
+            <p *ngIf="!d.owner" class="mp-alert mp-alert--warn" style="margin:0">No owner assigned to this mosque.</p>
+            <p style="margin:0.75rem 0 0;font-size:0.8125rem;color:var(--mp-muted)">
+              <strong style="color:var(--mp-text)">{{ d.userCount }}</strong> users linked
+            </p>
+            <p *ngIf="d.admins?.length" style="margin:0.5rem 0 0;font-size:0.8125rem;color:var(--mp-muted)">
+              <strong style="color:var(--mp-text)">{{ d.admins.length }}</strong> mosque admins
+            </p>
+          </div>
+        </section>
+
+        <section class="mp-panel" *ngIf="d.pendingClaim as c">
+          <div class="mp-panel__head">
+            <h2>Pending claim</h2>
+          </div>
+          <div style="padding:1rem 1.25rem">
+            <p style="margin:0;font-size:0.875rem;font-weight:700;color:var(--mp-text)">{{ claimLabel(c) }}</p>
+            <p style="margin:0.25rem 0 0;font-size:0.75rem;color:var(--mp-muted)">{{ c.claimReference || ('#' + c.claimId) }}</p>
+            <p *ngIf="c.submittedAt" style="margin:0.5rem 0 0;font-size:0.75rem;color:var(--mp-muted)">Submitted {{ c.submittedAt | date:'mediumDate' }}</p>
+            <a routerLink="/dashboard/super/claims" class="mp-link" style="display:inline-block;margin-top:0.75rem">Open claims queue →</a>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </ng-container>
+</div>

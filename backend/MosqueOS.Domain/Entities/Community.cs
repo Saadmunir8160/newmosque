@@ -50,4 +50,41 @@ namespace MosqueOS.Domain.Entities
         public int EventId { get; set; }
         public Event? Event { get; set; }
     }
+
+    public class GuidanceNote : BaseEntity
+    {
+        public int CommunityId { get; set; }
+        public Community? Community { get; set; }
+        public string MuridUserId { get; set; } = string.Empty;
+        public ApplicationUser? Murid { get; set; }
+        public GuidanceNoteType Type { get; set; }
+        public string Content { get; set; } = string.Empty;
+        public DateOnly? FollowUpDate { get; set; }
+        public bool IsCompleted { get; set; }
+        public string? CreatedById { get; set; }
+    }
+
+    public class CommunityGathering : BaseEntity
+    {
+        public int CommunityId { get; set; }
+        public Community? Community { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public CommunityGatheringType GatheringType { get; set; }
+        public DateOnly Date { get; set; }
+        public TimeOnly? StartTime { get; set; }
+        public string? Location { get; set; }
+        public string? CreatedById { get; set; }
+
+        public ICollection<GatheringAttendance> Attendance { get; set; } = new List<GatheringAttendance>();
+    }
+
+    public class GatheringAttendance : BaseEntity
+    {
+        public int GatheringId { get; set; }
+        public CommunityGathering? Gathering { get; set; }
+        public string UserId { get; set; } = string.Empty;
+        public ApplicationUser? User { get; set; }
+        public AttendanceStatus Status { get; set; } = AttendanceStatus.Present;
+    }
 }

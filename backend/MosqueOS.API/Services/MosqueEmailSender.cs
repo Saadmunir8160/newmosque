@@ -1,0 +1,79 @@
+using System.Net;
+using System.Net.Mail;
+using Microsoft.Extensions.Options;
+
+namespace MosqueOS.API.Services;
+
+public class MosqueEmailSender : IEmailSender
+{
+    private readonly EmailOptions _options;
+    private readonly ILogger<MosqueEmailSender> _logger;
+
+    public MosqueEmailSender(IOptions<EmailOptions> options, ILogger<MosqueEmailSender> logger)
+    {
+        _options = options.Value;
+        _logger = logger;
+    }
+
+    public async Task SendEmailAsync(string to, string subject, string htmlBody)
+    {
+        await SendEmailAsync(to, subject, htmlBody, null);
+    }
+
+    public async Task SendEmailAsync(string to, string subject, string htmlBody, string? plainTextBody)
+    {
+        var smtpReady = !string.IsNullOrWhiteSpace(_options.Smtp.Host)
+            && !string.IsNullOrWhiteSpace(_options.Smtp.Username)
+            && !string.IsNullOrWhiteSpace(_options.Smtp.Password);
+
+        if (_options.LogToConsole || !smtpReady)
+        {
+            _logger.LogInformation(
+                "=== MosqueOS Email ===\nTo: {To}\nSubject: {Subject}\n{Body}\nSMTP configured: {SmtpReady}\n======================",
+                to, subject, plainTextBody ?? htmlBody, smtpReady);
+        }
+
+        if (!smtpReady)
+        {
+            if (!_options.LogToConsole)
+                _logger.LogWarning("Email not sent — configure Email:Smtp in appsettings.Local.json");
+            return;
+        }
+
+        var fromAddress = !string.IsNullOrWhiteSpace(_options.FromAddress)
+            ? _options.FromAddress
+            : _options.Smtp.Username;
+
+        try
+        {
+            using var client = new SmtpClient(_options.Smtp.Host, _options.Smtp.Port)
+            {
+                EnableSsl = _options.Smtp.EnableSsl,
+                Credentials = new NetworkCredential(_options.Smtp.Username, _options.Smtp.Password)
+            };
+
+            using var message = new MailMessage
+            {
+                From = new MailAddress(fromAddress, _options.FromName),
+                Subject = subject,
+                Body = htmlBody,
+                IsBodyHtml = true
+            };
+            message.To.Add(to);
+
+            if (!string.IsNullOrWhiteSpace(plainTextBody))
+            {
+                message.AlternateViews.Add(
+                    AlternateView.CreateAlternateViewFromString(plainTextBody, null, "text/plain"));
+            }
+
+            await client.SendMailAsync(message);
+            _logger.LogInformation("Email sent to {To}", to);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send email to {To}. Check Gmail App Password in appsettings.Local.json", to);
+            throw;
+        }
+    }
+}

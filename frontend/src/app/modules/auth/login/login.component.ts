@@ -1,9 +1,10 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/auth/auth.service';
+import { isValidEmail } from '../../../core/utils/auth-password.util';
 
 @Component({
   selector: 'app-login',
@@ -219,6 +220,31 @@ import { AuthService } from '../../../core/auth/auth.service';
     }
     .btn-login:active:not(:disabled) { transform: translateY(0); }
     .btn-login:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-login .auth-spinner {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.35); border-top-color: #fff;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .verify-panel {
+      margin: 0 0 1rem; padding: 0.75rem;
+      border-radius: 0.625rem;
+      border: 1px solid rgba(212,175,55,0.35);
+      background: rgba(2,44,34,0.45);
+      text-align: left;
+    }
+    .verify-panel p { margin: 0 0 0.65rem; font-size: 0.75rem; color: rgba(209,250,229,0.9); line-height: 1.45; }
+    .btn-resend {
+      width: 100%; border: 1px solid rgba(212,175,55,0.45);
+      cursor: pointer; border-radius: 0.625rem;
+      padding: 0.65rem 0.75rem; color: #fff;
+      font-size: 0.8125rem; font-weight: 700;
+      background: rgba(6,78,59,0.85);
+    }
+    .btn-resend:disabled { opacity: 0.55; cursor: not-allowed; }
+    .resend-msg { margin: 0.5rem 0 0; font-size: 0.75rem; color: #6ee7b7; }
+    .resend-msg--err { color: #fca5a5; }
 
     .auth-footer {
       margin: 1.125rem 0 0; text-align: center;
@@ -272,6 +298,14 @@ import { AuthService } from '../../../core/auth/auth.service';
           <span>{{ error() }}</span>
         </div>
 
+        <div *ngIf="needsVerification()" class="verify-panel">
+          <p>Check your inbox for the verification link, or resend it below.</p>
+          <button type="button" class="btn-resend" (click)="resendVerification()" [disabled]="resendSending()">
+            {{ resendSending() ? 'Sending…' : 'Resend Verification Email' }}
+          </button>
+          <p *ngIf="resendMsg()" class="resend-msg" [class.resend-msg--err]="resendMsgErr()">{{ resendMsg() }}</p>
+        </div>
+
         <div class="hp-field" aria-hidden="true">
           <input type="text" tabindex="-1" autocomplete="username">
           <input type="password" tabindex="-1" autocomplete="current-password">
@@ -291,8 +325,8 @@ import { AuthService } from '../../../core/auth/auth.service';
                 (focus)="enableInput($event)"
                 (keydown.tab)="allowPasswordField()"
                 (keydown.enter)="$event.preventDefault()"
-                [(ngModel)]="username">
-              <label for="mosqueos-login-id" class="floating-label">Mosque ID / Username</label>
+                [(ngModel)]="email">
+              <label for="mosqueos-login-id" class="floating-label">Email or username</label>
             </div>
           </div>
 
@@ -330,33 +364,40 @@ import { AuthService } from '../../../core/auth/auth.service';
           </div>
 
           <button type="submit" class="btn-login" [disabled]="submitting()">
+            <span *ngIf="submitting()" class="auth-spinner" aria-hidden="true"></span>
             {{ submitting() ? 'Signing in…' : 'Login' }}
           </button>
         </form>
 
         <p class="auth-footer">
-          Don't have an account? <a routerLink="/register">Sign Up Now</a>
+          Don't have an account? <a routerLink="/register">Create Account</a>
         </p>
       </div>
     </div>
   `
 })
 export class LoginComponent implements OnInit {
-  username = '';
+  email = '';
   password = '';
   rememberMe = false;
   submitting = signal(false);
   error = signal<string | null>(null);
+  needsVerification = signal(false);
+  resendSending = signal(false);
+  resendMsg = signal('');
+  resendMsgErr = signal(false);
   passwordReady = signal(false);
   showPassword = signal(false);
   private passwordFocusAllowed = false;
 
   private authService = inject(AuthService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   ngOnInit(): void {
-    this.username = localStorage.getItem('mosqueos_remember_username') || '';
-    this.rememberMe = !!this.username;
+    const qEmail = this.route.snapshot.queryParamMap.get('email');
+    this.email = qEmail || localStorage.getItem('mosqueos_remember_email') || '';
+    this.rememberMe = !!this.email;
     this.password = '';
     this.error.set(null);
     this.passwordReady.set(this.rememberMe);
@@ -382,26 +423,39 @@ export class LoginComponent implements OnInit {
 
   async onLogin(): Promise<void> {
     this.error.set(null);
+    this.needsVerification.set(false);
+    this.resendMsg.set('');
     this.submitting.set(true);
-    const user = this.username.trim();
+    const user = this.email.trim();
     const pass = this.password;
-    if (!user || !pass) {
-      this.error.set('Please enter username and password.');
+    if (!user) {
+      this.error.set('Email or username is required.');
+      this.submitting.set(false);
+      return;
+    }
+    if (!pass) {
+      this.error.set('Password is required.');
       this.submitting.set(false);
       return;
     }
     try {
       await this.authService.login(user, pass);
       if (this.rememberMe) {
-        localStorage.setItem('mosqueos_remember_username', user);
+        localStorage.setItem('mosqueos_remember_email', user);
       } else {
-        localStorage.removeItem('mosqueos_remember_username');
+        localStorage.removeItem('mosqueos_remember_email');
       }
-      this.router.navigate(['/dashboard']);
+      const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+      const home = await this.authService.resolveHomeRoute(returnUrl);
+      this.router.navigate([home]);
     } catch (err) {
       if (err instanceof HttpErrorResponse) {
         if (err.status === 401) {
-          this.error.set('Invalid username or password.');
+          const msg = err.error?.message || 'Invalid email/username or password.';
+          this.error.set(msg);
+          if (/verify your email/i.test(msg)) {
+            this.needsVerification.set(true);
+          }
         } else if (err.status === 0) {
           this.error.set('Cannot reach the server. Start the backend API on http://localhost:5000 and try again.');
         } else {
@@ -413,6 +467,27 @@ export class LoginComponent implements OnInit {
       this.password = '';
     } finally {
       this.submitting.set(false);
+    }
+  }
+
+  async resendVerification(): Promise<void> {
+    const email = this.email.trim();
+    if (!email || !isValidEmail(email)) {
+      this.resendMsg.set('Enter a valid email address above.');
+      this.resendMsgErr.set(true);
+      return;
+    }
+    this.resendSending.set(true);
+    this.resendMsg.set('');
+    try {
+      const res = await this.authService.resendVerification(email);
+      this.resendMsg.set(res.message);
+      this.resendMsgErr.set(false);
+    } catch {
+      this.resendMsg.set('Could not send verification email. Try again later.');
+      this.resendMsgErr.set(true);
+    } finally {
+      this.resendSending.set(false);
     }
   }
 }

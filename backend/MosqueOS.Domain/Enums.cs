@@ -7,10 +7,25 @@ namespace MosqueOS.Domain
         Active = 2,
         PendingReview = 3,
         Suspended = 4,
-        Archived = 5
+        Archived = 5,
+        /// <summary>Ownership claim submitted — awaiting super admin approval.</summary>
+        ClaimPending = 6,
+    }
+
+    public enum OwnershipClaimStatus
+    {
+        Pending = 0,
+        Approved = 1,
+        Rejected = 2,
     }
 
     public enum PublishStatus { Draft, Published, Unpublished }
+
+    public enum ContentPublishStatus { Draft, InReview, Approved, Published, Unpublished }
+
+    public enum LibraryItemType { Article, Pdf, Book }
+
+    public enum MediaAssetType { Audio, Image, Video }
 
     public enum EventType { General, Mawlid, Dhikr, Class, Jumuah, Other }
 
@@ -24,7 +39,11 @@ namespace MosqueOS.Domain
 
     public enum CommunityType { Tariqa, Class, YouthGroup, SistersGroup, StudyCircle, MadrassahGroup }
 
-    public enum CommunityRole { Admin, Teacher, Member }
+    public enum CommunityRole { Admin, Teacher, Member, Muqaddam }
+
+    public enum GuidanceNoteType { Note, FollowUp, Recommendation }
+
+    public enum CommunityGatheringType { DhikrGathering, SpiritualProgram }
 
     public enum Tariqa { General, BaAlawi, Shadhili }
 
@@ -59,4 +78,8 @@ namespace MosqueOS.Domain
     public enum JourneyType { Umrah, Hajj }
 
     public enum DisplayPreference { ArabicOnly, ArabicTransliteration, ArabicTranslation }
+
+    public enum StudentProgressType { Quran, Memorization, Exam, TeacherNote }
+
+    public enum AssignmentGradeStatus { Pending, Submitted, Graded }
 }

@@ -2,9 +2,10 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterOutlet, RouterModule } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
-import { navForGuest, navForRoles, navIcon, navSections, navIsSuperAdmin, navIsMosqueOwner, navIsPrayerEditor, NavItem } from '../../core/config/nav.config';
+import { NavigationService } from '../../core/services/navigation.service';
 import {
   SUPER_ADMIN_NAV_SECTIONS,
+  SUPER_ADMIN_TOP_ITEMS,
   SUPER_ADMIN_NAV_ICONS,
   superAdminNavItems,
 } from '../../core/config/super-admin-nav.config';
@@ -18,6 +19,39 @@ import {
   PRAYER_EDITOR_NAV_ICONS,
   prayerEditorNavItems,
 } from '../../core/config/prayer-editor-nav.config';
+import {
+  MOSQUE_ADMIN_NAV_SECTIONS,
+  MOSQUE_ADMIN_NAV_ICONS,
+  mosqueAdminNavItems,
+} from '../../core/config/mosque-admin-nav.config';
+import {
+  MEMBER_NAV_SECTIONS,
+  MEMBER_NAV_ICONS,
+  memberNavItems,
+} from '../../core/config/member-nav.config';
+import {
+  TEACHER_NAV_SECTIONS,
+  TEACHER_NAV_ICONS,
+  teacherNavItems,
+} from '../../core/config/teacher-nav.config';
+import {
+  MUQADDAM_NAV_SECTIONS,
+  MUQADDAM_NAV_ICONS,
+  muqaddamNavItems,
+} from '../../core/config/muqaddam-nav.config';
+import {
+  CONTENT_EDITOR_NAV_SECTIONS,
+  CONTENT_EDITOR_NAV_ICONS,
+  contentEditorNavItems,
+} from '../../core/config/content-editor-nav.config';
+import {
+  GUEST_NAV_SECTIONS,
+  GUEST_NAV_ICONS,
+  guestNavItems,
+} from '../../core/config/guest-nav.config';
+import { navForGuest, navForRoles, navIcon, navSections, navIsSuperAdmin, navIsMosqueOwner, navIsMosqueAdmin, navIsPrayerEditor, navIsTeacher, navIsMuqaddam, navIsContentEditor, navIsMember, NavItem } from '../../core/config/nav.config';
+import { MosqueContextService } from '../../core/services/mosque-context.service';
+import { MosqueSwitcherComponent } from '../../shared/components/mosque-switcher/mosque-switcher.component';
 
 const SIDEBAR_KEY = 'mos_sidebar_collapsed';
 const SECTIONS_KEY = 'mos_nav_sections';
@@ -25,10 +59,62 @@ const SECTIONS_KEY = 'mos_nav_sections';
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterModule],
+  imports: [CommonModule, RouterOutlet, RouterModule, MosqueSwitcherComponent],
   styles: [`
+    .shell-layout {
+      background: var(--mos-bg);
+    }
     .shell-sidebar {
       transition: width 0.25s ease;
+      background: var(--mos-sidebar-bg);
+      border-right: 1px solid var(--mos-sidebar-border);
+    }
+    .shell-sidebar-header {
+      border-bottom: 1px solid var(--mos-sidebar-border);
+    }
+    .shell-sidebar-footer {
+      border-top: 1px solid var(--mos-sidebar-border);
+    }
+    .shell-brand {
+      color: var(--mos-sidebar-text);
+    }
+    .shell-toggle-btn {
+      border: 1px solid var(--mos-sidebar-border);
+      color: rgba(255, 255, 255, 0.85);
+    }
+    .shell-toggle-btn:hover {
+      background: var(--mos-sidebar-hover);
+      color: var(--mos-sidebar-text);
+    }
+    .shell-section-btn {
+      color: var(--mos-sidebar-text);
+    }
+    .shell-section-btn:hover {
+      background: var(--mos-sidebar-hover);
+    }
+    .shell-section-title {
+      color: var(--mos-sidebar-section);
+    }
+    .shell-section-chevron {
+      color: rgba(255, 255, 255, 0.65);
+    }
+    .shell-nav-link {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      color: rgba(255, 255, 255, 0.88);
+      border-radius: 10px;
+      border: 1px solid transparent;
+    }
+    .shell-nav-link:hover {
+      background: var(--mos-sidebar-hover);
+      color: var(--mos-sidebar-text);
+    }
+    .shell-nav-link.router-link-active {
+      background: var(--mos-sidebar-active);
+      color: var(--mos-sidebar-text);
+      font-weight: 700;
+      border-color: rgba(255, 255, 255, 0.1);
     }
     .shell-nav-label {
       transition: opacity 0.2s ease, max-width 0.25s ease;
@@ -50,11 +136,6 @@ const SECTIONS_KEY = 'mos_nav_sections';
     .shell-section-inner {
       overflow: hidden;
     }
-    .shell-nav-link {
-      display: flex;
-      align-items: center;
-      gap: 0.625rem;
-    }
     .shell-nav-icon {
       flex-shrink: 0;
       width: 1.75rem;
@@ -62,28 +143,115 @@ const SECTIONS_KEY = 'mos_nav_sections';
       font-size: 1rem;
       line-height: 1;
     }
+    .shell-sidebar--super {
+      border-right-color: rgba(251, 191, 36, 0.35);
+    }
+    .shell-sidebar--super .shell-nav-link.router-link-active {
+      background: rgba(17, 94, 89, 0.95);
+      border-color: rgba(251, 191, 36, 0.35);
+    }
+    .shell-role-badge {
+      font-size: 0.625rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-radius: 9999px;
+      padding: 0.125rem 0.5rem;
+    }
+    .shell-role-badge--super {
+      color: #FBBF24;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(251, 191, 36, 0.35);
+    }
+    .shell-role-badge--guest {
+      color: #FBBF24;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+    }
+    .shell-btn-login {
+      background: var(--mos-accent);
+      color: var(--mos-text-inverse);
+      border: 1px solid rgba(217, 119, 6, 0.4);
+      font-weight: 700;
+    }
+    .shell-btn-login:hover {
+      background: #B45309;
+    }
+    .shell-btn-logout {
+      background: rgba(220, 38, 38, 0.12);
+      color: #FECACA;
+      border: 1px solid rgba(220, 38, 38, 0.35);
+      font-weight: 700;
+    }
+    .shell-btn-logout:hover {
+      background: rgba(220, 38, 38, 0.22);
+    }
+    .shell-mobile-header {
+      background: var(--mos-header-bg);
+      border-bottom: 1px solid var(--mos-header-border);
+      color: var(--mos-text-primary);
+    }
+    .shell-mobile-menu-btn {
+      color: var(--mos-primary);
+      border: 1px solid var(--mos-border-input);
+      background: var(--mos-surface);
+    }
+    .shell-mobile-overlay aside {
+      background: var(--mos-sidebar-bg);
+      border-right: 1px solid var(--mos-sidebar-border);
+    }
+    .shell-loading-text {
+      color: rgba(255, 255, 255, 0.65);
+    }
+    .shell-empty-text {
+      color: rgba(251, 191, 36, 0.9);
+    }
+    .owner-mosque-bar__label {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem 0.75rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--mos-text-secondary);
+    }
+    .owner-mosque-bar__select {
+      min-width: 12rem;
+      max-width: 100%;
+      padding: 0.45rem 0.65rem;
+      border-radius: 0.5rem;
+      border: 1px solid var(--mos-border);
+      background: var(--mos-surface);
+      font-size: 0.8125rem;
+      color: var(--mos-text-primary);
+    }
   `],
   template: `
-    <div class="flex w-full h-[100dvh] min-h-[100dvh] max-h-[100dvh] bg-[#022c22] overflow-hidden">
+    <div class="shell-layout flex w-full h-[100dvh] min-h-[100dvh] max-h-[100dvh] overflow-hidden">
       <!-- Desktop sidebar -->
       <aside
-        class="shell-sidebar bg-[#064e3b] border-r border-emerald-800 flex flex-col hidden md:flex shrink-0 h-full"
+        class="shell-sidebar flex flex-col hidden md:flex shrink-0 h-full"
         [class.shell-sidebar--collapsed]="sidebarCollapsed()"
+        [class.shell-sidebar--super]="isSuperAdmin()"
         [class.w-64]="!sidebarCollapsed()"
         [class.lg:w-72]="!sidebarCollapsed()"
         [class.w-[4.75rem]]="sidebarCollapsed()">
 
-        <div class="h-14 lg:h-16 flex items-center border-b border-emerald-800 shrink-0 px-2"
+        <div class="shell-sidebar-header h-14 lg:h-16 flex items-center shrink-0 px-2"
           [class.justify-center]="sidebarCollapsed()"
           [class.justify-between]="!sidebarCollapsed()"
           [class.lg:px-4]="!sidebarCollapsed()">
-          <a *ngIf="!sidebarCollapsed()" routerLink="/dashboard" class="text-lg lg:text-xl font-bold text-white truncate min-w-0">MosqueOS</a>
+          <a *ngIf="!sidebarCollapsed()" [routerLink]="homeLink()" class="shell-brand text-lg lg:text-xl font-bold truncate min-w-0">MosqueOS</a>
+          <span *ngIf="!sidebarCollapsed() && isSuperAdmin()"
+            class="shell-role-badge shell-role-badge--super shrink-0">
+            Super Admin
+          </span>
           <span *ngIf="!sidebarCollapsed() && authService.isGuest()"
-            class="text-[0.625rem] font-bold uppercase tracking-wider text-amber-300/90 bg-amber-400/10 border border-amber-400/25 rounded-full px-2 py-0.5 shrink-0">
+            class="shell-role-badge shell-role-badge--guest shrink-0">
             Guest
           </span>
           <button type="button" (click)="toggleSidebar()"
-            class="shrink-0 w-8 h-8 rounded-lg border border-emerald-700 text-emerald-200 hover:text-white hover:bg-emerald-800/60 flex items-center justify-center text-sm"
+            class="shell-toggle-btn shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm"
             [attr.title]="sidebarCollapsed() ? 'Expand sidebar' : 'Collapse sidebar'"
             [attr.aria-label]="sidebarCollapsed() ? 'Expand sidebar' : 'Collapse sidebar'">
             {{ sidebarCollapsed() ? '»' : '«' }}
@@ -91,20 +259,31 @@ const SECTIONS_KEY = 'mos_nav_sections';
         </div>
 
         <nav class="flex-1 overflow-y-auto no-scrollbar py-3 min-h-0">
-          <p *ngIf="authService.loading()" class="px-4 text-xs text-emerald-400/70">Loading menu…</p>
+          <p *ngIf="authService.loading()" class="px-4 text-xs shell-loading-text">Loading menu…</p>
           <p *ngIf="!authService.loading() && !sections().length && !authService.isGuest()"
-            class="px-4 text-xs text-amber-300/80 leading-relaxed">
+            class="px-4 text-xs shell-empty-text leading-relaxed">
             No menu items for your account. Ask an admin to assign a role, then log in again.
           </p>
           <!-- Expanded: grouped sections -->
           <ng-container *ngIf="!sidebarCollapsed()">
+            <ul *ngIf="isSuperAdmin()" class="space-y-0.5 px-1 mb-2 pb-2 border-b border-white/10">
+              <li *ngFor="let item of superTopNavItems">
+                <a [routerLink]="item.route"
+                  routerLinkActive="router-link-active"
+                  [routerLinkActiveOptions]="{ exact: isExactNavRoute(item.route) }"
+                  class="shell-nav-link px-3 py-2.5 mx-1">
+                  <span class="shell-nav-icon">{{ iconFor(item) }}</span>
+                  <span class="truncate">{{ item.label }}</span>
+                </a>
+              </li>
+            </ul>
             <div *ngFor="let section of sections()" class="mb-1">
               <button type="button"
                 (click)="toggleSection(section.section)"
-                class="w-full flex items-center gap-2 px-3 lg:px-4 py-2 text-left hover:bg-emerald-800/30 rounded-md mx-1">
-                <span class="shell-nav-icon text-amber-400/90">{{ sectionIcon(section.section) }}</span>
-                <span class="flex-1 text-label text-amber-400 min-w-0">{{ section.section }}</span>
-                <span class="text-emerald-400 text-xs shrink-0">
+                class="shell-section-btn w-full flex items-center gap-2 px-3 lg:px-4 py-2 text-left rounded-md mx-1">
+                <span class="shell-nav-icon shell-section-title">{{ sectionIcon(section.section) }}</span>
+                <span class="flex-1 text-label shell-section-title min-w-0">{{ section.section }}</span>
+                <span class="shell-section-chevron text-xs shrink-0">
                   {{ isSectionOpen(section.section) ? '▾' : '▸' }}
                 </span>
               </button>
@@ -115,9 +294,9 @@ const SECTIONS_KEY = 'mos_nav_sections';
                   <ul class="space-y-0.5 py-1 text-base">
                     <li *ngFor="let item of section.items">
                       <a [routerLink]="item.route"
-                        routerLinkActive="bg-emerald-800/50 text-white font-bold"
-                        [routerLinkActiveOptions]="{ exact: item.route === '/dashboard' }"
-                        class="shell-nav-link px-3 py-2.5 rounded-md hover:bg-emerald-800 text-emerald-100 mx-1">
+                        routerLinkActive="router-link-active"
+                        [routerLinkActiveOptions]="{ exact: isExactNavRoute(item.route) }"
+                        class="shell-nav-link px-3 py-2.5 mx-1">
                         <span class="shell-nav-icon">{{ iconFor(item) }}</span>
                         <span class="truncate">{{ item.label }}</span>
                       </a>
@@ -128,25 +307,25 @@ const SECTIONS_KEY = 'mos_nav_sections';
             </div>
           </ng-container>
 
-          <!-- Collapsed: icons only, no labels -->
+          <!-- Collapsed: icons only -->
           <ul *ngIf="sidebarCollapsed()" class="space-y-1 px-1 text-base">
             <li *ngFor="let item of flatNavItems()">
               <a [routerLink]="item.route"
-                routerLinkActive="bg-emerald-800/50 text-white font-bold"
-                [routerLinkActiveOptions]="{ exact: item.route === '/dashboard' }"
+                routerLinkActive="router-link-active"
+                [routerLinkActiveOptions]="{ exact: isExactNavRoute(item.route) }"
                 [attr.title]="item.label"
                 [attr.aria-label]="item.label"
-                class="shell-nav-link justify-center px-2 py-2.5 rounded-md hover:bg-emerald-800 text-emerald-100 mx-auto w-10">
+                class="shell-nav-link justify-center px-2 py-2.5 mx-auto w-10">
                 <span class="shell-nav-icon">{{ iconFor(item) }}</span>
               </a>
             </li>
           </ul>
         </nav>
 
-        <div class="p-3 lg:p-4 border-t border-emerald-800 shrink-0"
+        <div class="shell-sidebar-footer p-3 lg:p-4 shrink-0"
           style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom))">
           <button *ngIf="authService.isGuest()" (click)="goToLogin()"
-            class="w-full bg-amber-400/90 text-emerald-950 hover:bg-amber-300 rounded py-2.5 text-base border border-amber-500/50 font-bold flex items-center justify-center gap-2"
+            class="shell-btn-login w-full rounded-[10px] py-2.5 text-base flex items-center justify-center gap-2"
             [class.px-2]="sidebarCollapsed()"
             [attr.title]="sidebarCollapsed() ? 'Login' : null"
             [attr.aria-label]="sidebarCollapsed() ? 'Login' : null">
@@ -154,7 +333,7 @@ const SECTIONS_KEY = 'mos_nav_sections';
             <span *ngIf="!sidebarCollapsed()">Login</span>
           </button>
           <button *ngIf="!authService.isGuest()" (click)="authService.logout()"
-            class="w-full bg-red-900/30 text-red-400 hover:bg-red-900/50 rounded py-2.5 text-base border border-red-900/50 font-bold flex items-center justify-center gap-2"
+            class="shell-btn-logout w-full rounded-[10px] py-2.5 text-base flex items-center justify-center gap-2"
             [class.px-2]="sidebarCollapsed()"
             [attr.title]="sidebarCollapsed() ? 'Logout' : null"
             [attr.aria-label]="sidebarCollapsed() ? 'Logout' : null">
@@ -165,61 +344,72 @@ const SECTIONS_KEY = 'mos_nav_sections';
       </aside>
 
       <!-- Mobile overlay -->
-      <div *ngIf="menuOpen()" class="fixed inset-0 z-50 md:hidden">
-        <div class="absolute inset-0 bg-black/60" (click)="menuOpen.set(false)"></div>
-        <aside class="absolute left-0 top-0 bottom-0 w-[min(88vw,340px)] bg-[#064e3b] border-r border-emerald-800 flex flex-col z-50 h-full"
+      <div *ngIf="menuOpen()" class="shell-mobile-overlay fixed inset-0 z-50 md:hidden">
+        <div class="absolute inset-0 bg-black/50" (click)="menuOpen.set(false)"></div>
+        <aside class="absolute left-0 top-0 bottom-0 w-[min(88vw,340px)] flex flex-col z-50 h-full"
           (click)="$event.stopPropagation()">
-          <div class="h-14 flex items-center justify-between px-4 border-b border-emerald-800 shrink-0"
+          <div class="shell-sidebar-header h-14 flex items-center justify-between px-4 shrink-0"
             style="padding-top: env(safe-area-inset-top)">
-            <span class="text-lg font-bold text-white">MosqueOS</span>
-            <button (click)="menuOpen.set(false)" class="text-emerald-200 text-base font-bold px-3 py-1">✕</button>
+            <span class="shell-brand text-lg font-bold">MosqueOS</span>
+            <button (click)="menuOpen.set(false)" class="shell-toggle-btn text-base font-bold px-3 py-1 rounded-lg">✕</button>
           </div>
           <nav class="flex-1 overflow-y-auto no-scrollbar py-3 min-h-0">
+            <div *ngIf="isSuperAdmin()" class="mb-2 pb-2 border-b border-white/10">
+              <a *ngFor="let item of superTopNavItems" [routerLink]="item.route" (click)="menuOpen.set(false)"
+                routerLinkActive="router-link-active"
+                [routerLinkActiveOptions]="{ exact: isExactNavRoute(item.route) }"
+                class="shell-nav-link px-4 py-3 text-base">
+                <span class="shell-nav-icon">{{ iconFor(item) }}</span>
+                <span>{{ item.label }}</span>
+              </a>
+            </div>
             <div *ngFor="let section of sections()" class="mb-1">
               <button type="button" (click)="toggleSection(section.section)"
-                class="w-full flex items-center justify-between px-4 py-2.5 text-left">
-                <span class="text-label text-amber-400">{{ section.section }}</span>
-                <span class="text-emerald-400 text-xs">{{ isSectionOpen(section.section) ? '▾' : '▸' }}</span>
+                class="shell-section-btn w-full flex items-center justify-between px-4 py-2.5 text-left">
+                <span class="text-label shell-section-title">{{ section.section }}</span>
+                <span class="shell-section-chevron text-xs">{{ isSectionOpen(section.section) ? '▾' : '▸' }}</span>
               </button>
               <div *ngIf="isSectionOpen(section.section)">
                 <a *ngFor="let item of section.items" [routerLink]="item.route" (click)="menuOpen.set(false)"
-                  routerLinkActive="bg-emerald-800/50 text-white font-bold"
-                  class="shell-nav-link px-4 py-3 text-base text-emerald-100">
+                  routerLinkActive="router-link-active"
+                  [routerLinkActiveOptions]="{ exact: isExactNavRoute(item.route) }"
+                  class="shell-nav-link px-4 py-3 text-base">
                   <span class="shell-nav-icon">{{ iconFor(item) }}</span>
                   <span>{{ item.label }}</span>
                 </a>
               </div>
             </div>
           </nav>
-          <div class="p-4 border-t border-emerald-800 shrink-0"
+          <div class="shell-sidebar-footer p-4 shrink-0"
             style="padding-bottom: max(1rem, env(safe-area-inset-bottom))">
             <button *ngIf="authService.isGuest()" (click)="goToLogin()"
-              class="w-full bg-amber-400/90 text-emerald-950 rounded py-2.5 text-base border border-amber-500/50 font-bold">Login</button>
+              class="shell-btn-login w-full rounded-[10px] py-2.5 text-base font-bold">Login</button>
             <button *ngIf="!authService.isGuest()" (click)="authService.logout()"
-              class="w-full bg-red-900/30 text-red-400 rounded py-2.5 text-base border border-red-900/50 font-bold">Logout</button>
+              class="shell-btn-logout w-full rounded-[10px] py-2.5 text-base font-bold">Logout</button>
           </div>
         </aside>
       </div>
 
-      <main class="flex-1 flex flex-col overflow-hidden w-full min-w-0 h-full">
-        <header class="h-14 bg-[#064e3b] border-b border-emerald-800 flex items-center justify-between px-3 sm:px-4 md:hidden shrink-0"
+      <main class="app-shell-main flex-1 flex flex-col overflow-hidden w-full min-w-0 h-full">
+        <header class="shell-mobile-header h-14 flex items-center justify-between px-3 sm:px-4 md:hidden shrink-0"
           style="padding-top: env(safe-area-inset-top)">
           <div class="flex items-center gap-2 min-w-0">
-            <span class="text-base sm:text-lg font-bold text-white truncate">MosqueOS</span>
+            <span class="text-base sm:text-lg font-bold truncate">MosqueOS</span>
             <span *ngIf="authService.isGuest()"
-              class="text-[0.625rem] font-bold uppercase tracking-wider text-amber-300/90 bg-amber-400/10 border border-amber-400/25 rounded-full px-2 py-0.5 shrink-0">
+              class="text-[0.625rem] font-bold uppercase tracking-wider text-mos-accent bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 shrink-0">
               Guest
             </span>
           </div>
           <div class="flex items-center gap-2">
             <button (click)="menuOpen.set(!menuOpen())"
-              class="text-emerald-200 text-base font-bold px-3 py-2 border border-emerald-700 rounded min-h-[44px]">Menu</button>
+              class="shell-mobile-menu-btn text-base font-bold px-3 py-2 rounded-[10px] min-h-[44px]">Menu</button>
           </div>
         </header>
 
-          <div class="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar w-full min-h-0">
+        <div class="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar w-full min-h-0">
           <div class="app-page app-section w-full max-w-full min-w-0 py-4 sm:py-6 lg:py-8"
             style="padding-bottom: max(1rem, env(safe-area-inset-bottom))">
+            <app-mosque-switcher *ngIf="showMosqueSwitcher()" />
             <router-outlet></router-outlet>
           </div>
         </div>
@@ -229,7 +419,10 @@ const SECTIONS_KEY = 'mos_nav_sections';
 })
 export class ShellComponent {
   authService = inject(AuthService);
+  mosqueContext = inject(MosqueContextService);
+  private dynamicNav = inject(NavigationService);
   private router = inject(Router);
+  readonly superTopNavItems = SUPER_ADMIN_TOP_ITEMS;
   menuOpen = signal(false);
   sidebarCollapsed = signal(this.readSidebarCollapsed());
   sectionOpen = signal<Record<string, boolean>>(this.readSectionState());
@@ -240,41 +433,105 @@ export class ShellComponent {
   isMosqueOwner = computed(() =>
     !this.authService.isGuest() && navIsMosqueOwner(this.authService.roles()));
 
+  isMosqueAdmin = computed(() =>
+    !this.authService.isGuest() && navIsMosqueAdmin(this.authService.roles()));
+
   isPrayerEditor = computed(() =>
     !this.authService.isGuest() && navIsPrayerEditor(this.authService.roles()));
 
+  isMember = computed(() =>
+    !this.authService.isGuest() && navIsMember(this.authService.roles()));
+
+  isTeacher = computed(() =>
+    !this.authService.isGuest() && navIsTeacher(this.authService.roles()));
+
+  isMuqaddam = computed(() =>
+    !this.authService.isGuest() && navIsMuqaddam(this.authService.roles()));
+
+  isContentEditor = computed(() =>
+    !this.authService.isGuest() && navIsContentEditor(this.authService.roles()));
+
+  showMosqueSwitcher = computed(() =>
+    !this.authService.isGuest()
+    && (this.isMosqueOwner() || this.isMosqueAdmin())
+    && this.mosqueContext.ownedMosques().length > 0);
+
   sections = computed(() => {
+    if (this.authService.isGuest()) {
+      return GUEST_NAV_SECTIONS.map(s => ({ section: s.title, items: s.items }));
+    }
     if (this.isSuperAdmin()) {
       return SUPER_ADMIN_NAV_SECTIONS.map(s => ({ section: s.title, items: s.items }));
     }
     if (this.isMosqueOwner()) {
       return OWNER_NAV_SECTIONS.map(s => ({ section: s.title, items: s.items }));
     }
+    if (this.isMosqueAdmin()) {
+      return MOSQUE_ADMIN_NAV_SECTIONS.map(s => ({ section: s.title, items: s.items }));
+    }
     if (this.isPrayerEditor()) {
       return PRAYER_EDITOR_NAV_SECTIONS.map(s => ({ section: s.title, items: s.items }));
     }
-    const items = this.authService.isGuest()
-      ? navForGuest()
-      : navForRoles(this.authService.roles());
+    if (this.isTeacher()) {
+      return TEACHER_NAV_SECTIONS.map(s => ({ section: s.title, items: s.items }));
+    }
+    if (this.isMuqaddam()) {
+      return MUQADDAM_NAV_SECTIONS.map(s => ({ section: s.title, items: s.items }));
+    }
+    if (this.isContentEditor()) {
+      return CONTENT_EDITOR_NAV_SECTIONS.map(s => ({ section: s.title, items: s.items }));
+    }
+    if (this.isMember()) {
+      return MEMBER_NAV_SECTIONS.map(s => ({ section: s.title, items: s.items }));
+    }
+    const dynamic = this.dynamicNav.sections();
+    if (this.dynamicNav.loaded() && dynamic.length) {
+      return dynamic;
+    }
+    const items = navForRoles(this.authService.roles());
     return navSections(items);
   });
 
   flatNavItems = computed(() => {
+    if (this.authService.isGuest()) return guestNavItems();
     if (this.isSuperAdmin()) return superAdminNavItems();
     if (this.isMosqueOwner()) return ownerNavItems();
+    if (this.isMosqueAdmin()) return mosqueAdminNavItems();
     if (this.isPrayerEditor()) return prayerEditorNavItems();
+    if (this.isTeacher()) return teacherNavItems();
+    if (this.isMuqaddam()) return muqaddamNavItems();
+    if (this.isContentEditor()) return contentEditorNavItems();
+    if (this.isMember()) return memberNavItems();
     return this.sections().flatMap(s => s.items);
   });
 
   iconFor(item: NavItem): string {
+    if (this.authService.isGuest() && item.icon) {
+      return GUEST_NAV_ICONS[item.icon] ?? navIcon(item);
+    }
     if (this.isSuperAdmin() && item.icon) {
       return SUPER_ADMIN_NAV_ICONS[item.icon] ?? navIcon(item);
     }
     if (this.isMosqueOwner() && item.icon) {
       return OWNER_NAV_ICONS[item.icon] ?? navIcon(item);
     }
+    if (this.isMosqueAdmin() && item.icon) {
+      return MOSQUE_ADMIN_NAV_ICONS[item.icon] ?? navIcon(item);
+    }
     if (this.isPrayerEditor() && item.icon) {
       return PRAYER_EDITOR_NAV_ICONS[item.icon] ?? navIcon(item);
+    }
+    if (this.isTeacher() && item.icon) {
+      return TEACHER_NAV_ICONS[item.icon] ?? navIcon(item);
+    }
+    if (this.isMuqaddam() && item.icon) {
+      return MUQADDAM_NAV_ICONS[item.icon] ?? navIcon(item);
+    }
+    if (this.isContentEditor() && item.icon) {
+      return CONTENT_EDITOR_NAV_ICONS[item.icon] ?? navIcon(item);
+    }
+    if (this.isMember() && item.icon) {
+      return MEMBER_NAV_ICONS[item.icon] ?? navIcon(item);
     }
     return navIcon(item);
   }
@@ -283,9 +540,39 @@ export class ShellComponent {
     this.router.navigate(['/login']);
   }
 
+  homeLink(): string {
+    if (this.authService.isGuest()) return '/dashboard/guest';
+    if (this.isSuperAdmin()) return '/dashboard/super';
+    if (this.isMosqueOwner()) return '/dashboard/owner';
+    if (this.isMosqueAdmin()) return '/dashboard/admin';
+    if (this.isPrayerEditor()) return '/dashboard/prayer-editor';
+    if (this.isTeacher()) return '/dashboard/teacher';
+    if (this.isMuqaddam()) return '/dashboard/muqaddam';
+    if (this.isContentEditor()) return '/dashboard/content';
+    return '/dashboard';
+  }
+
+  isExactNavRoute(route: string): boolean {
+    return route === '/dashboard'
+      || route === '/dashboard/super'
+      || route === '/dashboard/owner'
+      || route === '/dashboard/admin'
+      || route === '/dashboard/prayer-editor'
+      || route === '/dashboard/teacher'
+      || route === '/dashboard/muqaddam'
+      || route === '/dashboard/content'
+      || route === '/dashboard/guest'
+      || route === '/dashboard/owner/verification'
+      || route === '/dashboard/owner/my-claims'
+      || route === '/dashboard/owner/mosque-listings'
+      || route === '/dashboard/admin'
+      || route === '/dashboard/mosque';
+  }
+
   private readonly sectionIcons: Record<string, string> = {
     'Browse': '👁️',
     'Main': '🏠',
+    'Dashboard': '▦',
     'Prayer Times': '🕌',
     'Overview': '▦',
     'Mosques': '⌂',
@@ -296,6 +583,9 @@ export class ShellComponent {
     'Super Admin': '⚙️',
     'Mosque Owner': '🏛️',
     'Mosque Management': '🔧',
+    'Users': '👥',
+    'Reports': '📊',
+    'Settings': '⚙️',
     'Madrassah': '📚',
     'Muqaddam': '📿',
     'Parent': '👨‍👩‍👧',

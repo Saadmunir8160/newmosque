@@ -2,98 +2,158 @@
 
 ## 1. Overview
 
-- **Database Name:** MosqueOS
-- **DBMS:** Microsoft SQL Server
-- **Version:** SQL Server 2019+
-- **Created By:** [Your Name]
-- **Date:** [Date]
+| Item | Value |
+|------|--------|
+| **Database** | `mos_db` |
+| **Server** | SQL Server Express (`.\SQLEXPRESS` or `localhost\SQLEXPRESS`) |
+| **Approach** | **EF Core Code First** (migrations in `MosqueOS.Infrastructure/Migrations/`) |
+| **ORM** | Entity Framework Core 10 |
+| **Identity** | ASP.NET Core Identity tables (`AspNetUsers`, `AspNetRoles`, …) |
+
+> **Note:** The original MOS TRD mentioned PostgreSQL. This deployment uses **SQL Server Express + SSMS** instead. Business logic and EF entities are the same; only the database provider differs (`UseSqlServer`).
+
+### Connection string (`appsettings.json`)
+
+```
+Server=.\SQLEXPRESS;Database=mos_db;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true
+```
+
+### First-time setup
+
+1. Open SSMS → connect to `localhost\SQLEXPRESS`
+2. Run API once — `DataSeeder` applies migrations and seeds demo data:
+
+```bash
+cd backend/MosqueOS.API
+dotnet run --urls http://localhost:5000
+```
+
+3. Verify: `USE mos_db; SELECT name FROM sys.tables ORDER BY name;`
 
 ---
 
-## 2. Tables
+## 2. Architecture (data access)
 
-### 2.1 AspNetUsers (Identity Users)
-| Column       | Data Type     | Constraints         | Description              |
-|--------------|---------------|---------------------|--------------------------|
-| Id           | NVARCHAR(450) | PK, NOT NULL        | Unique user identifier   |
-| UserName     | NVARCHAR(256) | UNIQUE, NOT NULL    | Login username           |
-| Email        | NVARCHAR(256) | UNIQUE              | User email address       |
-| PasswordHash | NVARCHAR(MAX) | NOT NULL            | Hashed password          |
+```
+API Controllers
+    → IUnitOfWork (Application layer interface)
+        → Repository<T> (Infrastructure)
+            → ApplicationDbContext (EF Core)
+                → SQL Server mos_db
+```
 
-### 2.2 Members
-| Column       | Data Type     | Constraints         | Description              |
-|--------------|---------------|---------------------|--------------------------|
-| MemberId     | INT           | PK, IDENTITY        | Unique member ID         |
-| FullName     | NVARCHAR(200) | NOT NULL            | Member full name         |
-| PhoneNumber  | NVARCHAR(20)  |                     | Contact number           |
-| Address      | NVARCHAR(500) |                     | Member address           |
-| JoinDate     | DATE          | NOT NULL            | Date of registration     |
-| IsActive     | BIT           | DEFAULT 1           | Active status            |
-
-### 2.3 Donations
-| Column       | Data Type     | Constraints         | Description              |
-|--------------|---------------|---------------------|--------------------------|
-| DonationId   | INT           | PK, IDENTITY        | Unique donation ID       |
-| MemberId     | INT           | FK → Members        | Donor reference          |
-| Amount       | DECIMAL(10,2) | NOT NULL            | Donation amount          |
-| DonationDate | DATE          | NOT NULL            | Date of donation         |
-| Notes        | NVARCHAR(500) |                     | Optional remarks         |
-
-### 2.4 Events
-| Column       | Data Type     | Constraints         | Description              |
-|--------------|---------------|---------------------|--------------------------|
-| EventId      | INT           | PK, IDENTITY        | Unique event ID          |
-| Title        | NVARCHAR(200) | NOT NULL            | Event name               |
-| EventDate    | DATETIME      | NOT NULL            | Scheduled date/time      |
-| Description  | NVARCHAR(MAX) |                     | Event details            |
-| CreatedBy    | NVARCHAR(450) | FK → AspNetUsers    | Admin who created it     |
-
-### 2.5 Expenses
-| Column       | Data Type     | Constraints         | Description              |
-|--------------|---------------|---------------------|--------------------------|
-| ExpenseId    | INT           | PK, IDENTITY        | Unique expense ID        |
-| Category     | NVARCHAR(100) | NOT NULL            | Expense category         |
-| Amount       | DECIMAL(10,2) | NOT NULL            | Expense amount           |
-| ExpenseDate  | DATE          | NOT NULL            | Date of expense          |
-| Description  | NVARCHAR(500) |                     | Details                  |
+- **No** direct `ApplicationDbContext` in controllers (except startup seeding in `Program.cs`)
+- **Repository Pattern:** `IRepository<T>` + `UnitOfWork`
+- **Code First:** entities in `MosqueOS.Domain/Entities/` → migrations → database
 
 ---
 
-## 3. Relationships
+## 3. Module tables (TRD v1.0)
 
-| Parent Table  | Child Table | FK Column  | Relationship  |
-|---------------|-------------|------------|---------------|
-| Members       | Donations   | MemberId   | One-to-Many   |
-| AspNetUsers   | Events      | CreatedBy  | One-to-Many   |
+### 3.1 Mosque Profile
+- `Mosques`, `MosqueSettings`, `PlatformAuditLogs`
+
+### 3.2 Prayer Times
+- `PrayerTimesDaily`, `JumuahTimes`, `PrayerExceptions`, `PrayerTimeAuditLogs`
+- `RamadanTimetables`, `RamadanDayEntries`, `PrayerSpecialTimings` (editor module)
+
+### 3.3–3.4 Content
+- `Announcements`, `Events`, `EventRegistrations` (member event sign-up)
+
+### 3.5 Madrassah
+- `Students`, `Guardians`, `MadrassahClasses`, `Enrolments`
+- `AttendanceSessions`, `AttendanceRecords`, `Fees`, `ProgressNotes`
+- `StudentProgressRecords`, `ClassAssignments`, `AssignmentGrades` (teacher module)
+
+### 3.6 Communities
+- `Communities`, `CommunityMembers`, `CommunityPosts`, `CommunityResources`, `CommunityEvents`
+- `GuidanceNotes`, `CommunityGatherings`, `GatheringAttendances` (muqaddam module)
+
+### 3.7 Awrad & Wird
+- `ContentItems`, `WirdCollections`, `WirdSteps`
+- `UserWirdSchedules`, `UserWirdProgress`
+
+### 3.8 Adhkar
+- `AdhkarItems`, `UserAdhkar`, `UserAdhkarLogs`
+
+### 3.9 Duas
+- `Duas`, `DuaCollections`, `DuaCollectionItems`
+
+### 3.10 Qur'an
+- `QuranPlans`, `QuranProgress`
+
+### 3.11 Ritual Guides
+- `RitualGuides`, `RitualSteps`
+
+### 3.12–3.13 Janaza & Death Readings
+- `JanazaAnnouncements`, `ReadingCampaigns`, `ReadingAllocations`
+
+### 3.14 Participation
+- `ParticipationOpportunities`, `ParticipationRegistrations`
+
+### 3.15 Journey Guides
+- `JourneyGuides`, `JourneyStages`
+
+### Identity
+- `AspNetUsers`, `AspNetRoles`, `AspNetUserRoles`, …
 
 ---
 
-## 4. Primary Keys
+## 3.7–3.9 Content Editor (workflow)
 
-| Table        | Primary Key  | Type           |
-|--------------|-------------|----------------|
-| AspNetUsers  | Id          | NVARCHAR(450)  |
-| Members      | MemberId    | INT IDENTITY   |
-| Donations    | DonationId  | INT IDENTITY   |
-| Events       | EventId     | INT IDENTITY   |
-| Expenses     | ExpenseId   | INT IDENTITY   |
+| Table | Purpose |
+|-------|---------|
+| `ContentArticles` | Library: articles, PDFs, books |
+| `MediaAssets` | Audio, image, video uploads |
+| `ContentWorkflowLogs` | Status transition audit |
 
----
+Workflow columns (`Status`, `PublishedAt`, `PublishedById`) on:
 
-## 5. Foreign Keys
+- `WirdCollections`, `ContentItems` (awrad)
+- `Duas`, `AdhkarItems`
 
-| FK Name                  | Table     | Column    | References         |
-|--------------------------|-----------|-----------|--------------------|
-| FK_Donations_Members     | Donations | MemberId  | Members(MemberId)  |
-| FK_Events_AspNetUsers    | Events    | CreatedBy | AspNetUsers(Id)    |
+`ContentPublishStatus`: Draft, InReview, Approved, Published, Unpublished
 
 ---
 
-## 6. Business Rules
+## 4. Key relationships
 
-1. A donation must always be linked to an existing member.
-2. Members cannot be deleted if they have donation records — use `IsActive = 0` instead.
-3. Events must have a future `EventDate` at time of creation.
-4. Only users with the **Admin** role can create or delete events and manage members.
-5. All financial amounts must be greater than 0.
-6. `JoinDate` cannot be a future date.
+| Parent | Child | Notes |
+|--------|-------|-------|
+| `Mosques` | Most mosque-scoped tables | `MosqueId` FK |
+| `AspNetUsers` | `UserAdhkar`, `QuranPlans`, `CommunityMembers`, … | `UserId` FK |
+| `WirdCollections` | `WirdSteps` | Ordered steps |
+| `ReadingCampaigns` | `ReadingAllocations` | Death readings |
+
+---
+
+## 5. Demo data (seed)
+
+Seeded on first API run (`DataSeeder.cs`):
+
+- Masjid Al-Noor Bradford (active) + Leeds unclaimed listing
+- 30 days prayer times, announcements, events, madrassah class
+- Ba'alawi community, Khulasa Wird, Ghazali duas, Umrah guide
+- Users: `admin`, `member`, `mosqueadmin`, `teacher`, `parent`, etc.
+
+---
+
+## 6. Useful SSMS queries
+
+```sql
+-- Table count
+SELECT COUNT(*) AS TableCount FROM sys.tables;
+
+-- Demo users
+SELECT UserName, Email FROM AspNetUsers;
+
+-- Member adhkar today
+SELECT * FROM UserAdhkarLogs WHERE Date = CAST(GETUTCDATE() AS date);
+
+-- Quran plan progress
+SELECT * FROM QuranPlans;
+SELECT * FROM QuranProgress WHERE Completed = 1;
+
+-- Communities membership
+SELECT * FROM CommunityMembers;
+```

@@ -21,17 +21,17 @@ interface CampaignDetail {
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <app-card *ngFor="let c of campaigns()">
-        <h4 class="text-white font-bold">{{ c.campaign.title }}</h4>
-        <p class="text-emerald-300 text-sm mt-1 mb-4">{{ c.campaign.description }}</p>
+        <h4 class="text-mos-text font-bold text-base">{{ c.campaign.title }}</h4>
+        <p class="text-mos-muted text-sm mt-1 mb-4">{{ c.campaign.description }}</p>
         <div class="flex items-center gap-3">
-          <div class="flex-1 bg-emerald-900 rounded-full h-2">
-            <div class="bg-amber-400 h-2 rounded-full transition-all" [style.width.%]="progress(c)"></div>
+          <div class="mos-progress-track">
+            <div class="mos-progress-fill" [style.width.%]="progress(c)"></div>
           </div>
-          <span class="text-emerald-200 text-sm shrink-0">{{ c.completed }}/{{ c.totalAllocations }}</span>
+          <span class="text-mos-text text-sm font-semibold shrink-0 tabular-nums">{{ c.completed }}/{{ c.totalAllocations }}</span>
         </div>
       </app-card>
     </div>
-    <p *ngIf="!campaigns().length" class="text-emerald-300">No active reading campaigns.</p>
+    <p *ngIf="!campaigns().length" class="text-mos-muted text-sm">No active reading campaigns.</p>
   `
 })
 export class MuqaddamReadingsComponent implements OnInit {

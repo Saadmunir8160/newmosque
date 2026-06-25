@@ -1,178 +1,216 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
 import { AdminService } from '../../../core/services/admin.service';
 import { MosqueService } from '../../../core/services/mosque.service';
-import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
-import { environment } from '../../../../environments/environment';
-import { JanazaAnnouncement } from '../../../core/models';
+import { MosqueContextService } from '../../../core/services/mosque-context.service';
+import { JanazaAnnouncement, JanazaStatus } from '../../../core/models';
+
+type SortKey = 'name' | 'janazaDate' | 'burialLocation' | 'posted';
 
 @Component({
   selector: 'app-admin-janaza',
   standalone: true,
-  imports: [CommonModule, FormsModule, PageHeaderComponent],
-  template: `
-    <app-page-header badge="Mosque Admin" title="Janaza Announcements"
-      subtitle="Respectful death and funeral notices for the community." />
-
-    <div class="janaza-layout">
-      <aside class="aside">
-        <section class="panel">
-          <div class="panel__head">
-            <span class="panel__icon">🕊️</span>
-            <div>
-              <h3 class="panel__title">Post announcement</h3>
-              <p class="panel__sub">Share janaza details with the congregation</p>
-            </div>
-          </div>
-
-          <div class="field">
-            <label class="label" for="j-name">Name of deceased <span class="req">*</span></label>
-            <input id="j-name" class="input" placeholder="Full name" [(ngModel)]="form.name">
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label class="label" for="j-date">Janaza date</label>
-              <input id="j-date" class="input" type="date" [(ngModel)]="form.janazaDate">
-            </div>
-            <div class="field">
-              <label class="label" for="j-time">Time</label>
-              <input id="j-time" class="input" type="time" [(ngModel)]="form.janazaTime">
-            </div>
-          </div>
-          <div class="field">
-            <label class="label" for="j-loc">Location</label>
-            <input id="j-loc" class="input" placeholder="Masjid or venue" [(ngModel)]="form.location">
-          </div>
-          <div class="field">
-            <label class="label" for="j-burial">Burial location</label>
-            <input id="j-burial" class="input" placeholder="Cemetery name" [(ngModel)]="form.burialLocation">
-          </div>
-
-          <button type="button" class="btn-post" (click)="create()" [disabled]="saving() || !form.name.trim()">
-            {{ saving() ? 'Posting…' : 'Post janaza' }}
-          </button>
-          <p *ngIf="msg()" class="form-msg" [class.form-msg--err]="msgErr()">{{ msg() }}</p>
-        </section>
-
-        <div class="stat-box">
-          <span class="stat-val">{{ items().length }}</span>
-          <span class="stat-lbl">Announcements</span>
-        </div>
-      </aside>
-
-      <main class="main">
-        <h3 class="list-title">Recent notices ({{ items().length }})</h3>
-
-        <div *ngIf="loading()" class="loading">Loading…</div>
-        <div *ngIf="!loading() && !items().length" class="empty">
-          <span class="empty__icon">🕊️</span>
-          <p>No janaza announcements yet.</p>
-        </div>
-
-        <div *ngIf="!loading() && items().length" class="janaza-list">
-          <article *ngFor="let j of items()" class="janaza-card">
-            <div class="janaza-card__bar"></div>
-            <div class="janaza-card__body">
-              <h4 class="janaza-name">{{ j.name }}</h4>
-              <div class="janaza-meta">
-                <span class="meta-item">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                  {{ j.janazaDate }}
-                </span>
-                <span class="meta-item">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                  {{ formatTime(j.janazaTime) }}
-                </span>
-              </div>
-              <p *ngIf="j.location" class="janaza-loc">{{ j.location }}</p>
-              <p *ngIf="j.burialLocation" class="janaza-burial">Burial: {{ j.burialLocation }}</p>
-            </div>
-          </article>
-        </div>
-      </main>
-    </div>
-  `,
-  styles: [`
-    .janaza-layout { display: grid; gap: 1rem; grid-template-columns: 1fr; }
-    @media (min-width: 900px) { .janaza-layout { grid-template-columns: minmax(280px, 300px) 1fr; align-items: start; } }
-
-    .panel {
-      padding: 1rem; margin-bottom: 0.75rem;
-      background: linear-gradient(160deg, rgba(6,78,59,0.9), rgba(2,44,34,0.98));
-      border: 1px solid rgba(212,175,55,0.22); border-radius: 0.75rem;
-    }
-    .panel__head { display: flex; gap: 0.625rem; align-items: center; margin-bottom: 1rem;
-      padding-bottom: 0.75rem; border-bottom: 1px solid rgba(212,175,55,0.1); }
-    .panel__icon { font-size: 1.25rem; }
-    .panel__title { margin: 0; font-size: 0.875rem; font-weight: 700; color: #fff; }
-    .panel__sub { margin: 0.1rem 0 0; font-size: 0.6875rem; color: rgba(167,243,208,0.6); }
-
-    .field { margin-bottom: 0.75rem; }
-    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-    .label { display: block; margin-bottom: 0.35rem; font-size: 0.625rem; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.04em; color: rgba(212,175,55,0.85); }
-    .req { color: #fca5a5; }
-    .input { width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.35);
-      border: 1px solid rgba(16,185,129,0.22); border-radius: 0.5rem; padding: 0.55rem 0.65rem;
-      font-size: 0.8125rem; color: #fff; outline: none; color-scheme: dark; }
-    .input:focus { border-color: #D4AF37; }
-
-    .btn-post {
-      width: 100%; font-size: 0.8125rem; font-weight: 700; color: #022c22;
-      background: linear-gradient(180deg, #fcd34d, #D4AF37); border: none;
-      border-radius: 0.5rem; padding: 0.65rem; cursor: pointer;
-    }
-    .btn-post:disabled { opacity: 0.5; cursor: not-allowed; }
-    .form-msg { margin: 0.5rem 0 0; font-size: 0.6875rem; color: #6ee7b7; }
-    .form-msg--err { color: #fecaca; }
-
-    .stat-box {
-      text-align: center; padding: 0.75rem;
-      background: rgba(2,44,34,0.8); border: 1px solid rgba(16,185,129,0.15); border-radius: 0.5rem;
-    }
-    .stat-val { display: block; font-size: 1.25rem; font-weight: 800; color: #fff; }
-    .stat-lbl { font-size: 0.5625rem; text-transform: uppercase; color: rgba(167,243,208,0.6); }
-
-    .list-title { margin: 0 0 0.875rem; font-size: 0.875rem; font-weight: 700; color: #fff; }
-    .loading, .empty { font-size: 0.8125rem; color: rgba(167,243,208,0.6); padding: 2rem; text-align: center;
-      border: 1px dashed rgba(100,116,139,0.3); border-radius: 0.75rem; }
-    .empty__icon { font-size: 1.75rem; display: block; margin-bottom: 0.5rem; }
-
-    .janaza-list { display: flex; flex-direction: column; gap: 0.5rem; }
-    .janaza-card {
-      display: flex; background: linear-gradient(135deg, rgba(30,41,59,0.4), rgba(2,44,34,0.9));
-      border: 1px solid rgba(100,116,139,0.25); border-radius: 0.625rem; overflow: hidden;
-    }
-    .janaza-card__bar { width: 3px; background: linear-gradient(180deg, #94a3b8, #64748b); flex-shrink: 0; }
-    .janaza-card__body { padding: 0.875rem 1rem; flex: 1; }
-    .janaza-name { margin: 0 0 0.5rem; font-size: 0.9375rem; font-weight: 700; color: #f1f5f9; }
-    .janaza-meta { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.35rem; }
-    .meta-item { display: inline-flex; align-items: center; gap: 0.3rem;
-      font-size: 0.6875rem; color: rgba(203,213,225,0.8); }
-    .janaza-loc { margin: 0; font-size: 0.75rem; color: rgba(167,243,208,0.75); }
-    .janaza-burial { margin: 0.25rem 0 0; font-size: 0.6875rem; color: rgba(148,163,184,0.7); font-style: italic; }
-  `]
+  imports: [CommonModule, FormsModule, RouterModule],
+  templateUrl: './admin-janaza.component.html',
+  styleUrl: './admin-janaza.component.css',
 })
 export class AdminJanazaComponent implements OnInit {
   private admin = inject(AdminService);
   private mosque = inject(MosqueService);
+  private mosqueCtx = inject(MosqueContextService);
+
   items = signal<JanazaAnnouncement[]>([]);
   loading = signal(true);
   saving = signal(false);
-  msg = signal('');
-  msgErr = signal(false);
-  form = { name: '', janazaDate: '', janazaTime: '13:30', location: '', burialLocation: '', dateOfDeath: '' };
-  mid = environment.defaultMosqueId;
+  drawerOpen = signal(false);
+  editingId = signal<number | null>(null);
+  openMenuId = signal<number | null>(null);
+  toast = signal('');
+  toastOk = signal(true);
 
-  ngOnInit(): void { this.load(); }
+  search = '';
+  sortKey: SortKey = 'janazaDate';
+  sortAsc = false;
+  page = signal(1);
+  pageSize = 10;
+  mid = 1;
+
+  form = {
+    name: '',
+    dateOfDeath: '',
+    janazaDate: '',
+    janazaTime: '13:30',
+    location: '',
+    burialLocation: '',
+    notes: '',
+    status: 'Draft' as JanazaStatus,
+  };
+
+  filtered = computed(() => {
+    const term = this.search.trim().toLowerCase();
+    let list = [...this.items()];
+    if (term) {
+      list = list.filter(j =>
+        j.name.toLowerCase().includes(term) ||
+        j.location?.toLowerCase().includes(term) ||
+        j.burialLocation?.toLowerCase().includes(term));
+    }
+    list.sort((a, b) => this.compare(a, b, this.sortKey));
+    if (this.sortAsc) list.reverse();
+    return list;
+  });
+
+  paged = computed(() => {
+    const start = (this.page() - 1) * this.pageSize;
+    return this.filtered().slice(start, start + this.pageSize);
+  });
+
+  totalPages = computed(() => Math.max(1, Math.ceil(this.filtered().length / this.pageSize)));
+
+  ngOnInit(): void {
+    this.mosqueCtx.resolve().then(id => { this.mid = id; this.load(); });
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.drawerOpen()) this.closeDrawer();
+  }
+
+  @HostListener('document:click')
+  closeMenus(): void {
+    this.openMenuId.set(null);
+  }
+
+  onSearchChange(): void {
+    this.page.set(1);
+    this.load();
+  }
 
   load(): void {
     this.loading.set(true);
-    this.mosque.getJanaza(this.mid).subscribe({
+    this.mosque.getJanaza(this.mid, this.search.trim() || undefined).subscribe({
       next: j => { this.items.set(j); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
+  }
+
+  setSort(key: SortKey): void {
+    if (this.sortKey === key) this.sortAsc = !this.sortAsc;
+    else { this.sortKey = key; this.sortAsc = false; }
+  }
+
+  toggleSort(): void {
+    this.sortAsc = !this.sortAsc;
+  }
+
+  setPage(p: number): void {
+    this.page.set(Math.min(Math.max(1, p), this.totalPages()));
+  }
+
+  openCreate(): void {
+    this.editingId.set(null);
+    this.form = {
+      name: '', dateOfDeath: '', janazaDate: '', janazaTime: '13:30',
+      location: '', burialLocation: '', notes: '', status: 'Draft',
+    };
+    this.drawerOpen.set(true);
+  }
+
+  openEdit(j: JanazaAnnouncement): void {
+    this.openMenuId.set(null);
+    this.editingId.set(j.id);
+    this.form = {
+      name: j.name,
+      dateOfDeath: j.dateOfDeath?.slice(0, 10) ?? '',
+      janazaDate: j.janazaDate?.slice(0, 10) ?? '',
+      janazaTime: j.janazaTime?.slice(0, 5) ?? '13:30',
+      location: j.location ?? '',
+      burialLocation: j.burialLocation ?? '',
+      notes: j.notes ?? '',
+      status: (j.status as JanazaStatus) ?? 'Draft',
+    };
+    this.drawerOpen.set(true);
+  }
+
+  closeDrawer(): void {
+    this.drawerOpen.set(false);
+    this.editingId.set(null);
+  }
+
+  save(): void {
+    if (!this.form.name.trim()) return;
+    this.saving.set(true);
+    const payload = {
+      name: this.form.name.trim(),
+      dateOfDeath: this.form.dateOfDeath || this.form.janazaDate,
+      janazaDate: this.form.janazaDate,
+      janazaTime: this.form.janazaTime.length === 5 ? `${this.form.janazaTime}:00` : this.form.janazaTime,
+      location: this.form.location,
+      burialLocation: this.form.burialLocation || undefined,
+      notes: this.form.notes || undefined,
+      status: this.form.status,
+    };
+
+    const id = this.editingId();
+    const req = id
+      ? this.admin.updateJanaza(this.mid, id, payload)
+      : this.admin.createJanaza(this.mid, payload);
+
+    req.subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.closeDrawer();
+        this.showToast(id ? 'Janaza updated.' : 'Janaza posted.', true);
+        this.load();
+      },
+      error: () => {
+        this.saving.set(false);
+        this.showToast('Could not save janaza.', false);
+      },
+    });
+  }
+
+  publish(j: JanazaAnnouncement): void {
+    this.openMenuId.set(null);
+    this.admin.publishJanaza(this.mid, j.id).subscribe({
+      next: () => { this.showToast('Janaza published.', true); this.load(); },
+      error: () => this.showToast('Publish failed.', false),
+    });
+  }
+
+  del(j: JanazaAnnouncement): void {
+    this.openMenuId.set(null);
+    if (!confirm(`Remove janaza announcement for ${j.name}?`)) return;
+    this.admin.deleteJanaza(this.mid, j.id).subscribe({
+      next: () => { this.showToast('Janaza removed.', true); this.load(); },
+      error: () => this.showToast('Delete failed.', false),
+    });
+  }
+
+  copyLink(j: JanazaAnnouncement): void {
+    const url = `${window.location.origin}/dashboard/guest/janaza?mosque=${this.mid}&id=${j.id}`;
+    navigator.clipboard.writeText(url).then(
+      () => this.showToast('Link copied to clipboard.', true),
+      () => this.showToast('Could not copy link.', false),
+    );
+  }
+
+  toggleMenu(id: number, event: Event): void {
+    event.stopPropagation();
+    this.openMenuId.update(cur => cur === id ? null : id);
+  }
+
+  formatDate(d: string): string {
+    if (!d) return '—';
+    return new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  formatJanazaDateTime(j: JanazaAnnouncement): string {
+    const date = this.formatDate(j.janazaDate);
+    const time = this.formatTime(j.janazaTime);
+    return `${date} | ${time}`;
   }
 
   formatTime(t: string): string {
@@ -186,20 +224,37 @@ export class AdminJanazaComponent implements OnInit {
     return `${h12}:${m} ${ampm}`;
   }
 
-  create(): void {
-    if (!this.form.name.trim()) return;
-    this.saving.set(true);
-    this.msg.set('');
-    const data = { ...this.form, dateOfDeath: this.form.janazaDate, janazaTime: this.form.janazaTime + ':00' };
-    this.admin.createJanaza(this.mid, data).subscribe({
-      next: () => {
-        this.form = { name: '', janazaDate: '', janazaTime: '13:30', location: '', burialLocation: '', dateOfDeath: '' };
-        this.saving.set(false);
-        this.msgErr.set(false);
-        this.msg.set('Janaza posted.');
-        this.load();
-      },
-      error: () => { this.saving.set(false); this.msgErr.set(true); this.msg.set('Could not post.'); },
-    });
+  postedAgo(j: JanazaAnnouncement): string {
+    const raw = j.publishedAt ?? j.createdAt;
+    if (!raw) return '';
+    const days = Math.floor((Date.now() - new Date(raw).getTime()) / 86400000);
+    if (days <= 0) return 'today';
+    if (days === 1) return '1 day ago';
+    if (days < 7) return `${days} days ago`;
+    const weeks = Math.floor(days / 7);
+    return weeks === 1 ? '1 week ago' : `${weeks} weeks ago`;
+  }
+
+  private compare(a: JanazaAnnouncement, b: JanazaAnnouncement, key: SortKey): number {
+    switch (key) {
+      case 'name': return a.name.localeCompare(b.name);
+      case 'burialLocation': return (a.burialLocation ?? '').localeCompare(b.burialLocation ?? '');
+      case 'posted': {
+        const ta = new Date(a.publishedAt ?? a.createdAt ?? 0).getTime();
+        const tb = new Date(b.publishedAt ?? b.createdAt ?? 0).getTime();
+        return ta - tb;
+      }
+      default: {
+        const da = new Date(a.janazaDate).getTime();
+        const db = new Date(b.janazaDate).getTime();
+        return da - db;
+      }
+    }
+  }
+
+  private showToast(msg: string, ok: boolean): void {
+    this.toastOk.set(ok);
+    this.toast.set(msg);
+    setTimeout(() => this.toast.set(''), 3200);
   }
 }

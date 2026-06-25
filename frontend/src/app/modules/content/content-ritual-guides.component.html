@@ -1,0 +1,236 @@
+<div class="rg-page">
+  <div *ngIf="toast()" class="toast" [class.toast--ok]="toastOk()" [class.toast--err]="!toastOk()">{{ toast() }}</div>
+
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a routerLink="/dashboard/super">Dashboard</a>
+    <span class="breadcrumb__sep">›</span>
+    <span class="breadcrumb__current">Islamic Ritual Guides</span>
+  </nav>
+
+  <header class="rg-header">
+    <h1 class="rg-title">Islamic Ritual Guides</h1>
+    <p class="rg-sub">Manage Wudu, Ghusl, Salah and step-by-step ritual guides for members.</p>
+  </header>
+
+  <!-- Stats -->
+  <section class="stats-row" aria-label="Statistics">
+    <article class="stat-card">
+      <span class="stat-card__icon stat-card__icon--book" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      </span>
+      <div>
+        <p class="stat-card__label">Total Guides</p>
+        <p class="stat-card__value">{{ guides().length }}</p>
+      </div>
+    </article>
+    <article class="stat-card">
+      <span class="stat-card__icon stat-card__icon--wudu" aria-hidden="true">💧</span>
+      <div>
+        <p class="stat-card__label">Wudu Guides</p>
+        <p class="stat-card__value">{{ wuduCount() }}</p>
+      </div>
+    </article>
+    <article class="stat-card">
+      <span class="stat-card__icon stat-card__icon--ghusl" aria-hidden="true">🚿</span>
+      <div>
+        <p class="stat-card__label">Ghusl Guides</p>
+        <p class="stat-card__value">{{ ghuslCount() }}</p>
+      </div>
+    </article>
+    <article class="stat-card">
+      <span class="stat-card__icon stat-card__icon--salah" aria-hidden="true">🕌</span>
+      <div>
+        <p class="stat-card__label">Salah Guides</p>
+        <p class="stat-card__value">{{ salahCount() }}</p>
+      </div>
+    </article>
+  </section>
+
+  <!-- Toolbar -->
+  <section class="toolbar">
+    <div class="search-field">
+      <svg class="search-field__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input class="search-field__input" type="search" placeholder="Search guides…" [(ngModel)]="query">
+    </div>
+    <select class="toolbar-select" [(ngModel)]="typeFilter">
+      <option value="">All Categories</option>
+      <option *ngFor="let t of guideTypes" [ngValue]="t">{{ t }}</option>
+    </select>
+    <select class="toolbar-select" [(ngModel)]="sortBy">
+      <option value="recent">Sort By: Recent</option>
+      <option value="title">Sort By: Title</option>
+      <option value="steps">Sort By: Steps</option>
+    </select>
+  </section>
+
+  <h2 class="section-title">Your Guides</h2>
+
+  <div *ngIf="loading()" class="state-loading"><span class="pulse-dot"></span> Loading guides…</div>
+
+  <div *ngIf="!loading() && !guides().length" class="empty-hero">
+    <span class="empty-hero__icon">📖</span>
+    <h3>No Guides Found</h3>
+    <p>Start creating a new guide!</p>
+    <button type="button" class="btn-primary" (click)="openCreate()">+ Create Guide</button>
+  </div>
+
+  <div class="guide-grid" *ngIf="!loading() && guides().length">
+    <!-- Create card -->
+    <article class="create-card" (click)="openCreate()" role="button" tabindex="0" (keydown.enter)="openCreate()">
+      <div class="create-card__pattern"></div>
+      <div class="create-card__body">
+        <span class="create-card__plus">+</span>
+        <h3>Create Guide</h3>
+        <p>Start a new guide</p>
+        <button type="button" class="create-card__btn" (click)="openCreate(); $event.stopPropagation()">Create</button>
+      </div>
+    </article>
+
+    <!-- Guide cards -->
+    <article *ngFor="let g of filteredGuides()" class="guide-card"
+      [class.guide-card--active]="expandedDetail()?.id === g.id"
+      (click)="toggleExpand(g)" role="button" tabindex="0" (keydown.enter)="toggleExpand(g)">
+      <div class="guide-card__wave" [ngClass]="typeClass(g.type)"></div>
+      <div class="guide-card__content">
+        <span class="type-badge" [ngClass]="typeClass(g.type)">{{ g.type }}</span>
+        <h3 class="guide-card__title">{{ g.title }}</h3>
+        <p class="guide-card__meta">
+          <span>{{ stepCount(g) }} Step{{ stepCount(g) === 1 ? '' : 's' }}</span>
+          <span class="guide-card__dot">·</span>
+          <span>{{ formatUpdated(g) }}</span>
+        </p>
+        <div class="guide-card__actions" (click)="$event.stopPropagation()">
+          <button type="button" class="card-action" (click)="openView(g, $event)" title="View">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            View
+          </button>
+          <button type="button" class="card-action" (click)="openEdit(g, $event)" title="Edit">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Edit
+          </button>
+          <button type="button" class="card-action" (click)="openAddStep(g, $event)" title="Add Step">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            Add Step
+          </button>
+          <button type="button" class="card-action card-action--danger" (click)="deleteGuide(g, $event)" title="Delete">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Delete
+          </button>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <p *ngIf="!loading() && guides().length && !filteredGuides().length" class="no-results">No guides match your filters.</p>
+
+  <!-- Expanded guide panel -->
+  <section *ngIf="expandedDetail() as detail" class="expanded-panel">
+    <header class="expanded-panel__head">
+      <h3>{{ detail.title }}</h3>
+      <button type="button" class="expanded-panel__toggle" (click)="expandedDetail.set(null)" aria-label="Collapse">▲</button>
+    </header>
+    <div *ngIf="detailLoading()" class="expanded-loading">Loading steps…</div>
+    <ul *ngIf="!detailLoading()" class="step-accordion">
+      <li *ngFor="let s of detail.steps; let i = index" class="step-accordion__item">
+        <button type="button" class="step-accordion__trigger" (click)="toggleStepExpand(s.id)">
+          <span class="step-accordion__num">{{ i + 1 }}.</span>
+          <span class="step-accordion__label">{{ s.title }}</span>
+          <span class="step-accordion__chev" [class.step-accordion__chev--open]="expandedStepId() === s.id">▼</span>
+        </button>
+        <div *ngIf="expandedStepId() === s.id" class="step-accordion__body">
+          <p>{{ s.description || 'No instructions for this step.' }}</p>
+          <button type="button" class="step-delete" (click)="deleteStep(s, $event)">Delete step</button>
+        </div>
+      </li>
+      <li *ngIf="!detail.steps.length" class="step-accordion__empty">No steps yet.</li>
+    </ul>
+    <footer class="expanded-panel__foot">
+      <button type="button" class="foot-action" (click)="openView(activeGuide() ?? detail)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        View
+      </button>
+      <button type="button" class="foot-action" (click)="openEdit(activeGuide() ?? detail)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Edit
+      </button>
+      <button type="button" class="foot-action" (click)="openAddStep(activeGuide() ?? detail)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        Add Step
+      </button>
+      <button type="button" class="foot-action foot-action--danger" (click)="deleteGuide(activeGuide() ?? detail)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Delete
+      </button>
+    </footer>
+  </section>
+
+  <!-- Modals -->
+  <div *ngIf="panelMode()" class="modal-backdrop" (click)="dismissPanel()">
+    <div class="modal" (click)="$event.stopPropagation()" role="dialog">
+      <header class="modal__head">
+        <h2>
+          {{ panelMode() === 'create' ? 'Create Guide' : panelMode() === 'edit' ? 'Edit Guide' : panelMode() === 'add-step' ? 'Add Step' : 'Guide Preview' }}
+        </h2>
+        <button type="button" class="modal__close" (click)="dismissPanel()" aria-label="Close">×</button>
+      </header>
+
+      <div class="modal__body" *ngIf="panelMode() === 'create' || panelMode() === 'edit'">
+        <div class="field">
+          <label class="field-label" for="modal-title">Title</label>
+          <input id="modal-title" class="field-input" [(ngModel)]="form.title" placeholder="Performing Wudu">
+        </div>
+        <div class="field">
+          <span class="field-label">Category</span>
+          <div class="chip-row">
+            <button type="button" *ngFor="let t of guideTypes" class="chip"
+              [class.chip--on]="form.type === t" (click)="form.type = t">{{ t }}</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal__body" *ngIf="panelMode() === 'add-step'">
+        <p *ngIf="activeGuide() as ag" class="modal-sub">Adding to: <strong>{{ ag.title }}</strong></p>
+        <div class="field">
+          <label class="field-label" for="step-title">Step title</label>
+          <input id="step-title" class="field-input" [(ngModel)]="step.title" placeholder="Intention">
+        </div>
+        <div class="field">
+          <label class="field-label" for="step-desc">Instructions</label>
+          <textarea id="step-desc" class="field-input field-textarea" rows="4" [(ngModel)]="step.description"></textarea>
+        </div>
+        <div class="field">
+          <label class="field-label" for="step-order">Order</label>
+          <input id="step-order" class="field-input field-input--num" type="number" min="1" [(ngModel)]="step.orderIndex">
+        </div>
+      </div>
+
+      <div class="modal__body" *ngIf="panelMode() === 'view' && expandedDetail() as d">
+        <span class="type-badge type-badge--lg" [ngClass]="typeClass(d.type)">{{ d.type }}</span>
+        <h3 class="view-title">{{ d.title }}</h3>
+        <ol class="view-steps">
+          <li *ngFor="let s of d.steps; let i = index">
+            <strong>{{ i + 1 }}. {{ s.title }}</strong>
+            <p *ngIf="s.description">{{ s.description }}</p>
+          </li>
+          <li *ngIf="!d.steps.length" class="view-empty">No steps in this guide yet.</li>
+        </ol>
+      </div>
+
+      <footer class="modal__foot" *ngIf="panelMode() !== 'view'">
+        <button type="button" class="btn-outline" (click)="dismissPanel()">Cancel</button>
+        <button type="button" class="btn-primary" *ngIf="panelMode() === 'create' || panelMode() === 'edit'"
+          (click)="saveGuide()" [disabled]="saving() || !form.title.trim()">
+          {{ saving() ? 'Saving…' : 'Save' }}
+        </button>
+        <button type="button" class="btn-primary" *ngIf="panelMode() === 'add-step'"
+          (click)="saveStep()" [disabled]="saving() || !step.title.trim()">
+          {{ saving() ? 'Saving…' : 'Add Step' }}
+        </button>
+      </footer>
+      <footer class="modal__foot" *ngIf="panelMode() === 'view'">
+        <button type="button" class="btn-outline" (click)="dismissPanel()">Close</button>
+        <button type="button" class="btn-primary" *ngIf="activeGuide() as ag" (click)="editFromView()">Edit Guide</button>
+      </footer>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,120 @@
+<div class="pub-page">
+  <div *ngIf="loading()" class="pub-state" role="status">
+    <span class="pub-state__pulse" aria-hidden="true"></span>
+    <p>Loading mosque profile…</p>
+  </div>
+
+  <div *ngIf="!loading() && notFound()" class="pub-state pub-state--card">
+    <span class="pub-state__icon" aria-hidden="true">🕌</span>
+    <h1>Mosque not found</h1>
+    <p>We could not find a public profile for this address.</p>
+    <a routerLink="/" class="pub-btn pub-btn--ghost">Back to home</a>
+  </div>
+
+  <div *ngIf="!loading() && loadError()" class="pub-state pub-state--card">
+    <h1>Unable to load mosque profile</h1>
+    <p>Please try again later.</p>
+    <button type="button" class="pub-btn" (click)="retry()">Try again</button>
+  </div>
+
+  <ng-container *ngIf="!loading() && mosque() as m">
+    <header class="pub-hero">
+      <div
+        class="pub-hero__banner"
+        [style.background-image]="mediaUrl(m.bannerUrl) ? 'url(' + mediaUrl(m.bannerUrl) + ')' : null">
+        <div class="pub-hero__overlay"></div>
+      </div>
+
+      <div class="pub-hero__content app-section">
+        <div class="pub-hero__identity">
+          <div class="pub-hero__logo-wrap">
+            <img
+              *ngIf="mediaUrl(m.logoUrl); else logoFallback"
+              [src]="mediaUrl(m.logoUrl)!"
+              [alt]="m.name + ' logo'"
+              class="pub-hero__logo">
+            <ng-template #logoFallback>
+              <div class="pub-hero__logo pub-hero__logo--fallback" aria-hidden="true">{{ m.name.charAt(0) }}</div>
+            </ng-template>
+          </div>
+
+          <div class="pub-hero__copy">
+            <h1 class="pub-hero__name">{{ m.name }}</h1>
+            <p class="pub-hero__location">{{ locationLine(m) }}</p>
+            <span class="pub-hero__badge pub-hero__badge--{{ publicStatusCard(m.status).tone }}">
+              {{ formatStatus(m.status) }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="pub-layout app-section">
+      <main class="pub-main">
+        <section class="pub-card pub-status-card pub-status-card--{{ publicStatusCard(m.status).tone }}">
+          <h2 class="pub-card__title">{{ publicStatusCard(m.status).label }}</h2>
+          <p class="pub-card__text">{{ publicStatusCard(m.status).description }}</p>
+        </section>
+
+        <section *ngIf="m.description?.trim()" class="pub-card">
+          <h2 class="pub-card__title">About</h2>
+          <p class="pub-card__text pub-card__text--pre">{{ m.description }}</p>
+        </section>
+
+        <section class="pub-card" *ngIf="m.address || m.phone || m.email || m.website">
+          <h2 class="pub-card__title">Contact information</h2>
+          <dl class="pub-contact">
+            <div *ngIf="fullAddress(m)">
+              <dt>Address</dt>
+              <dd>{{ fullAddress(m) }}</dd>
+            </div>
+            <div *ngIf="m.phone?.trim()">
+              <dt>Phone</dt>
+              <dd><a [href]="'tel:' + m.phone">{{ m.phone }}</a></dd>
+            </div>
+            <div *ngIf="m.email?.trim()">
+              <dt>Email</dt>
+              <dd><a [href]="'mailto:' + m.email">{{ m.email }}</a></dd>
+            </div>
+            <div *ngIf="m.website?.trim()">
+              <dt>Website</dt>
+              <dd><a [href]="m.website" target="_blank" rel="noopener noreferrer">{{ m.website }}</a></dd>
+            </div>
+          </dl>
+        </section>
+      </main>
+
+      <aside class="pub-aside">
+        <section class="pub-card pub-card--sticky">
+          <h2 class="pub-card__title">Mosque information</h2>
+          <dl class="pub-info">
+            <div><dt>City</dt><dd>{{ m.city }}</dd></div>
+            <div><dt>Country</dt><dd>{{ m.country }}</dd></div>
+            <div><dt>Timezone</dt><dd>{{ m.timezone }}</dd></div>
+            <div *ngIf="m.website?.trim()"><dt>Website</dt><dd><a [href]="m.website" target="_blank" rel="noopener">{{ m.website }}</a></dd></div>
+            <div><dt>Public status</dt><dd>{{ publicStatusLabel(m) }}</dd></div>
+          </dl>
+        </section>
+
+        <section *ngIf="canShowClaim(m.status)" class="pub-card pub-claim-card">
+          <h2 class="pub-card__title">Represent this mosque?</h2>
+          <p class="pub-card__text">If you are an authorised representative, you can submit an ownership claim.</p>
+          <button type="button" class="pub-btn pub-btn--claim" (click)="openClaimFlow()">Claim This Mosque</button>
+        </section>
+      </aside>
+    </div>
+
+    <div *ngIf="canShowClaim(m.status)" class="pub-claim-bar" aria-hidden="true">
+      <button type="button" class="pub-btn pub-btn--claim pub-btn--block" (click)="openClaimFlow()">Claim This Mosque</button>
+    </div>
+
+    <div *ngIf="claimToast()" class="pub-toast" [class.pub-toast--ok]="claimToastOk()" [class.pub-toast--err]="!claimToastOk()">{{ claimToast() }}</div>
+
+    <app-mosque-claim-drawer
+      *ngIf="showClaimDrawer() && m"
+      [open]="showClaimDrawer()"
+      [mosque]="m"
+      (closed)="closeClaimDrawer()"
+      (submitted)="onClaimSubmitted()" />
+  </ng-container>
+</div>

@@ -1,0 +1,81 @@
+<div class="pa-page">
+  <div *ngIf="toast()" class="toast" [class.toast--ok]="toastOk()" [class.toast--err]="!toastOk()">{{ toast() }}</div>
+
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a routerLink="/dashboard/super">Dashboard</a>
+    <span class="breadcrumb__sep">›</span>
+    <span class="breadcrumb__current">Platform analytics</span>
+  </nav>
+
+  <header class="pa-header">
+    <div>
+      <p class="pa-badge">Overview</p>
+      <h1 class="pa-title">Platform analytics</h1>
+      <p class="pa-sub">Live metrics across all mosques on MOS</p>
+    </div>
+    <button type="button" class="btn-outline" [disabled]="loading()" (click)="reload()">
+      {{ loading() ? 'Refreshing…' : 'Refresh' }}
+    </button>
+  </header>
+
+  <div *ngIf="loading()" class="state-loading"><span class="pulse-dot"></span> Loading analytics…</div>
+
+  <ng-container *ngIf="!loading() && stats() as s">
+    <section class="kpi-row">
+      <a routerLink="/dashboard/super/mosques" class="kpi-card kpi-card--link">
+        <p class="kpi-label">Total mosques</p>
+        <p class="kpi-value">{{ s.totalMosques }}</p>
+        <p class="kpi-sub">{{ s.activeMosques }} active</p>
+      </a>
+      <a routerLink="/dashboard/super/claims" class="kpi-card kpi-card--link kpi-card--warn">
+        <p class="kpi-label">Pending claims</p>
+        <p class="kpi-value">{{ s.pendingClaims }}</p>
+      </a>
+      <a routerLink="/dashboard/super/users" class="kpi-card kpi-card--link">
+        <p class="kpi-label">Total users</p>
+        <p class="kpi-value">{{ s.totalUsers }}</p>
+      </a>
+      <a routerLink="/dashboard/super/mosque-data" class="kpi-card kpi-card--link">
+        <p class="kpi-label">Mosque snapshots</p>
+        <p class="kpi-value kpi-value--link">View data →</p>
+      </a>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel__title">Mosque status breakdown</h2>
+      <div class="status-strip">
+        <article *ngFor="let row of statusRows()" class="status-cell" [attr.data-tone]="row.tone">
+          <p class="status-cell__label">{{ row.label }}</p>
+          <p class="status-cell__value">{{ row.count }}</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel panel--table">
+      <div class="panel__head">
+        <h2 class="panel__title">All mosques</h2>
+        <span class="entry-count">{{ mosques().length }} listings</span>
+      </div>
+      <div class="table-scroll">
+        <table class="pa-table">
+          <thead>
+            <tr>
+              <th>Mosque</th>
+              <th>City</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let m of mosques()">
+              <td class="cell-name">{{ m.name }}</td>
+              <td class="cell-city">{{ m.city }}</td>
+              <td>
+                <span class="status-pill" [ngClass]="statusClass(m.status)">{{ formatStatus(m.status) }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </ng-container>
+</div>

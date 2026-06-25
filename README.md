@@ -6,7 +6,11 @@ Community mosque platform — prayer times, announcements, events, madrassah, an
 
 - **Frontend:** Angular (`frontend/`) — http://localhost:4200
 - **Backend:** ASP.NET Core API (`backend/MosqueOS.API/`) — http://localhost:5000
-- **Database:** SQL Server Express (`.\SQLEXPRESS`, database `mos_db`)
+- **Architecture:** Clean Architecture + Repository Pattern + Unit of Work
+- **ORM:** EF Core **Code First** (migrations auto-apply on startup)
+- **Database:** SQL Server Express (`.\SQLEXPRESS`, database `mos_db`) — manage with **SSMS**
+
+> TRD originally listed PostgreSQL; this project uses **SQL Server Express** instead (same EF Core entities, different provider).
 
 ## Quick start
 

@@ -5,21 +5,22 @@ export interface PrayerEditorNavSection {
   items: NavItem[];
 }
 
-/** Prayer Times Editor sidebar — dedicated timetable tools. */
+/** Prayer Times Editor sidebar — spec-aligned. */
 export const PRAYER_EDITOR_NAV_SECTIONS: PrayerEditorNavSection[] = [
   {
-    title: 'Prayer Times',
+    title: 'Dashboard',
     items: [
-      { section: 'Prayer Times', label: 'Dashboard', route: '/dashboard/prayer-editor', icon: 'dashboard' },
-      { section: 'Prayer Times', label: 'Daily timetable', route: '/dashboard/prayer-editor/daily', icon: 'daily' },
-      { section: 'Prayer Times', label: 'Monthly view', route: '/dashboard/prayer-editor/monthly', icon: 'monthly' },
-      { section: 'Prayer Times', label: 'Jumuah times', route: '/dashboard/prayer-editor/jumuah', icon: 'jumuah' },
+      { section: 'Dashboard', label: 'Dashboard', route: '/dashboard/prayer-editor', icon: 'dashboard' },
     ],
   },
   {
-    title: 'Browse',
+    title: 'Prayer Times',
     items: [
-      { section: 'Browse', label: 'Public timetable', route: '/dashboard/prayer-times', icon: 'public' },
+      { section: 'Prayer Times', label: 'Daily Prayers', route: '/dashboard/prayer-editor/daily', icon: 'daily' },
+      { section: 'Prayer Times', label: 'Jumuah', route: '/dashboard/prayer-editor/jumuah', icon: 'jumuah' },
+      { section: 'Prayer Times', label: 'Ramadan', route: '/dashboard/prayer-editor/ramadan', icon: 'ramadan' },
+      { section: 'Prayer Times', label: 'Monthly Preview', route: '/dashboard/prayer-editor/monthly', icon: 'monthly' },
+      { section: 'Prayer Times', label: 'Audit Log', route: '/dashboard/prayer-editor/audit', icon: 'audit' },
     ],
   },
 ];
@@ -31,7 +32,8 @@ export function prayerEditorNavItems(): NavItem[] {
 export const PRAYER_EDITOR_NAV_ICONS: Record<string, string> = {
   dashboard: '▦',
   daily: '⏰',
-  monthly: '🗓️',
   jumuah: '🕌',
-  public: '👁️',
+  ramadan: '🌙',
+  monthly: '📅',
+  audit: '📋',
 };

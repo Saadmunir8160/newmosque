@@ -1,0 +1,100 @@
+<div *ngIf="open" class="scr-backdrop" (click)="close()" role="presentation">
+  <aside class="scr-drawer" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="scr-title">
+    <header class="scr-header">
+      <div>
+        <p class="scr-eyebrow">Claim review</p>
+        <h2 id="scr-title">{{ detail()?.claimReference || ('Claim #' + claimId) }}</h2>
+      </div>
+      <button type="button" class="scr-close" (click)="close()" [disabled]="acting()" aria-label="Close">✕</button>
+    </header>
+
+    <div *ngIf="loading()" class="scr-loading" role="status">
+      <span class="scr-spinner" aria-hidden="true"></span>
+      Loading claim…
+    </div>
+
+    <p *ngIf="error()" class="scr-alert scr-alert--error" role="alert">{{ error() }}</p>
+
+    <div *ngIf="!loading() && detail() as d" class="scr-body">
+      <section class="scr-section">
+        <h3>Applicant information</h3>
+        <dl class="scr-dl">
+          <div><dt>Full name</dt><dd>{{ d.applicant.fullName }}</dd></div>
+          <div><dt>Email</dt><dd>{{ d.applicant.email || '—' }}</dd></div>
+          <div><dt>Phone</dt><dd>{{ d.applicant.phone || '—' }}</dd></div>
+          <div><dt>Role</dt><dd>{{ d.applicant.role || '—' }}</dd></div>
+        </dl>
+      </section>
+
+      <section class="scr-section">
+        <h3>Mosque information</h3>
+        <dl class="scr-dl">
+          <div><dt>Mosque name</dt><dd>{{ d.mosqueName }}</dd></div>
+          <div><dt>Address</dt><dd>{{ d.mosqueAddress || '—' }}</dd></div>
+          <div><dt>City</dt><dd>{{ d.mosqueCity || '—' }}</dd></div>
+          <div><dt>Current status</dt><dd><span class="scr-badge scr-badge--pending">{{ d.mosqueStatus }}</span></dd></div>
+        </dl>
+      </section>
+
+      <section class="scr-section">
+        <h3>Uploaded documents</h3>
+        <div *ngIf="primaryDocumentUrl(); else noDoc" class="scr-doc">
+          <p class="scr-doc__name">{{ d.documents?.[0]?.label || 'Proof of ownership' }}</p>
+          <button type="button" class="scr-btn scr-btn--ghost" (click)="openDocument()">View Document</button>
+        </div>
+        <ng-template #noDoc>
+          <p class="scr-muted">No document uploaded.</p>
+        </ng-template>
+      </section>
+
+      <section *ngIf="d.notes?.trim()" class="scr-section">
+        <h3>Additional notes</h3>
+        <p class="scr-notes">{{ d.notes }}</p>
+      </section>
+    </div>
+
+    <footer *ngIf="!loading() && detail()" class="scr-footer">
+      <button type="button" class="scr-btn scr-btn--ghost" (click)="close()" [disabled]="acting()">Close</button>
+      <div class="scr-footer__actions">
+        <button type="button" class="scr-btn scr-btn--danger" (click)="openRejectDialog()" [disabled]="acting()">Reject</button>
+        <button type="button" class="scr-btn scr-btn--primary" (click)="openApproveConfirm()" [disabled]="acting()">Approve</button>
+      </div>
+    </footer>
+  </aside>
+</div>
+
+<!-- Approve confirmation -->
+<div *ngIf="showApproveConfirm()" class="scr-modal-backdrop" role="presentation">
+  <div class="scr-modal" role="alertdialog" aria-labelledby="approve-title" aria-describedby="approve-desc">
+    <h3 id="approve-title">Approve Mosque Claim?</h3>
+    <p id="approve-desc" class="scr-modal__text">
+      This user will become the official owner of this mosque.
+      Ownership will be transferred and the mosque will become <strong>ACTIVE</strong>.
+      This action cannot be undone.
+    </p>
+    <footer class="scr-modal__foot">
+      <button type="button" class="scr-btn scr-btn--ghost" (click)="cancelApprove()" [disabled]="acting()">Cancel</button>
+      <button type="button" class="scr-btn scr-btn--primary" (click)="confirmApprove()" [disabled]="acting()">
+        {{ acting() ? 'Approving…' : 'Approve' }}
+      </button>
+    </footer>
+  </div>
+</div>
+
+<!-- Reject dialog -->
+<div *ngIf="showRejectDialog()" class="scr-modal-backdrop" role="presentation">
+  <div class="scr-modal" role="dialog" aria-labelledby="reject-title">
+    <h3 id="reject-title">Reject claim</h3>
+    <label class="scr-field">
+      <span>Reason <em>*</em></span>
+      <textarea class="scr-textarea" rows="4" [(ngModel)]="rejectReason" placeholder="Explain why this claim cannot be approved…"></textarea>
+    </label>
+    <p *ngIf="rejectError()" class="scr-alert scr-alert--error">{{ rejectError() }}</p>
+    <footer class="scr-modal__foot">
+      <button type="button" class="scr-btn scr-btn--ghost" (click)="cancelReject()" [disabled]="acting()">Cancel</button>
+      <button type="button" class="scr-btn scr-btn--danger" (click)="confirmReject()" [disabled]="acting()">
+        {{ acting() ? 'Rejecting…' : 'Reject Claim' }}
+      </button>
+    </footer>
+  </div>
+</div>
