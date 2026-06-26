@@ -13,11 +13,11 @@ import { CardComponent } from '../../shared/ui/card.component';
   template: `
     <app-page-header [useAuthRole]="true" title="Janaza" subtitle="View janaza announcements" />
     <app-card *ngFor="let j of janaza()" class="block mb-3">
-      <h4 class="text-white font-bold">{{ j.name }}</h4>
-      <p class="text-emerald-300 text-sm">{{ j.janazaDate | date:'mediumDate' }} · {{ j.janazaTime.slice(0,5) }}</p>
-      <p class="text-emerald-100 text-sm mt-1">{{ j.location }}</p>
+      <h4 class="member-title">{{ j.name }}</h4>
+      <p class="member-meta">{{ j.janazaDate | date:'mediumDate' }} · {{ j.janazaTime.slice(0,5) }}</p>
+      <p class="member-desc mt-1">{{ j.location }}</p>
     </app-card>
-    <p *ngIf="!janaza().length" class="text-emerald-300 text-sm">No janaza announcements currently.</p>
+    <p *ngIf="!janaza().length" class="member-empty">No janaza announcements currently.</p>
   `
 })
 export class MemberJanazaComponent implements OnInit {

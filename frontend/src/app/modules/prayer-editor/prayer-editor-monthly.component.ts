@@ -41,12 +41,12 @@ import { PrayerTimesDaily } from '../../core/models';
     .editor-badge { margin: 0; font-size: 0.7rem; color: #fbbf24; font-weight: 700; text-transform: uppercase; }
     .editor-title { margin: 0.25rem 0 0; color: #fff; font-size: 1.5rem; }
     .editor-sub { margin: 0.25rem 0 0; color: #6ee7b7; font-size: 0.85rem; }
-    .card { background: #064e3b; border: 1px solid #065f46; border-radius: 0.75rem; padding: 1rem; }
+    .card { background: #FFFFFF; border: 1px solid #F8FAFC; border-radius: 0.75rem; padding: 1rem; }
     .note { margin: 0 0 0.75rem; font-size: 0.8rem; color: #6ee7b7; }
-    .table-wrap { overflow: auto; border: 1px solid #065f46; border-radius: 0.5rem; }
+    .table-wrap { overflow: auto; border: 1px solid #F8FAFC; border-radius: 0.5rem; }
     table { width: 100%; border-collapse: collapse; font-size: 0.8rem; color: #d1fae5; }
     th, td { padding: 0.45rem 0.6rem; border-bottom: 1px solid rgba(6,95,70,0.6); text-align: center; }
-    th { color: #6ee7b7; position: sticky; top: 0; background: #022c22; }
+    th { color: #6ee7b7; position: sticky; top: 0; background: #0F172A; }
   `]
 })
 export class PrayerEditorMonthlyComponent implements OnInit {

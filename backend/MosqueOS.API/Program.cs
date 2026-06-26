@@ -1,15 +1,19 @@
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.Facebook;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using MosqueOS.Application;
+using MosqueOS.API.Services;
 using MosqueOS.Infrastructure;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -22,6 +26,15 @@ builder.Services.AddControllers()
 // Clean Architecture layers
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddScoped<MosqueAccessService>();
+builder.Services.AddScoped<SlugService>();
+builder.Services.AddScoped<MosqueModuleSeedService>();
+builder.Services.AddScoped<OwnershipClaimService>();
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<EmailOtpService>();
+builder.Services.AddScoped<EmailVerificationService>();
+builder.Services.Configure<MosqueOS.API.Services.EmailOptions>(builder.Configuration.GetSection("Email"));
+builder.Services.AddSingleton<MosqueOS.API.Services.IEmailSender, MosqueOS.API.Services.MosqueEmailSender>();
 
 var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
 var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
@@ -72,7 +85,7 @@ if (!string.IsNullOrWhiteSpace(facebookAppId) && !string.IsNullOrWhiteSpace(face
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
-        policy.WithOrigins("http://localhost:4200")
+        policy.WithOrigins("http://localhost:4200", "http://127.0.0.1:4200")
               .AllowAnyHeader()
               .AllowAnyMethod());
 });
@@ -114,11 +127,40 @@ var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
+    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     var userManager = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<MosqueOS.Domain.Entities.ApplicationUser>>();
     var roleManager = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<Microsoft.AspNetCore.Identity.IdentityRole>>();
-    await DataSeeder.SeedAsync(db, userManager, roleManager);
+
+    const int maxAttempts = 5;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++)
+    {
+        try
+        {
+            await DataSeeder.SeedAsync(db, userManager, roleManager);
+
+            var moduleSeed = scope.ServiceProvider.GetRequiredService<MosqueModuleSeedService>();
+            var mosqueIds = await db.Mosques.Where(m => !m.IsDeleted).Select(m => m.Id).ToListAsync();
+            foreach (var mosqueId in mosqueIds)
+                await moduleSeed.SeedAsync(mosqueId);
+
+            if (attempt > 1)
+                logger.LogInformation("Database seed completed on attempt {Attempt}.", attempt);
+            break;
+        }
+        catch (SqlException ex) when (attempt < maxAttempts && IsTransientSql(ex))
+        {
+            var delay = TimeSpan.FromSeconds(5 * attempt);
+            logger.LogWarning(ex,
+                "SQL Express not ready (attempt {Attempt}/{Max}). Retrying in {DelaySeconds}s…",
+                attempt, maxAttempts, delay.TotalSeconds);
+            await Task.Delay(delay);
+        }
+    }
 }
+
+static bool IsTransientSql(SqlException ex) =>
+    ex.Number is -2 or 53 or 4060 or 10054 or 10060 or 40197 or 40501 or 49918 or 49919 or 49920;
 
 if (app.Environment.IsDevelopment())
 {
@@ -131,6 +173,15 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("Frontend");
+
+var webRoot = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+Directory.CreateDirectory(webRoot);
+Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "audio"));
+Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "images"));
+Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "videos"));
+Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "mosques"));
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

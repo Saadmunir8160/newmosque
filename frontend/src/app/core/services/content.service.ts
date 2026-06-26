@@ -10,6 +10,7 @@ export interface ContentItem {
 }
 export interface AdhkarItem {
   id: number; title: string; arabicText: string; defaultCount: number; category?: string;
+  transliteration?: string; translation?: string; status?: string;
 }
 export interface UserAdhkar {
   id: number; targetCount: number; adhkarItem?: AdhkarItem; customTitle?: string;
@@ -18,7 +19,29 @@ export interface Community {
   id: number; name: string; type: string; description?: string; isPublic: boolean;
 }
 export interface RitualGuide {
+  id: number;
+  title: string;
+  type: string;
+  description?: string;
+  stepCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+export interface RitualStep {
+  id: number; title: string; description: string; orderIndex: number;
+  dua?: { title: string; arabicText: string; translation?: string };
+}
+export interface RitualGuideDetail extends RitualGuide {
+  steps: RitualStep[];
+}
+export interface JourneyGuide {
   id: number; title: string; type: string; description?: string;
+}
+export interface JourneyStage {
+  id: number; title: string; description: string; orderIndex: number; dayNumber?: number;
+}
+export interface JourneyGuideDetail extends JourneyGuide {
+  stages: JourneyStage[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -43,8 +66,8 @@ export class ContentService {
     return this.http.post<ContentItem>(`${this.base}/awrad/content-items`, data);
   }
 
-  getRecommendedWird(): Observable<unknown> {
-    return this.http.get(`${this.base}/awrad/recommended-now`);
+  getRecommendedWird(): Observable<{ slot: string; collection: WirdCollection; mode?: string }> {
+    return this.http.get<{ slot: string; collection: WirdCollection; mode?: string }>(`${this.base}/awrad/recommended-now`);
   }
 
   getMySchedule(): Observable<unknown[]> {
@@ -53,6 +76,10 @@ export class ContentService {
 
   markWirdComplete(collectionId: number): Observable<unknown> {
     return this.http.post(`${this.base}/awrad/collections/${collectionId}/complete`, {});
+  }
+
+  getWirdCompletedToday(): Observable<number[]> {
+    return this.http.get<number[]>(`${this.base}/awrad/completed-today`);
   }
 
   // Duas
@@ -88,6 +115,10 @@ export class ContentService {
     return this.http.post<UserAdhkar>(`${this.base}/adhkar/mine`, { adhkarItemId, targetCount });
   }
 
+  removeFromMyAdhkar(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/adhkar/mine/${id}`);
+  }
+
   createAdhkarItem(data: Partial<AdhkarItem>): Observable<AdhkarItem> {
     return this.http.post<AdhkarItem>(`${this.base}/adhkar/items`, data);
   }
@@ -98,22 +129,67 @@ export class ContentService {
     return this.http.get<RitualGuide[]>(`${this.base}/ritual-guides`, { params });
   }
 
+  getRitualGuide(id: number): Observable<RitualGuideDetail> {
+    return this.http.get<RitualGuideDetail>(`${this.base}/ritual-guides/${id}`);
+  }
+
+  // Journey guides
+  getJourneyGuides(type?: string): Observable<JourneyGuide[]> {
+    const params = type ? { type } : undefined;
+    return this.http.get<JourneyGuide[]>(`${this.base}/journey-guides`, { params });
+  }
+
+  getJourneyGuide(id: number): Observable<JourneyGuideDetail> {
+    return this.http.get<JourneyGuideDetail>(`${this.base}/journey-guides/${id}`);
+  }
+
+  createJourneyGuide(data: { title: string; type: string }): Observable<JourneyGuide> {
+    return this.http.post<JourneyGuide>(`${this.base}/journey-guides`, data);
+  }
+
+  addJourneyStage(guideId: number, stage: { title: string; description: string; orderIndex: number }): Observable<unknown> {
+    return this.http.post(`${this.base}/journey-guides/${guideId}/stages`, stage);
+  }
+
   createRitualGuide(data: { title: string; type: string }): Observable<RitualGuide> {
     return this.http.post<RitualGuide>(`${this.base}/ritual-guides`, data);
   }
 
-  addRitualStep(guideId: number, step: { title: string; description: string; orderIndex: number }): Observable<unknown> {
-    return this.http.post(`${this.base}/ritual-guides/${guideId}/steps`, step);
+  updateRitualGuide(id: number, data: { title: string; type: string }): Observable<RitualGuide> {
+    return this.http.put<RitualGuide>(`${this.base}/ritual-guides/${id}`, data);
+  }
+
+  deleteRitualGuide(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/ritual-guides/${id}`);
+  }
+
+  addRitualStep(guideId: number, step: { title: string; description: string; orderIndex: number }): Observable<RitualStep> {
+    return this.http.post<RitualStep>(`${this.base}/ritual-guides/${guideId}/steps`, step);
+  }
+
+  updateRitualStep(guideId: number, stepId: number, step: { title: string; description: string; orderIndex: number }): Observable<RitualStep> {
+    return this.http.put<RitualStep>(`${this.base}/ritual-guides/${guideId}/steps/${stepId}`, step);
+  }
+
+  deleteRitualStep(guideId: number, stepId: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/ritual-guides/${guideId}/steps/${stepId}`);
   }
 
   // Communities
-  getCommunities(mosqueId?: number): Observable<Community[]> {
-    const params = mosqueId ? { mosqueId: mosqueId.toString() } : undefined;
+  getCommunities(mosqueId?: number, search?: string, type?: string): Observable<Community[]> {
+    const params: Record<string, string> = {};
+    if (mosqueId) params['mosqueId'] = mosqueId.toString();
+    if (search?.trim()) params['search'] = search.trim();
+    if (type) params['type'] = type;
     return this.http.get<Community[]>(`${this.base}/communities`, { params });
   }
 
   joinCommunity(id: number): Observable<unknown> {
     return this.http.post(`${this.base}/communities/${id}/join`, {});
+  }
+
+  getMyCommunityIds(): Observable<number[]> {
+    return this.http.get<number[]>(`${this.base}/communities/mine`);
   }
 
   // Preferences

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.API.Filters;
+using MosqueOS.API.Models.Common;
 using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
@@ -11,6 +13,7 @@ namespace MosqueOS.API.Controllers
 {
     [Route("api/v1/mosques/{mosqueId:int}/participation")]
     [ApiController]
+    [RequireMosqueModule("Participation")]
     public class ParticipationController : ControllerBase
     {
         private readonly IUnitOfWork _unitOfWork;
@@ -24,6 +27,19 @@ namespace MosqueOS.API.Controllers
                 .Where(o => o.MosqueId == mosqueId && o.IsActive);
             if (type.HasValue) query = query.Where(o => o.Type == type);
             return Ok(await query.OrderBy(o => o.Date).ToListAsync());
+        }
+
+        [Authorize]
+        [HttpGet("mine")]
+        public async Task<IActionResult> MyRegistrations(int mosqueId)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            var ids = await _unitOfWork.Repository<ParticipationRegistration>().QueryNoTracking()
+                .Include(r => r.Opportunity)
+                .Where(r => r.UserId == userId && r.Opportunity!.MosqueId == mosqueId)
+                .Select(r => r.OpportunityId)
+                .ToListAsync();
+            return Ok(ids);
         }
 
         [Authorize(Roles = Roles.Admins)]
@@ -44,7 +60,7 @@ namespace MosqueOS.API.Controllers
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
             if (await _unitOfWork.Repository<ParticipationRegistration>().Query()
                 .AnyAsync(r => r.OpportunityId == opportunityId && r.UserId == userId))
-                return Conflict(new { message = "Already registered." });
+                return Conflict(new ApiMessageResponse { Message = "Already registered." });
 
             var registration = new ParticipationRegistration
             {

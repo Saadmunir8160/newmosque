@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
+using System.Text.Json;
 
 namespace MosqueOS.Infrastructure
 {
@@ -25,16 +26,27 @@ namespace MosqueOS.Infrastructure
 
             // ---- Users ----
             var superAdmin = await EnsureUser(userManager, "admin", "admin@mosqueos.uk", "Super Admin", "Admin@123", Roles.SuperAdmin);
-            var mosqueAdmin = await EnsureUser(userManager, "mosqueadmin", "mosqueadmin@mosqueos.uk", "Mosque Admin", "Mosque@123", Roles.MosqueAdmin);
+            var mosqueAdmin = await EnsureUser(userManager, "mosqueadmin", "mosqueadmin@mosqueos.uk", "Mosque Admin", "Admin@123", Roles.MosqueAdmin);
             var owner = await EnsureUser(userManager, "owner", "owner@mosqueos.uk", "Br. Hamid (Owner)", "Owner@123", Roles.MosqueOwner);
-            await EnsureUser(userManager, "prayereditor", "prayer@mosqueos.uk", "Br. Salim", "Prayer@123", Roles.PrayerTimesEditor);
+            var prayerEditor = await EnsureUser(userManager, "prayereditor", "prayer@mosqueos.uk", "Br. Salim", "Prayer@123", Roles.PrayerTimesEditor);
             var teacher = await EnsureUser(userManager, "teacher", "teacher@mosqueos.uk", "Ustadh Yusuf", "Teacher@123", Roles.Teacher);
-            await EnsureUser(userManager, "muqaddam", "muqaddam@mosqueos.uk", "Habib Ali", "Muqaddam@123", Roles.Muqaddam, Roles.Member);
+            var muqaddam = await EnsureUser(userManager, "muqaddam", "muqaddam@mosqueos.uk", "Habib Ali", "Muqaddam@123", Roles.Muqaddam, Roles.Member);
             await EnsureUser(userManager, "editor", "editor@mosqueos.uk", "Sr. Fatima", "Editor@123", Roles.ContentEditor);
             var parent = await EnsureUser(userManager, "parent", "parent@mosqueos.uk", "Br. Ahmed Khan", "Parent@123", Roles.Parent, Roles.Member);
             var member = await EnsureUser(userManager, "member", "member@mosqueos.uk", "Br. Bilal Hussain", "Member@123", Roles.Member);
+            var zayd = await EnsureUser(userManager, "zayd", "zayd@mosqueos.uk", "Zayd Ahmed", "Member@123", Roles.Member);
+            var fatima = await EnsureUser(userManager, "fatima", "fatima@mosqueos.uk", "Fatima Khan", "Member@123", Roles.Member);
+            var omar = await EnsureUser(userManager, "omar", "omar@mosqueos.uk", "Omar Farooq", "Member@123", Roles.Member);
+            var aisha = await EnsureUser(userManager, "aisha", "aisha@mosqueos.uk", "Aisha Malik", "Member@123", Roles.Member);
+            var muhammadC = await EnsureUser(userManager, "mchishti", "m.chishti@mosqueos.uk", "Muhammad Chishti", "Member@123", Roles.Member);
             await EnsureUser(userManager, "google_user", "google.user@mosqueos.uk", "Google Member", "Google@123", Roles.Member);
             await EnsureUser(userManager, "facebook_user", "facebook.user@mosqueos.uk", "Facebook Member", "Facebook@123", Roles.Member);
+
+            await RepairDemoUserRolesAsync(userManager);
+            await RepairAdhkarLibraryAsync(db);
+            await EnterpriseSeeder.SeedAsync(db, roleManager);
+            await SeedContentEditorDemoAsync(db);
+            await EnsurePlatformConfigAsync(db);
 
             // Idempotent: ensure demo owner is linked to the Bradford mosque
             var existingDemo = await db.Mosques.FirstOrDefaultAsync(m => m.Slug == "masjid-al-noor-bradford");
@@ -50,6 +62,39 @@ namespace MosqueOS.Infrastructure
                     owner.HomeMosqueId = existingDemo.Id;
                     await userManager.UpdateAsync(owner);
                 }
+                if (mosqueAdmin.HomeMosqueId != existingDemo.Id)
+                {
+                    mosqueAdmin.HomeMosqueId = existingDemo.Id;
+                    await userManager.UpdateAsync(mosqueAdmin);
+                }
+                if (member.HomeMosqueId != existingDemo.Id)
+                {
+                    member.HomeMosqueId = existingDemo.Id;
+                    await userManager.UpdateAsync(member);
+                }
+                if (prayerEditor.HomeMosqueId != existingDemo.Id)
+                {
+                    prayerEditor.HomeMosqueId = existingDemo.Id;
+                    await userManager.UpdateAsync(prayerEditor);
+                }
+                if (teacher.HomeMosqueId != existingDemo.Id)
+                {
+                    teacher.HomeMosqueId = existingDemo.Id;
+                    await userManager.UpdateAsync(teacher);
+                }
+                if (muqaddam.HomeMosqueId != existingDemo.Id)
+                {
+                    muqaddam.HomeMosqueId = existingDemo.Id;
+                    await userManager.UpdateAsync(muqaddam);
+                }
+                await EnrichPublicProfileDemoAsync(db, existingDemo);
+                await db.SaveChangesAsync();
+            }
+
+            var unclaimedLeeds = await db.Mosques.FirstOrDefaultAsync(m => m.Slug == "masjid-al-huda-leeds");
+            if (unclaimedLeeds != null)
+            {
+                await EnrichPublicProfileDemoAsync(db, unclaimedLeeds, includeDonations: false);
                 await db.SaveChangesAsync();
             }
 
@@ -93,6 +138,14 @@ namespace MosqueOS.Infrastructure
 
             owner.HomeMosqueId = mosque.Id;
             await userManager.UpdateAsync(owner);
+            member.HomeMosqueId = mosque.Id;
+            await userManager.UpdateAsync(member);
+            prayerEditor.HomeMosqueId = mosque.Id;
+            await userManager.UpdateAsync(prayerEditor);
+            teacher.HomeMosqueId = mosque.Id;
+            await userManager.UpdateAsync(teacher);
+            muqaddam.HomeMosqueId = mosque.Id;
+            await userManager.UpdateAsync(muqaddam);
 
             // Unclaimed listing for owner claim flow demos
             db.Mosques.Add(new Mosque
@@ -341,6 +394,67 @@ namespace MosqueOS.Infrastructure
                 CreatedById = teacher.Id
             });
 
+            db.StudentProgressRecords.AddRange(
+                new StudentProgressRecord
+                {
+                    StudentId = students[0].Id,
+                    ClassId = madrassahClass.Id,
+                    ProgressType = StudentProgressType.Quran,
+                    Title = "Surah al-Fil",
+                    SurahOrTopic = "Surah al-Fil",
+                    Detail = "Completed with good tajweed",
+                    RecordDate = start.AddDays(-2),
+                    CreatedById = teacher.Id
+                },
+                new StudentProgressRecord
+                {
+                    StudentId = students[1].Id,
+                    ClassId = madrassahClass.Id,
+                    ProgressType = StudentProgressType.Memorization,
+                    Title = "Juz Amma — Surah an-Nas",
+                    SurahOrTopic = "an-Nas",
+                    Detail = "Memorised, needs revision",
+                    RecordDate = start.AddDays(-1),
+                    CreatedById = teacher.Id
+                },
+                new StudentProgressRecord
+                {
+                    StudentId = students[2].Id,
+                    ClassId = madrassahClass.Id,
+                    ProgressType = StudentProgressType.Exam,
+                    Title = "Term 1 Tajweed Test",
+                    Score = 78,
+                    Detail = "Good effort on makhraj",
+                    RecordDate = start.AddDays(-5),
+                    CreatedById = teacher.Id
+                });
+
+            var homework = new ClassAssignment
+            {
+                ClassId = madrassahClass.Id,
+                Title = "Revise Surah al-Fil",
+                Description = "Practice recitation with tajweed rules for heavy letters.",
+                DueDate = start.AddDays(3),
+                ResourceUrl = "https://example.com/surah-al-fil.pdf",
+                ResourceFileName = "surah-al-fil.pdf",
+                CreatedById = teacher.Id
+            };
+            db.ClassAssignments.Add(homework);
+            await db.SaveChangesAsync();
+
+            foreach (var student in students)
+            {
+                db.AssignmentGrades.Add(new AssignmentGrade
+                {
+                    AssignmentId = homework.Id,
+                    StudentId = student.Id,
+                    Status = student.Id == students[0].Id ? AssignmentGradeStatus.Graded : AssignmentGradeStatus.Pending,
+                    Grade = student.Id == students[0].Id ? "A" : null,
+                    Feedback = student.Id == students[0].Id ? "Excellent revision" : null,
+                    GradedById = student.Id == students[0].Id ? teacher.Id : null
+                });
+            }
+
             // ---- 3.6 Community: Ba'alawi tariqa circle ----
             var circle = new Community
             {
@@ -355,6 +469,7 @@ namespace MosqueOS.Infrastructure
 
             db.CommunityMembers.AddRange(
                 new CommunityMember { CommunityId = circle.Id, UserId = mosqueAdmin.Id, Role = CommunityRole.Admin },
+                new CommunityMember { CommunityId = circle.Id, UserId = muqaddam.Id, Role = CommunityRole.Muqaddam },
                 new CommunityMember { CommunityId = circle.Id, UserId = member.Id, Role = CommunityRole.Member });
 
             db.CommunityPosts.Add(new CommunityPost
@@ -363,6 +478,54 @@ namespace MosqueOS.Infrastructure
                 AuthorId = mosqueAdmin.Id,
                 Content = "This week's rawhah will cover the chapter on gratitude from Imam al-Haddad's Book of Assistance. All welcome after Maghrib on Wednesday."
             });
+
+            var dhikrGathering = new CommunityGathering
+            {
+                CommunityId = circle.Id,
+                Title = "Thursday Dhikr Majlis",
+                Description = "Weekly collective dhikr following the Ba'alawi tradition.",
+                GatheringType = CommunityGatheringType.DhikrGathering,
+                Date = start.AddDays(3),
+                StartTime = new TimeOnly(19, 30),
+                Location = "Main Hall",
+                CreatedById = muqaddam.Id
+            };
+            db.CommunityGatherings.Add(dhikrGathering);
+            await db.SaveChangesAsync();
+
+            db.GatheringAttendances.Add(new GatheringAttendance
+            {
+                GatheringId = dhikrGathering.Id,
+                UserId = member.Id,
+                Status = AttendanceStatus.Present
+            });
+
+            db.GuidanceNotes.AddRange(
+                new GuidanceNote
+                {
+                    CommunityId = circle.Id,
+                    MuridUserId = member.Id,
+                    Type = GuidanceNoteType.Note,
+                    Content = "Encourage consistent morning wird — member shows good effort in dhikr circle.",
+                    CreatedById = muqaddam.Id
+                },
+                new GuidanceNote
+                {
+                    CommunityId = circle.Id,
+                    MuridUserId = member.Id,
+                    Type = GuidanceNoteType.FollowUp,
+                    Content = "Follow up on Qur'an reading plan progress next week.",
+                    FollowUpDate = start.AddDays(7),
+                    CreatedById = muqaddam.Id
+                },
+                new GuidanceNote
+                {
+                    CommunityId = circle.Id,
+                    MuridUserId = member.Id,
+                    Type = GuidanceNoteType.Recommendation,
+                    Content = "Recommend attending the Ba'alawi rawhah readings on Wednesday evenings.",
+                    CreatedById = muqaddam.Id
+                });
 
             // ---- 3.9 Duas: Ghazali Supplications (morning, wudu, prayer) ----
             var duaMorning = new Dua { Title = "Upon Waking", ArabicText = "الْحَمْدُ لِلَّهِ الَّذِي أَحْيَانَا بَعْدَ مَا أَمَاتَنَا وَإِلَيْهِ النُّشُورُ", Transliteration = "Alhamdu lillahil-ladhi ahyana ba'da ma amatana wa ilayhin-nushur", Translation = "Praise be to Allah who gave us life after causing us to die, and to Him is the resurrection.", SourceName = "Imam al-Ghazali", SourceRef = "Ihya 'Ulum al-Din, Book of Invocations", Category = "morning", Tradition = "Ghazali" };
@@ -392,9 +555,49 @@ namespace MosqueOS.Infrastructure
                 new DuaCollectionItem { CollectionId = ghazaliCollection.Id, DuaId = duaWuduEnd.Id, OrderIndex = 4 },
                 new DuaCollectionItem { CollectionId = ghazaliCollection.Id, DuaId = duaAfterPrayer.Id, OrderIndex = 5 });
 
-            // ---- 3.11 Wudu ritual guide with step-by-step duas ----
-            var wuduGuide = new RitualGuide { Title = "How to Perform Wudu", Type = RitualGuideType.Wudu };
+            // ---- 3.11 Ritual guides with review workflow ----
+            var wuduGuide = new RitualGuide
+            {
+                Title = "Performing Wudu",
+                Type = RitualGuideType.Wudu,
+                Status = ContentPublishStatus.InReview,
+                UpdatedAt = DateTime.UtcNow.AddDays(-2)
+            };
             db.RitualGuides.Add(wuduGuide);
+
+            var ghuslGuide = new RitualGuide
+            {
+                Title = "How to Perform Ghusl",
+                Type = RitualGuideType.Ghusl,
+                Status = ContentPublishStatus.InReview,
+                UpdatedAt = DateTime.UtcNow.AddDays(-1)
+            };
+            db.RitualGuides.Add(ghuslGuide);
+
+            var fajrGuide = new RitualGuide
+            {
+                Title = "Fajr Prayer Guide",
+                Type = RitualGuideType.Salah,
+                Status = ContentPublishStatus.InReview
+            };
+            db.RitualGuides.Add(fajrGuide);
+
+            var approvedGuide = new RitualGuide
+            {
+                Title = "How to Perform Wudu",
+                Type = RitualGuideType.Wudu,
+                Status = ContentPublishStatus.Approved
+            };
+            db.RitualGuides.Add(approvedGuide);
+
+            var draftGuide = new RitualGuide
+            {
+                Title = "Isha Prayer Guide",
+                Type = RitualGuideType.Salah,
+                Status = ContentPublishStatus.Draft
+            };
+            db.RitualGuides.Add(draftGuide);
+
             await db.SaveChangesAsync();
 
             db.RitualSteps.AddRange(
@@ -405,6 +608,20 @@ namespace MosqueOS.Infrastructure
                 new RitualStep { GuideId = wuduGuide.Id, OrderIndex = 5, Title = "Wash the Arms", Description = "Wash the right arm up to and including the elbow three times, then the left." },
                 new RitualStep { GuideId = wuduGuide.Id, OrderIndex = 6, Title = "Wipe the Head and Ears", Description = "With wet hands, wipe over the head once, then wipe the inside and outside of the ears." },
                 new RitualStep { GuideId = wuduGuide.Id, OrderIndex = 7, Title = "Wash the Feet", Description = "Wash the right foot up to and including the ankle three times, then the left.", DuaId = duaWuduEnd.Id });
+
+            db.RitualSteps.AddRange(
+                new RitualStep { GuideId = ghuslGuide.Id, OrderIndex = 1, Title = "Intention", Description = "Make the intention for ghusl in your heart." },
+                new RitualStep { GuideId = ghuslGuide.Id, OrderIndex = 2, Title = "Wash Hands", Description = "Wash both hands thoroughly." },
+                new RitualStep { GuideId = ghuslGuide.Id, OrderIndex = 3, Title = "Rinse Mouth and Nose", Description = "Rinse the mouth and nose." },
+                new RitualStep { GuideId = ghuslGuide.Id, OrderIndex = 4, Title = "Wash Entire Body", Description = "Pour water over the entire body, ensuring no dry spot remains." },
+                new RitualStep { GuideId = ghuslGuide.Id, OrderIndex = 5, Title = "Complete", Description = "Say the shahada and perform wudu if needed for prayer." });
+
+            db.RitualSteps.AddRange(
+                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 1, Title = "Make Wudu", Description = "Perform ablution before prayer." },
+                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 2, Title = "Face Qiblah", Description = "Stand facing the Ka'bah." },
+                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 3, Title = "Two Rak'ahs", Description = "Pray two rak'ahs of Fajr with recitation." },
+                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 4, Title = "Taslim", Description = "End the prayer with salam to the right and left." },
+                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 5, Title = "Morning Adhkar", Description = "Recite morning remembrances after the prayer." });
 
             // ---- 3.8 Adhkar library ----
             db.AdhkarItems.AddRange(
@@ -424,25 +641,64 @@ namespace MosqueOS.Infrastructure
                 JanazaTime = new TimeOnly(13, 45),
                 Location = "Masjid Al-Noor Bradford — after Dhuhr jamaah",
                 BurialLocation = "Scholemoor Cemetery, Bradford",
-                Notes = "Inna lillahi wa inna ilayhi raji'un. Please keep the family in your duas."
+                Notes = "Inna lillahi wa inna ilayhi raji'un. Please keep the family in your duas.",
+                Status = PublishStatus.Published,
+                CreatedById = mosqueAdmin.Id,
+                PublishedAt = DateTime.UtcNow.AddDays(-5)
             });
+
+            db.JanazaAnnouncements.AddRange(
+                new JanazaAnnouncement
+                {
+                    MosqueId = mosque.Id,
+                    Name = "Muhammad Yusuf Khan",
+                    DateOfDeath = start.AddDays(-3),
+                    JanazaDate = start.AddDays(2),
+                    JanazaTime = new TimeOnly(14, 0),
+                    Location = "Masjid Al-Noor Bradford",
+                    BurialLocation = "Local City Cemetery",
+                    Status = PublishStatus.Draft,
+                    CreatedById = mosqueAdmin.Id
+                },
+                new JanazaAnnouncement
+                {
+                    MosqueId = mosque.Id,
+                    Name = "Fatima Begum",
+                    DateOfDeath = start.AddDays(-2),
+                    JanazaDate = start.AddDays(3),
+                    JanazaTime = new TimeOnly(10, 30),
+                    Location = "Masjid Al-Noor — Main Hall",
+                    BurialLocation = "Scholemoor Cemetery, Bradford",
+                    Status = PublishStatus.Published,
+                    CreatedById = mosqueAdmin.Id,
+                    PublishedAt = DateTime.UtcNow.AddDays(-1)
+                });
 
             // Reading campaign for the deceased
             var campaign = new ReadingCampaign
             {
                 MosqueId = mosque.Id,
                 DeceasedName = "Hajji Abdul Rahim Sahib",
+                Title = "Global Esaal-e-Sawab Campaign",
                 CreatedById = mosqueAdmin.Id,
-                IsActive = true
+                IsActive = true,
+                TargetReadings = 100_000
             };
             db.ReadingCampaigns.Add(campaign);
             await db.SaveChangesAsync();
 
             db.ReadingAllocations.AddRange(
-                new ReadingAllocation { CampaignId = campaign.Id, Type = ReadingAllocationType.Yaseen, Description = "Surah Yaseen x1" },
-                new ReadingAllocation { CampaignId = campaign.Id, UserId = member.Id, Type = ReadingAllocationType.Para, Description = "Para 1 (Alif Lam Meem)" },
-                new ReadingAllocation { CampaignId = campaign.Id, Type = ReadingAllocationType.Para, Description = "Para 2" },
-                new ReadingAllocation { CampaignId = campaign.Id, Type = ReadingAllocationType.Adhkar, Description = "Tahlil x1000" });
+                new ReadingAllocation { CampaignId = campaign.Id, UserId = zayd.Id, Type = ReadingAllocationType.Para, Description = "Para 18", ReadingCount = 4250, Region = "North America", Status = ReadingAllocationStatus.Completed, UpdatedAt = DateTime.UtcNow.AddMinutes(-2) },
+                new ReadingAllocation { CampaignId = campaign.Id, UserId = fatima.Id, Type = ReadingAllocationType.Para, Description = "Para 12", ReadingCount = 3890, Region = "UK", Status = ReadingAllocationStatus.Completed, UpdatedAt = DateTime.UtcNow.AddHours(-1) },
+                new ReadingAllocation { CampaignId = campaign.Id, UserId = omar.Id, Type = ReadingAllocationType.Yaseen, Description = "Surah Yaseen x1", ReadingCount = 3200, Region = "UK", Status = ReadingAllocationStatus.Completed, UpdatedAt = DateTime.UtcNow.AddHours(-3) },
+                new ReadingAllocation { CampaignId = campaign.Id, UserId = aisha.Id, Type = ReadingAllocationType.Para, Description = "Para 5", ReadingCount = 2950, Region = "SE Asia", Status = ReadingAllocationStatus.Completed, UpdatedAt = DateTime.UtcNow.AddHours(-5) },
+                new ReadingAllocation { CampaignId = campaign.Id, UserId = muhammadC.Id, Type = ReadingAllocationType.Adhkar, Description = "Tahlil x150", ReadingCount = 150, Region = "North America", Status = ReadingAllocationStatus.Completed, UpdatedAt = DateTime.UtcNow.AddMinutes(-2) },
+                new ReadingAllocation { CampaignId = campaign.Id, UserId = member.Id, Type = ReadingAllocationType.Para, Description = "Para 1 (Alif Lam Meem)", ReadingCount = 1, Region = "UK", Status = ReadingAllocationStatus.Completed },
+                new ReadingAllocation { CampaignId = campaign.Id, Type = ReadingAllocationType.Yaseen, Description = "Surah Yaseen x1", ReadingCount = 1, Region = "North America" },
+                new ReadingAllocation { CampaignId = campaign.Id, Type = ReadingAllocationType.Para, Description = "Para 2", ReadingCount = 1, Region = "UK" },
+                new ReadingAllocation { CampaignId = campaign.Id, Type = ReadingAllocationType.Adhkar, Description = "Tahlil x1000", ReadingCount = 1000, Region = "SE Asia" },
+                new ReadingAllocation { CampaignId = campaign.Id, UserId = zayd.Id, Type = ReadingAllocationType.Para, Description = "Para 20", ReadingCount = 62000, Region = "North America", Status = ReadingAllocationStatus.Completed, UpdatedAt = DateTime.UtcNow.AddDays(-2) },
+                new ReadingAllocation { CampaignId = campaign.Id, UserId = fatima.Id, Type = ReadingAllocationType.Para, Description = "Para 22", ReadingCount = 5991, Region = "UK", Status = ReadingAllocationStatus.Completed, UpdatedAt = DateTime.UtcNow.AddDays(-1) });
 
             // ---- 3.14 Participation opportunities ----
             db.ParticipationOpportunities.AddRange(
@@ -463,6 +719,92 @@ namespace MosqueOS.Infrastructure
                 new JourneyStage { GuideId = umrahGuide.Id, OrderIndex = 6, Title = "Completion", Description = "Exit ihram. Spend your remaining time in Makkah in prayer, tawaf, and recitation. Drink Zamzam with the intention of cure and good.", Duas = "Dua upon drinking Zamzam: Allahumma inni as'aluka 'ilman nafi'an..." });
 
             await db.SaveChangesAsync();
+        }
+
+        private static async Task SeedContentEditorDemoAsync(ApplicationDbContext db)
+        {
+            if (await db.ContentArticles.AnyAsync()) return;
+
+            db.ContentArticles.AddRange(
+                new ContentArticle
+                {
+                    Title = "The Virtues of Morning Dhikr",
+                    Summary = "An introduction to the spiritual benefits of post-Fajr remembrance.",
+                    Body = "The morning adhkar are among the most beloved acts to Allah when performed consistently after Fajr...",
+                    ItemType = LibraryItemType.Article,
+                    Status = ContentPublishStatus.InReview
+                },
+                new ContentArticle
+                {
+                    Title = "Ba'alawi Wird — PDF Reference",
+                    Summary = "Scanned reference booklet for murids.",
+                    Body = "Download the official Khulasa reference PDF for community study circles.",
+                    ItemType = LibraryItemType.Pdf,
+                    ResourceUrl = "/uploads/documents/khulasa-reference.pdf",
+                    Status = ContentPublishStatus.Draft
+                },
+                new ContentArticle
+                {
+                    Title = "Forty Hadith on Good Character",
+                    Summary = "Curated hadith collection for madrassah reading.",
+                    Body = "A structured reading plan across forty narrations on akhlaq.",
+                    ItemType = LibraryItemType.Book,
+                    Status = ContentPublishStatus.Approved
+                });
+
+            await db.SaveChangesAsync();
+        }
+
+        /// <summary>Remove broken adhkar library rows (empty title) that break the member counter UI.</summary>
+        private static async Task RepairAdhkarLibraryAsync(ApplicationDbContext db)
+        {
+            var broken = await db.AdhkarItems
+                .Where(a => string.IsNullOrWhiteSpace(a.Title))
+                .ToListAsync();
+            if (broken.Count == 0) return;
+
+            var brokenIds = broken.Select(b => b.Id).ToList();
+            var linked = await db.UserAdhkar
+                .Where(u => u.AdhkarItemId != null && brokenIds.Contains(u.AdhkarItemId.Value))
+                .ToListAsync();
+            if (linked.Count > 0)
+            {
+                var linkedIds = linked.Select(l => l.Id).ToList();
+                var logs = await db.UserAdhkarLogs.Where(l => linkedIds.Contains(l.UserAdhkarId)).ToListAsync();
+                db.UserAdhkarLogs.RemoveRange(logs);
+                db.UserAdhkar.RemoveRange(linked);
+            }
+
+            db.AdhkarItems.RemoveRange(broken);
+            await db.SaveChangesAsync();
+        }
+
+        /// <summary>Re-apply demo staff roles on every startup (idempotent).</summary>
+        private static async Task RepairDemoUserRolesAsync(UserManager<ApplicationUser> userManager)
+        {
+            var demoRoles = new (string Username, string[] Roles)[]
+            {
+                ("admin", [Roles.SuperAdmin]),
+                ("mosqueadmin", [Roles.MosqueAdmin]),
+                ("owner", [Roles.MosqueOwner]),
+                ("prayereditor", [Roles.PrayerTimesEditor]),
+                ("teacher", [Roles.Teacher]),
+                ("muqaddam", [Roles.Muqaddam, Roles.Member]),
+                ("editor", [Roles.ContentEditor]),
+                ("parent", [Roles.Parent, Roles.Member]),
+                ("member", [Roles.Member]),
+            };
+
+            foreach (var (username, roles) in demoRoles)
+            {
+                var user = await userManager.FindByNameAsync(username);
+                if (user == null) continue;
+                foreach (var role in roles)
+                {
+                    if (!await userManager.IsInRoleAsync(user, role))
+                        await userManager.AddToRoleAsync(user, role);
+                }
+            }
         }
 
         private static async Task<ApplicationUser> EnsureUser(
@@ -486,10 +828,13 @@ namespace MosqueOS.Infrastructure
             else
             {
                 if (user.FullName != fullName)
-                {
                     user.FullName = fullName;
-                    await userManager.UpdateAsync(user);
-                }
+                if (!user.EmailConfirmed)
+                    user.EmailConfirmed = true;
+                if (user.Email != email)
+                    user.Email = email;
+
+                await userManager.UpdateAsync(user);
 
                 var token = await userManager.GeneratePasswordResetTokenAsync(user);
                 await userManager.ResetPasswordAsync(user, token, password);
@@ -506,6 +851,83 @@ namespace MosqueOS.Infrastructure
             }
 
             return user;
+        }
+
+        private static async Task EnsurePlatformConfigAsync(ApplicationDbContext db)
+        {
+            var defaults = new Dictionary<string, string>
+            {
+                [PlatformConfigKeys.TariqaBaAlawi] = "Khulasa Wird (Morning)",
+                [PlatformConfigKeys.TariqaShadhili] = "Hizb al-Bahr",
+                [PlatformConfigKeys.GlobalBanner] = string.Empty,
+                [PlatformConfigKeys.AllowMultiMosqueOwnership] = "false",
+            };
+
+            foreach (var (key, value) in defaults)
+            {
+                if (await db.PlatformConfigs.AnyAsync(c => c.Key == key)) continue;
+                db.PlatformConfigs.Add(new PlatformConfig { Key = key, Value = value });
+            }
+            await db.SaveChangesAsync();
+        }
+
+        /// <summary>Migrate legacy Claimed mosques to ClaimPending and ensure claim records exist.</summary>
+        private static async Task EnrichPublicProfileDemoAsync(ApplicationDbContext db, Mosque mosque, bool includeDonations = true)
+        {
+            if (mosque.EstablishedYear == null)
+            {
+                mosque.EstablishedYear = mosque.Slug.Contains("leeds") ? 1998 : 1987;
+                mosque.Capacity = mosque.Slug.Contains("leeds") ? 400 : 850;
+                mosque.Vision = "A vibrant centre of worship, learning, and community service for generations to come.";
+                mosque.History = "Founded by local families, our mosque has grown into a hub for daily prayers, madrassah education, and community outreach.";
+                mosque.ParkingInfo = "Free on-street parking on Manningham Lane; accessible bays near the main entrance.";
+                mosque.ShortDescription = "Serving Bradford with daily prayers, education, and community programmes.";
+                mosque.FacilitiesJson = JsonSerializer.Serialize(new[] { "Parking", "WuduArea", "WomensPrayerArea", "WheelchairAccess", "Madrasah", "CommunityHall" });
+                mosque.ServicesJson = JsonSerializer.Serialize(new[] { "DailyPrayers", "Jumuah", "QuranClasses", "ArabicClasses", "Youth", "Nikah" });
+                mosque.GalleryJson = JsonSerializer.Serialize(new[]
+                {
+                    "/uploads/mosques/demo-banner.png",
+                    "/uploads/mosques/demo-logo.png",
+                    "/uploads/mosques/demo-banner.png"
+                });
+                mosque.ProfileJson = JsonSerializer.Serialize(new
+                {
+                    leadership = new[]
+                    {
+                        new { name = "Imam Abdullah Rahman", role = "Head Imam", bio = "Hafiz & graduate of Islamic studies with 15 years community leadership.", photoUrl = "/uploads/mosques/demo-logo.png" },
+                        new { name = "Sr. Fatima Khan", role = "Education Director", bio = "Oversees madrassah curriculum and sisters programmes.", photoUrl = (string?)null },
+                        new { name = "Br. Yusuf Ahmed", role = "Chair of Trustees", bio = "Coordinates governance and community partnerships.", photoUrl = (string?)null }
+                    },
+                    stats = new { members = 1240, weeklyAttendance = 680, eventsHosted = 96, yearsOfService = mosque.EstablishedYear.HasValue ? DateTime.UtcNow.Year - mosque.EstablishedYear.Value : 35 }
+                });
+                if (mosque.Latitude == null)
+                {
+                    mosque.Latitude = 53.796;
+                    mosque.Longitude = -1.759;
+                }
+                if (string.IsNullOrEmpty(mosque.BannerUrl))
+                    mosque.BannerUrl = "/uploads/mosques/demo-banner.png";
+                if (string.IsNullOrEmpty(mosque.LogoUrl))
+                    mosque.LogoUrl = "/uploads/mosques/demo-logo.png";
+            }
+
+            foreach (var key in new[] { "Donations", "Madrassah", "Events", "Announcements" })
+            {
+                var setting = await db.MosqueSettings.FirstOrDefaultAsync(s => s.MosqueId == mosque.Id && s.ModuleKey == key);
+                if (setting == null)
+                    db.MosqueSettings.Add(new MosqueSetting { MosqueId = mosque.Id, ModuleKey = key, IsEnabled = true });
+                else
+                    setting.IsEnabled = true;
+            }
+
+            if (includeDonations && !await db.DonationFunds.AnyAsync(f => f.MosqueId == mosque.Id))
+            {
+                db.DonationFunds.AddRange(
+                    new DonationFund { MosqueId = mosque.Id, Name = "General Fund", FundType = "General", Description = "Support daily operations and utilities.", ExternalUrl = "https://example.org/donate", SortOrder = 0 },
+                    new DonationFund { MosqueId = mosque.Id, Name = "Zakat Fund", FundType = "Zakat", Description = "Distributed to eligible recipients in our community.", ExternalUrl = "https://example.org/zakat", SortOrder = 1 },
+                    new DonationFund { MosqueId = mosque.Id, Name = "Building Appeal", FundType = "Building", Description = "Expansion and refurbishment of prayer halls.", ExternalUrl = "https://example.org/building", SortOrder = 2 }
+                );
+            }
         }
     }
 }

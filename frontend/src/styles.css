@@ -1,3 +1,10 @@
+@import './design-system.css';
+@import './marketing-theme.css';
+@import './dashboard-shared.css';
+@import './member-dashboard.css';
+@import './material-theme.css';
+@import './responsive.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -14,6 +21,8 @@
     width: 100%;
     font-size: 13px;
     -webkit-text-size-adjust: 100%;
+    scrollbar-color: rgba(15, 76, 58, 0.35) var(--mos-bg);
+    scrollbar-width: thin;
   }
 
   @media (min-width: 640px) {
@@ -30,11 +39,32 @@
     min-height: 100dvh;
     width: 100%;
     overflow-x: hidden;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     font-size: 1rem;
     line-height: 1.5;
-    background-color: #022c22;
-    color: #ecfdf5;
+    background-color: var(--mos-bg);
+    color: var(--mos-text-primary);
+    scrollbar-color: rgba(15, 76, 58, 0.35) var(--mos-bg);
+    scrollbar-width: thin;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: var(--mos-bg);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: rgba(15, 76, 58, 0.28);
+    border-radius: 9999px;
+    border: 2px solid var(--mos-bg);
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(15, 76, 58, 0.45);
   }
 
   app-root {
@@ -63,6 +93,11 @@
     width: 100%;
     max-width: 100%;
     min-width: 0;
+    color: var(--mos-text-primary);
+  }
+
+  .app-shell-main {
+    background: var(--mos-bg);
   }
 
   .break-anywhere {
@@ -78,79 +113,397 @@
 
   .text-label {
     @apply text-xs sm:text-sm font-bold uppercase tracking-widest;
+    color: var(--mos-text-secondary);
   }
 
   .text-meta {
-    @apply text-xs sm:text-sm text-emerald-400 leading-relaxed;
+    @apply text-xs sm:text-sm leading-relaxed;
+    color: var(--mos-text-secondary);
   }
 
   .text-stat-label {
-    @apply text-xs sm:text-sm text-emerald-300;
+    @apply text-xs sm:text-sm;
+    color: var(--mos-text-secondary);
   }
 
   .text-body {
     @apply text-sm sm:text-base leading-relaxed;
+    color: var(--mos-text-primary);
   }
 
   .text-body-muted {
-    @apply text-sm sm:text-base text-emerald-200 leading-relaxed;
+    @apply text-sm sm:text-base leading-relaxed;
+    color: var(--mos-text-secondary);
   }
 
   .heading-page {
-    @apply text-xl sm:text-2xl font-bold text-white tracking-tight;
+    @apply text-xl sm:text-2xl font-bold tracking-tight;
+    color: var(--mos-text-primary);
   }
 
   .heading-section {
-    @apply text-base sm:text-lg font-semibold text-white;
+    @apply text-base sm:text-lg font-semibold;
+    color: var(--mos-text-primary);
   }
 
-  /* Super Admin / mosque admin shared UI */
+  /* Cards */
+  .mos-card {
+    background: var(--mos-surface);
+    border: 1px solid var(--mos-border);
+    border-radius: var(--mos-radius-card);
+    box-shadow: var(--mos-shadow-card);
+    padding: 1rem 1.25rem;
+    width: 100%;
+    transition: box-shadow 0.2s, border-color 0.2s;
+  }
+
+  .mos-card--interactive:hover {
+    border-color: var(--mos-primary-25);
+    box-shadow: var(--mos-shadow-card-hover);
+  }
+
+  .mos-kpi-value {
+    color: var(--mos-text-primary);
+    font-weight: 700;
+    font-size: 1.5rem;
+    line-height: 1.2;
+  }
+
+  .mos-kpi-label {
+    color: var(--mos-text-secondary);
+    font-size: 0.8125rem;
+  }
+
+  /* Buttons */
+  .mos-btn {
+    @apply inline-flex items-center justify-center gap-1.5 font-semibold text-xs sm:text-sm px-3 py-2 sm:px-4 sm:py-2.5 rounded-[10px] border-none cursor-pointer transition disabled:opacity-50 disabled:cursor-wait;
+    background: var(--mos-primary);
+    color: var(--mos-text-inverse);
+  }
+
+  .mos-btn:hover:not(:disabled) {
+    background: var(--mos-primary-hover);
+  }
+
+  .mos-btn--secondary {
+    background: var(--mos-surface);
+    color: var(--mos-text-primary);
+    border: 1px solid var(--mos-border-input);
+  }
+
+  .mos-btn--secondary:hover:not(:disabled) {
+    background: var(--mos-bg);
+    border-color: var(--mos-border);
+  }
+
+  .mos-btn--success {
+    background: var(--mos-success);
+    color: var(--mos-text-inverse);
+  }
+
+  .mos-btn--warning {
+    background: var(--mos-warning);
+    color: var(--mos-text-primary);
+  }
+
+  .mos-btn--danger {
+    background: var(--mos-danger);
+    color: var(--mos-text-inverse);
+  }
+
+  .mos-btn--ghost {
+    background: transparent;
+    color: var(--mos-text-secondary);
+    border: 1px solid var(--mos-border);
+  }
+
+  .mos-btn--ghost:hover:not(:disabled) {
+    background: var(--mos-bg);
+    color: var(--mos-primary);
+    border-color: var(--mos-primary-25);
+  }
+
+  /* Admin shared UI (legacy class names) */
   .admin-toolbar {
     @apply flex flex-wrap items-center justify-between gap-2.5 mb-3;
   }
 
-  .admin-search {
-    @apply w-full sm:max-w-xs bg-[#022c22] border border-emerald-800 rounded-lg px-2.5 py-2 text-xs sm:text-sm text-white placeholder:text-emerald-600 focus:outline-none focus:border-amber-500/50;
+  .admin-search,
+  .admin-input {
+    @apply w-full rounded-[10px] px-3 py-2 text-xs sm:text-sm focus:outline-none;
+    background: var(--mos-surface);
+    border: 1px solid var(--mos-border-input);
+    color: var(--mos-text-primary);
   }
 
-  .admin-input {
-    @apply w-full bg-[#022c22] border border-emerald-800 rounded-lg px-2.5 py-2 text-xs sm:text-sm text-white placeholder:text-emerald-600 focus:outline-none focus:border-amber-500/50;
+  .admin-search {
+    @apply sm:max-w-xs;
+  }
+
+  .admin-search::placeholder,
+  .admin-input::placeholder {
+    color: var(--mos-text-muted);
+  }
+
+  .admin-search:focus,
+  .admin-input:focus {
+    border-color: var(--mos-primary);
+    box-shadow: var(--mos-focus-ring);
   }
 
   .admin-btn {
-    @apply inline-flex items-center justify-center gap-1.5 bg-amber-500 text-[#022c22] font-semibold text-xs sm:text-sm px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border-none cursor-pointer transition hover:bg-amber-400 disabled:opacity-50 disabled:cursor-wait;
+    @apply mos-btn;
   }
 
   .admin-btn--ghost {
-    @apply bg-transparent text-emerald-200 border border-emerald-700 hover:border-amber-500/40 hover:text-amber-300;
+    @apply mos-btn--ghost;
   }
 
   .admin-btn--success {
-    @apply bg-emerald-500 text-[#022c22] hover:bg-emerald-400;
+    @apply mos-btn--success;
   }
 
   .admin-btn--danger {
-    @apply bg-red-500 text-white hover:bg-red-400;
+    @apply mos-btn--danger;
   }
 
   .admin-empty {
-    @apply text-center py-10 px-4 bg-[#064e3b] border border-dashed border-emerald-800 rounded-xl;
+    @apply text-center py-10 px-4 rounded-card;
+    background: var(--mos-surface);
+    border: 1px dashed var(--mos-border);
+    box-shadow: var(--mos-shadow-card);
   }
 
   .admin-empty-title {
-    @apply text-white font-semibold text-sm sm:text-base m-0;
+    @apply font-semibold text-sm sm:text-base m-0;
+    color: var(--mos-text-primary);
   }
 
   .admin-empty-desc {
-    @apply text-emerald-300/80 text-xs sm:text-sm mt-2 m-0 max-w-md mx-auto;
+    @apply text-xs sm:text-sm mt-2 m-0 max-w-md mx-auto;
+    color: var(--mos-text-secondary);
   }
 
   .admin-role-pill {
-    @apply inline-flex items-center gap-1 text-xs font-medium bg-emerald-950 text-emerald-200 px-2.5 py-1 rounded-full border border-emerald-800;
+    @apply inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full;
+    background: var(--mos-bg);
+    color: var(--mos-text-primary);
+    border: 1px solid var(--mos-border);
   }
 
   .admin-meta {
-    @apply text-sm text-emerald-400/90;
+    @apply text-sm;
+    color: var(--mos-text-secondary);
+  }
+
+  /* Status badges */
+  .mos-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+
+  .mos-badge--active {
+    background: var(--mos-badge-active-bg);
+    color: var(--mos-badge-active-text);
+  }
+
+  .mos-badge--pending {
+    background: var(--mos-badge-pending-bg);
+    color: var(--mos-badge-pending-text);
+  }
+
+  .mos-badge--rejected {
+    background: var(--mos-badge-rejected-bg);
+    color: var(--mos-badge-rejected-text);
+  }
+
+  /* Tables */
+  .mos-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--mos-surface);
+    border: 1px solid var(--mos-border);
+    border-radius: var(--mos-radius-card);
+    overflow: hidden;
+    box-shadow: var(--mos-shadow-card);
+  }
+
+  .mos-table thead th {
+    background: var(--mos-table-header-bg);
+    color: var(--mos-table-header-text);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--mos-border);
+  }
+
+  .mos-table tbody td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--mos-border);
+    color: var(--mos-text-primary);
+    font-size: 0.875rem;
+  }
+
+  .mos-table tbody tr:hover {
+    background: var(--mos-table-row-hover);
+  }
+
+  .mos-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  /* Enterprise dashboard light overrides */
+  .app-page .panel,
+  .app-page .enterprise-dash .panel {
+    background: var(--mos-surface) !important;
+    border: 1px solid var(--mos-border) !important;
+    border-radius: var(--mos-radius-card) !important;
+    box-shadow: var(--mos-shadow-card) !important;
+    color: var(--mos-text-primary) !important;
+  }
+
+  .app-page .panel__title,
+  .app-page .kpi-label,
+  .app-page .score-label,
+  .app-page .chart-title,
+  .app-page .user-stat-label,
+  .app-page .feature-title {
+    color: var(--mos-text-secondary) !important;
+  }
+
+  .app-page .kpi-value,
+  .app-page .score-value,
+  .app-page .dash-greeting,
+  .app-page .panel__title + *,
+  .app-page .action-card__title {
+    color: var(--mos-text-primary) !important;
+  }
+
+  .app-page .kpi-card,
+  .app-page .health-score-card,
+  .app-page .action-card,
+  .app-page .chart-card,
+  .app-page .sec-cell,
+  .app-page .content-cell,
+  .app-page .quick-btn {
+    background: var(--mos-surface) !important;
+    border: 1px solid var(--mos-border) !important;
+    color: var(--mos-text-primary) !important;
+    box-shadow: var(--mos-shadow-card) !important;
+  }
+
+  .app-page .dash-eyebrow {
+    color: var(--mos-primary) !important;
+  }
+
+  .app-page .dash-header {
+    border-bottom-color: var(--mos-border) !important;
+  }
+
+  .app-page .data-table__head {
+    background: var(--mos-table-header-bg) !important;
+    color: var(--mos-table-header-text) !important;
+  }
+
+  .app-page .data-table__row {
+    color: var(--mos-text-primary) !important;
+    border-color: var(--mos-border) !important;
+  }
+
+  .app-page .data-table__row:hover {
+    background: var(--mos-table-row-hover) !important;
+  }
+
+  .app-page .btn-primary {
+    background: var(--mos-primary) !important;
+    color: var(--mos-text-inverse) !important;
+  }
+
+  .app-page .btn-secondary {
+    color: var(--mos-primary) !important;
+    border-color: var(--mos-border-input) !important;
+  }
+
+  .app-page .notif-panel {
+    background: var(--mos-surface) !important;
+    border-color: var(--mos-border) !important;
+    box-shadow: var(--mos-shadow-card-hover) !important;
+  }
+
+  .app-page .notif-item strong {
+    color: var(--mos-text-primary) !important;
+  }
+
+  .app-page .notif-item span {
+    color: var(--mos-text-secondary) !important;
+  }
+
+  .app-page .icon-btn {
+    background: var(--mos-surface) !important;
+    border-color: var(--mos-border) !important;
+  }
+
+  .app-page .chart-bar {
+    background: var(--mos-chart-primary) !important;
+  }
+
+  .app-page .chart-bar--blue {
+    background: var(--mos-info) !important;
+  }
+
+  .app-page .chart-bar--gold {
+    background: var(--mos-chart-accent) !important;
+  }
+
+  .app-page .role-bar__fill {
+    background: var(--mos-primary) !important;
+  }
+
+  .app-page .dash-loading {
+    color: var(--mos-text-secondary) !important;
+  }
+
+  /* Legacy dark-theme utility compatibility inside dashboard content */
+  .app-page .text-white {
+    color: var(--mos-text-primary) !important;
+  }
+
+  .app-page .bg-mos-surface,
+  .app-page .mos-card,
+  .app-page app-card .ui-card {
+    color: var(--mos-text-primary);
+  }
+
+  .app-page input,
+  .app-page select,
+  .app-page textarea {
+    background: var(--mos-surface);
+    border: 1px solid var(--mos-border-input);
+    color: var(--mos-text-primary);
+    border-radius: var(--mos-radius-input);
+  }
+
+  .app-page input:focus,
+  .app-page select:focus,
+  .app-page textarea:focus {
+    outline: none;
+    border-color: var(--mos-primary);
+    box-shadow: var(--mos-focus-ring);
+  }
+
+  /* Public marketing pages outside shell keep teal hero */
+  .mos-marketing-page {
+    --mos-bg: #F8FAFC;
+    background: var(--mos-bg);
+    color: var(--mos-text-primary);
+  }
+
+  .mos-marketing-hero {
+    background: linear-gradient(135deg, var(--mos-primary) 0%, var(--mos-primary-deep) 55%, #062E24 100%);
+    color: #FFFFFF;
   }
 
   @media (min-width: 640px) {
@@ -168,7 +521,6 @@
   }
 }
 
-/* Hide scrollbars — scrolling still works */
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;

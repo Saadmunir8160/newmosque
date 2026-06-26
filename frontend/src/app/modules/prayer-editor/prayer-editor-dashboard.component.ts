@@ -1,51 +1,175 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
+
 import { CommonModule } from '@angular/common';
+
 import { RouterModule } from '@angular/router';
-import { environment } from '../../../environments/environment';
-import { MosqueService } from '../../core/services/mosque.service';
+
+import { MatButtonModule } from '@angular/material/button';
+
+import { MatCardModule } from '@angular/material/card';
+
+import { MatChipsModule } from '@angular/material/chips';
+
+import { PrayerEditorService, PrayerEditorDashboard } from '../../core/services/prayer-editor.service';
+
+import { MosqueContextService } from '../../core/services/mosque-context.service';
+
 import { PrayerTimesDaily } from '../../core/models';
 
+import { MosqueService } from '../../core/services/mosque.service';
+
+
+
 @Component({
+
   selector: 'app-prayer-editor-dashboard',
+
   standalone: true,
-  imports: [CommonModule, RouterModule],
+
+  imports: [CommonModule, RouterModule, MatCardModule, MatButtonModule, MatChipsModule],
+
   template: `
-    <div class="editor-page">
-      <header class="editor-head">
-        <p class="editor-badge">Prayer Times Editor</p>
-        <h1 class="editor-title">Dashboard</h1>
-        <p class="editor-sub">Quick view of today's start and jamaah times.</p>
+
+    <div class="mos-dash">
+
+      <header class="mos-dash-header">
+
+        <div>
+
+          <p class="mos-dash-eyebrow">Prayer Times Editor</p>
+
+          <h1 class="mos-dash-title">Dashboard</h1>
+
+          <p class="mos-dash-sub" *ngIf="summary() as s">{{ s.mosqueName }} — manage and publish prayer schedules.</p>
+
+        </div>
+
       </header>
 
-      <section class="card" *ngIf="times() as t">
-        <h2 class="card-title">Today's timetable</h2>
-        <div class="rows">
-          <div class="row"><span>Fajr</span><span>{{ t.fajrStart.slice(0,5) }} / {{ t.fajrJamaat.slice(0,5) }}</span></div>
-          <div class="row"><span>Dhuhr</span><span>{{ t.dhuhrStart.slice(0,5) }} / {{ t.dhuhrJamaat.slice(0,5) }}</span></div>
-          <div class="row"><span>Asr</span><span>{{ t.asrStart.slice(0,5) }} / {{ t.asrJamaat.slice(0,5) }}</span></div>
-          <div class="row"><span>Maghrib</span><span>{{ t.maghribStart.slice(0,5) }} / {{ t.maghribJamaat.slice(0,5) }}</span></div>
-          <div class="row"><span>Isha</span><span>{{ t.ishaStart.slice(0,5) }} / {{ t.ishaJamaat.slice(0,5) }}</span></div>
+
+
+      <div class="mos-kpi-grid mb-4" *ngIf="summary() as s">
+
+        <div class="mos-kpi">
+
+          <p class="mos-kpi__label">Today</p>
+
+          <p class="mos-kpi__value mos-kpi__value--sm">{{ s.todayStatus || '—' }}</p>
+
         </div>
+
+        <div class="mos-kpi">
+
+          <p class="mos-kpi__label">Published days</p>
+
+          <p class="mos-kpi__value">{{ s.publishedDays }}</p>
+
+        </div>
+
+        <div class="mos-kpi">
+
+          <p class="mos-kpi__label">Draft days</p>
+
+          <p class="mos-kpi__value">{{ s.draftDays }}</p>
+
+        </div>
+
+        <div class="mos-kpi">
+
+          <p class="mos-kpi__label">Jumuah slots</p>
+
+          <p class="mos-kpi__value">{{ s.jumuahSlots }}</p>
+
+        </div>
+
+      </div>
+
+
+
+      <section class="mos-dash-panel" *ngIf="times() as t">
+
+        <h2 class="mos-dash-panel__title">Today's timetable</h2>
+
+        <div class="space-y-2 mb-4">
+
+          <div class="flex justify-between text-sm border-b border-mos-border pb-2" *ngFor="let p of prayers">
+
+            <span class="font-medium text-mos-text">{{ p.label }}</span>
+
+            <span class="text-mos-muted">{{ t[p.start].slice(0,5) }} start · {{ t[p.jamaat].slice(0,5) }} jamaat</span>
+
+          </div>
+
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+
+          <a mat-flat-button color="primary" routerLink="/dashboard/prayer-editor/daily">Edit daily</a>
+
+          <a mat-stroked-button routerLink="/dashboard/prayer-editor/jumuah">Jumuah</a>
+
+          <a mat-stroked-button routerLink="/dashboard/prayer-editor/ramadan">Ramadan</a>
+
+          <a mat-stroked-button routerLink="/dashboard/prayer-editor/audit">Audit log</a>
+
+        </div>
+
       </section>
+
     </div>
+
   `,
-  styles: [`
-    .editor-page { display: flex; flex-direction: column; gap: 1rem; }
-    .editor-badge { margin: 0; font-size: 0.7rem; color: #fbbf24; font-weight: 700; text-transform: uppercase; }
-    .editor-title { margin: 0.25rem 0 0; color: #fff; font-size: 1.5rem; }
-    .editor-sub { margin: 0.25rem 0 0; color: #6ee7b7; font-size: 0.85rem; }
-    .card { background: #064e3b; border: 1px solid #065f46; border-radius: 0.75rem; padding: 1rem; }
-    .card-title { margin: 0 0 0.75rem; color: #fff; font-size: 1rem; }
-    .rows { display: flex; flex-direction: column; gap: 0.5rem; }
-    .row { display: flex; justify-content: space-between; color: #d1fae5; font-size: 0.875rem; border-bottom: 1px solid rgba(6,95,70,0.6); padding-bottom: 0.4rem; }
-  `]
+
 })
+
 export class PrayerEditorDashboardComponent implements OnInit {
+
+  private editor = inject(PrayerEditorService);
+
+  private mosqueCtx = inject(MosqueContextService);
+
   private mosque = inject(MosqueService);
+
+
+
+  summary = signal<PrayerEditorDashboard | null>(null);
+
   times = signal<PrayerTimesDaily | null>(null);
-  private mosqueId = environment.defaultMosqueId;
+
+  private mosqueId = 1;
+
+
+
+  prayers = [
+
+    { label: 'Fajr', start: 'fajrStart' as const, jamaat: 'fajrJamaat' as const },
+
+    { label: 'Dhuhr', start: 'dhuhrStart' as const, jamaat: 'dhuhrJamaat' as const },
+
+    { label: 'Asr', start: 'asrStart' as const, jamaat: 'asrJamaat' as const },
+
+    { label: 'Maghrib', start: 'maghribStart' as const, jamaat: 'maghribJamaat' as const },
+
+    { label: 'Isha', start: 'ishaStart' as const, jamaat: 'ishaJamaat' as const },
+
+  ];
+
+
 
   ngOnInit(): void {
-    this.mosque.getDailyPrayerTimes(this.mosqueId).subscribe(r => this.times.set(r.times));
+
+    this.mosqueCtx.resolve().then(id => {
+
+      this.mosqueId = id;
+
+      this.editor.getDashboard(id).subscribe(s => this.summary.set(s));
+
+      this.mosque.getDailyPrayerTimes(id).subscribe(r => this.times.set(r.times));
+
+    });
+
   }
+
 }
+
+

@@ -14,6 +14,9 @@ namespace MosqueOS.Domain.Entities
         public string? Tags { get; set; }
         public string? Tradition { get; set; }
         public string? AudioUrl { get; set; }
+        public ContentPublishStatus Status { get; set; } = ContentPublishStatus.Published;
+        public DateTime? PublishedAt { get; set; }
+        public string? PublishedById { get; set; }
     }
 
     public class DuaCollection : BaseEntity

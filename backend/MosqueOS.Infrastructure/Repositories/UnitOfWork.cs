@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore.Storage;
 using MosqueOS.Application.Common.Interfaces;
 
 namespace MosqueOS.Infrastructure.Repositories;
@@ -23,5 +24,23 @@ public class UnitOfWork : IUnitOfWork
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _context.SaveChangesAsync(cancellationToken);
 
+    public async Task<IUnitOfWorkTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        var tx = await _context.Database.BeginTransactionAsync(cancellationToken);
+        return new EfUnitOfWorkTransaction(tx);
+    }
+
     public void Dispose() => _context.Dispose();
+
+    private sealed class EfUnitOfWorkTransaction : IUnitOfWorkTransaction
+    {
+        private readonly IDbContextTransaction _tx;
+
+        public EfUnitOfWorkTransaction(IDbContextTransaction tx) => _tx = tx;
+
+        public Task CommitAsync(CancellationToken cancellationToken = default) =>
+            _tx.CommitAsync(cancellationToken);
+
+        public ValueTask DisposeAsync() => _tx.DisposeAsync();
+    }
 }

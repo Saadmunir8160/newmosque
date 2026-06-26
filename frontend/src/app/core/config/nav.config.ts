@@ -23,11 +23,18 @@ const ADMINS = [ROLES.SuperAdmin, ROLES.MosqueOwner, ROLES.MosqueAdmin];
 const MAIN_ACCESS = [...ADMINS, ROLES.Member, ROLES.Parent];
 
 export const GUEST_NAV_ITEMS: NavItem[] = [
-  { section: 'Browse', label: 'Mosque profile', route: '/mosque/masjid-al-noor-bradford' },
-  { section: 'Browse', label: 'Prayer times', route: '/dashboard/prayer-times' },
-  { section: 'Browse', label: 'Announcements & events', route: '/dashboard/guest/updates' },
-  { section: 'Browse', label: 'Janaza', route: '/dashboard/guest/janaza' },
-  { section: 'Browse', label: 'Login / register', route: '/login' },
+  { section: 'Browse', label: 'Home', route: '/dashboard/guest' },
+  { section: 'Browse', label: 'Prayer times', route: '/dashboard/guest/prayer-times' },
+  { section: 'Browse', label: 'Announcements', route: '/dashboard/guest/announcements' },
+  { section: 'Browse', label: 'Events', route: '/dashboard/guest/events' },
+  { section: 'Browse', label: 'Janaza notices', route: '/dashboard/guest/janaza' },
+  { section: 'Browse', label: 'Communities', route: '/dashboard/guest/communities' },
+  { section: 'Content', label: 'Duas library', route: '/dashboard/guest/duas' },
+  { section: 'Content', label: 'Adhkar library', route: '/dashboard/guest/adhkar' },
+  { section: 'Content', label: 'Ritual guides', route: '/dashboard/guest/ritual-guides' },
+  { section: 'Content', label: 'Umrah & Hajj guides', route: '/dashboard/guest/journey-guides' },
+  { section: 'Account', label: 'Login', route: '/auth/login' },
+  { section: 'Account', label: 'Register', route: '/register' },
 ];
 
 
@@ -55,53 +62,50 @@ export const NAV_ITEMS: NavItem[] = [
 
 
 
-  // —— Super Admin ——
+  // —— Super Admin (fallback nav only — dedicated sidebar uses super-admin-nav.config) ——
 
   { section: 'Super Admin', label: 'Platform Control', route: '/dashboard/super', roles: [ROLES.SuperAdmin] },
 
-  { section: 'Super Admin', label: 'Mosque Listings', route: '/dashboard/super/mosques', roles: [ROLES.SuperAdmin] },
+  { section: 'Super Admin', label: 'Mosque listings', route: '/dashboard/super/mosques', roles: [ROLES.SuperAdmin] },
 
-  { section: 'Super Admin', label: 'Verify Claims', route: '/dashboard/super/claims', roles: [ROLES.SuperAdmin] },
+  { section: 'Super Admin', label: 'Claim management', route: '/dashboard/super/claims', roles: [ROLES.SuperAdmin] },
+
+  { section: 'Super Admin', label: 'Mosque data', route: '/dashboard/super/mosque-data', roles: [ROLES.SuperAdmin] },
+
+  { section: 'Super Admin', label: 'Module flags', route: '/dashboard/super/features', roles: [ROLES.SuperAdmin] },
 
   { section: 'Super Admin', label: 'User Management', route: '/dashboard/super/users', roles: [ROLES.SuperAdmin] },
 
-  { section: 'Super Admin', label: 'Mosque Data', route: '/dashboard/super/mosque-data', roles: [ROLES.SuperAdmin] },
-
-  { section: 'Super Admin', label: 'Feature Flags', route: '/dashboard/super/features', roles: [ROLES.SuperAdmin] },
-
-  { section: 'Super Admin', label: 'Audit Logs', route: '/dashboard/super/audit', roles: [ROLES.SuperAdmin] },
 
 
-
-  // —— Mosque Owner ——
+  // —— Mosque Owner (fallback nav only — dedicated sidebar uses owner-nav.config) ——
 
   { section: 'Mosque Owner', label: 'Owner Dashboard', route: '/dashboard/owner', roles: [ROLES.MosqueOwner] },
 
-  { section: 'Mosque Owner', label: 'Claim Mosque', route: '/dashboard/owner/claim', roles: [ROLES.MosqueOwner] },
+  { section: 'Mosque Owner', label: 'Mosque profile', route: '/dashboard/owner/profile', roles: [ROLES.MosqueOwner] },
 
-  { section: 'Mosque Owner', label: 'Appoint Staff', route: '/dashboard/owner/staff', roles: [ROLES.MosqueOwner] },
+  { section: 'Mosque Owner', label: 'My claims', route: '/dashboard/owner/my-claims', roles: [ROLES.MosqueOwner] },
+
+  { section: 'Mosque Owner', label: 'Mosque listings', route: '/dashboard/owner/mosque-listings', roles: [ROLES.MosqueOwner] },
+
+  { section: 'Mosque Owner', label: 'Module settings', route: '/dashboard/owner/settings', roles: [ROLES.MosqueOwner] },
+  { section: 'Mosque Owner', label: 'Admin management', route: '/dashboard/owner/staff', roles: [ROLES.MosqueOwner] },
 
 
 
-  // —— Mosque Management ——
+  // —— Mosque Admin (fallback nav only — dedicated sidebar uses mosque-admin-nav.config) ——
+
+  { section: 'Mosque Admin', label: 'Overview', route: '/dashboard/mosque', roles: [ROLES.MosqueAdmin] },
+
+  { section: 'Mosque Admin', label: 'Mosque profile', route: '/dashboard/mosque/profile', roles: [ROLES.MosqueAdmin] },
+
+  { section: 'Mosque Admin', label: 'Module settings', route: '/dashboard/mosque/settings', roles: [ROLES.MosqueAdmin] },
+
+  // —— Mosque Management (Module 3.1 only) ——
 
   { section: 'Mosque Management', label: 'Mosque Profile', route: '/dashboard/admin/mosque', roles: ADMINS },
 
-  { section: 'Mosque Management', label: 'Edit Prayer Times', route: '/dashboard/admin/prayer-times', roles: [ROLES.SuperAdmin, ROLES.MosqueAdmin, ROLES.PrayerTimesEditor] },
-
-  { section: 'Mosque Management', label: 'Manage Announcements', route: '/dashboard/admin/announcements', roles: ADMINS },
-
-  { section: 'Mosque Management', label: 'Manage Events', route: '/dashboard/admin/events', roles: ADMINS },
-
-  { section: 'Mosque Management', label: 'Janaza', route: '/dashboard/admin/janaza', roles: ADMINS },
-
-  { section: 'Mosque Management', label: 'Communities', route: '/dashboard/admin/communities', roles: ADMINS },
-
-  { section: 'Mosque Management', label: 'Participation', route: '/dashboard/admin/participation', roles: ADMINS },
-
   { section: 'Mosque Management', label: 'Module Settings', route: '/dashboard/admin/settings', roles: ADMINS },
-
-  { section: 'Mosque Management', label: 'Madrassah Overview', route: '/dashboard/admin/madrassah', roles: ADMINS },
 
 
 
@@ -128,14 +132,11 @@ export const NAV_ITEMS: NavItem[] = [
   // —— Content Editor ——
 
   { section: 'Content', label: 'Dashboard', route: '/dashboard/content', roles: [ROLES.ContentEditor, ...ADMINS] },
-  { section: 'Content', label: 'Awrad & wird', route: '/dashboard/content/awrad', roles: [ROLES.ContentEditor, ...ADMINS] },
-
-  { section: 'Content', label: 'Duas library', route: '/dashboard/content/duas', roles: [ROLES.ContentEditor, ...ADMINS] },
-
-  { section: 'Content', label: 'Adhkar library', route: '/dashboard/content/adhkar', roles: [ROLES.ContentEditor, ...ADMINS] },
-
-  { section: 'Content', label: 'Ritual guides', route: '/dashboard/content/ritual-guides', roles: [ROLES.ContentEditor, ...ADMINS] },
-  { section: 'Content', label: 'Articles', route: '/dashboard/content/articles', roles: [ROLES.ContentEditor, ...ADMINS] },
+  { section: 'Content', label: 'Awrad', route: '/dashboard/content/awrad', roles: [ROLES.ContentEditor, ...ADMINS] },
+  { section: 'Content', label: 'Duas', route: '/dashboard/content/duas', roles: [ROLES.ContentEditor, ...ADMINS] },
+  { section: 'Content', label: 'Adhkar', route: '/dashboard/content/adhkar', roles: [ROLES.ContentEditor, ...ADMINS] },
+  { section: 'Content', label: 'Library', route: '/dashboard/content/library', roles: [ROLES.ContentEditor, ...ADMINS] },
+  { section: 'Content', label: 'Content Reviews', route: '/dashboard/content/reviews', roles: [ROLES.ContentEditor, ...ADMINS] },
 
 
 
@@ -195,7 +196,9 @@ export function homeRouteForRoles(userRoles: string[]): string {
 
   if (userRoles.includes(ROLES.MosqueOwner)) return '/dashboard/owner';
 
-  if (userRoles.includes(ROLES.MosqueAdmin)) return '/dashboard/admin/mosque';
+  if (userRoles.includes(ROLES.MosqueAdmin) && !userRoles.includes(ROLES.MosqueOwner)) return '/dashboard/mosque';
+
+  if (userRoles.includes(ROLES.MosqueAdmin)) return '/dashboard/admin';
 
   if (userRoles.includes(ROLES.PrayerTimesEditor)) return '/dashboard/prayer-editor';
 
@@ -227,23 +230,82 @@ export function navIsMosqueOwner(userRoles: string[]): boolean {
   return userRoles.includes(ROLES.MosqueOwner) && !userRoles.includes(ROLES.SuperAdmin);
 }
 
+/** Dedicated mosque-admin sidebar (not super admin / owner). */
+export function navIsMosqueAdmin(userRoles: string[]): boolean {
+  if (!userRoles.includes(ROLES.MosqueAdmin)) return false;
+  if (navIsSuperAdmin(userRoles) || navIsMosqueOwner(userRoles)) return false;
+  return true;
+}
+
+/** Dedicated prayer-editor sidebar (not mosque admin / super admin). */
+export function navIsPrayerEditor(userRoles: string[]): boolean {
+  if (!userRoles.includes(ROLES.PrayerTimesEditor)) return false;
+  if (navIsSuperAdmin(userRoles) || navIsMosqueOwner(userRoles)) return false;
+  if (hasAny(userRoles, ADMINS)) return false;
+  return true;
+}
+
+/** Dedicated teacher sidebar (not admin roles). */
+export function navIsTeacher(userRoles: string[]): boolean {
+  if (!userRoles.includes(ROLES.Teacher)) return false;
+  if (navIsSuperAdmin(userRoles) || navIsMosqueOwner(userRoles) || navIsMosqueAdmin(userRoles)) return false;
+  if (hasAny(userRoles, ADMINS)) return false;
+  return true;
+}
+
+/** Dedicated muqaddam sidebar (muqaddam-only users). */
+export function navIsMuqaddam(userRoles: string[]): boolean {
+  if (!userRoles.includes(ROLES.Muqaddam)) return false;
+  if (navIsSuperAdmin(userRoles)) return false;
+  if (hasAny(userRoles, ADMINS)) return false;
+  return isSinglePurpose(userRoles, ROLES.Muqaddam, ADMINS);
+}
+
+/** Dedicated content-editor sidebar (content-editor-only users). */
+export function navIsContentEditor(userRoles: string[]): boolean {
+  if (!userRoles.includes(ROLES.ContentEditor)) return false;
+  if (navIsSuperAdmin(userRoles) || navIsMosqueOwner(userRoles) || navIsMosqueAdmin(userRoles)) return false;
+  return isSinglePurpose(userRoles, ROLES.ContentEditor, ADMINS);
+}
+
+/** Dedicated member sidebar (not admin / editor / teacher / content / muqaddam-only). */
+export function navIsMember(userRoles: string[]): boolean {
+  if (!userRoles.includes(ROLES.Member)) return false;
+  if (navIsSuperAdmin(userRoles) || navIsMosqueOwner(userRoles) || navIsMosqueAdmin(userRoles)) return false;
+  if (navIsPrayerEditor(userRoles)) return false;
+  if (navIsTeacher(userRoles)) return false;
+  if (navIsMuqaddam(userRoles)) return false;
+  if (isSinglePurpose(userRoles, ROLES.ContentEditor, ADMINS)) return false;
+  return true;
+}
+
 export function navForRoles(userRoles: string[]): NavItem[] {
 
   if (navIsSuperAdmin(userRoles)) return [];
 
   if (navIsMosqueOwner(userRoles)) return [];
 
+  if (navIsMosqueAdmin(userRoles)) return [];
 
+  if (navIsTeacher(userRoles)) return [];
 
-  const editorOnly = isSinglePurpose(userRoles, ROLES.PrayerTimesEditor, ADMINS);
+  if (navIsMuqaddam(userRoles)) return [];
 
-  const teacherOnly = isSinglePurpose(userRoles, ROLES.Teacher, ADMINS);
+  if (navIsContentEditor(userRoles)) return [];
 
-  const contentOnly = isSinglePurpose(userRoles, ROLES.ContentEditor, ADMINS);
+  if (navIsMember(userRoles)) return [];
 
-  const muqaddamOnly = isSinglePurpose(userRoles, ROLES.Muqaddam, ADMINS);
+  const roles = userRoles?.length ? userRoles : [ROLES.Member];
 
-  const parentOnly = isSinglePurpose(userRoles, ROLES.Parent, ADMINS);
+  const editorOnly = isSinglePurpose(roles, ROLES.PrayerTimesEditor, ADMINS);
+
+  const teacherOnly = isSinglePurpose(roles, ROLES.Teacher, ADMINS);
+
+  const contentOnly = isSinglePurpose(roles, ROLES.ContentEditor, ADMINS);
+
+  const muqaddamOnly = isSinglePurpose(roles, ROLES.Muqaddam, ADMINS);
+
+  const parentOnly = isSinglePurpose(roles, ROLES.Parent, ADMINS);
 
 
 
@@ -251,7 +313,7 @@ export function navForRoles(userRoles: string[]): NavItem[] {
 
     if (!item.roles?.length) return false;
 
-    if (!item.roles.some(r => userRoles.includes(r))) return false;
+    if (!item.roles.some(r => roles.includes(r))) return false;
 
 
 
@@ -278,7 +340,7 @@ export function navForRoles(userRoles: string[]): NavItem[] {
 
     // Hide duplicate Prayer Times section for editors who also have admin
 
-    if (item.section === 'Prayer Times' && hasAny(userRoles, ADMINS)) return false;
+    if (item.section === 'Prayer Times' && hasAny(roles, ADMINS)) return false;
 
 
 
@@ -341,6 +403,7 @@ const NAV_ICONS: Record<string, string> = {
   '/dashboard/super/audit': '📋',
 
   '/dashboard/owner': '🏛️',
+  '/dashboard/mosque': '🕌',
 
   '/dashboard/owner/claim': '📝',
 
@@ -382,7 +445,8 @@ const NAV_ICONS: Record<string, string> = {
 
   '/dashboard/content/awrad': '📿',
   '/dashboard/content': '▦',
-  '/dashboard/content/articles': '📰',
+  '/dashboard/content/library': '📚',
+  '/dashboard/content/reviews': '✅',
 
   '/dashboard/content/duas': '🤲',
 

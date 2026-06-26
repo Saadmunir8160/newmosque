@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.API.Models.Awrad;
+using MosqueOS.API.Models.Common;
 using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
@@ -22,7 +24,8 @@ namespace MosqueOS.API.Controllers
         [HttpGet("collections")]
         public async Task<IActionResult> GetCollections([FromQuery] Tariqa? tariqa, [FromQuery] WirdCollectionType? type)
         {
-            var query = _unitOfWork.Repository<WirdCollection>().QueryNoTracking().AsQueryable();
+            var query = _unitOfWork.Repository<WirdCollection>().QueryNoTracking()
+                .Where(c => c.Status == ContentPublishStatus.Published);
             if (tariqa.HasValue) query = query.Where(c => c.Tariqa == tariqa || c.Tariqa == Tariqa.General);
             if (type.HasValue) query = query.Where(c => c.Type == type);
             return Ok(await query.OrderBy(c => c.Name).ToListAsync());
@@ -35,7 +38,7 @@ namespace MosqueOS.API.Controllers
             var collection = await _unitOfWork.Repository<WirdCollection>().QueryNoTracking()
                 .Include(c => c.Steps.OrderBy(s => s.OrderIndex))
                 .ThenInclude(s => s.ContentItem)
-                .FirstOrDefaultAsync(c => c.Id == id);
+                .FirstOrDefaultAsync(c => c.Id == id && c.Status == ContentPublishStatus.Published);
             return collection == null ? NotFound() : Ok(collection);
         }
 
@@ -44,9 +47,28 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> CreateCollection([FromBody] WirdCollection collection)
         {
             collection.Id = 0;
+            collection.Status = ContentPublishStatus.Draft;
             _unitOfWork.Repository<WirdCollection>().Add(collection);
             await _unitOfWork.SaveChangesAsync();
             return CreatedAtAction(nameof(GetCollection), new { id = collection.Id }, collection);
+        }
+
+        [Authorize(Roles = Roles.ContentManagers)]
+        [HttpPut("collections/{id:int}")]
+        public async Task<IActionResult> UpdateCollection(int id, [FromBody] WirdCollection input)
+        {
+            var collection = await _unitOfWork.Repository<WirdCollection>().FindAsync(id);
+            if (collection == null) return NotFound();
+
+            collection.Name = input.Name;
+            collection.Tariqa = input.Tariqa;
+            collection.Type = input.Type;
+            collection.RecommendedTime = input.RecommendedTime;
+            collection.Description = input.Description;
+            collection.UpdatedAt = DateTime.UtcNow;
+
+            await _unitOfWork.SaveChangesAsync();
+            return Ok(collection);
         }
 
         [Authorize(Roles = Roles.ContentManagers)]
@@ -75,7 +97,9 @@ namespace MosqueOS.API.Controllers
 
         [HttpGet("content-items")]
         public async Task<IActionResult> GetContentItems() =>
-            Ok(await _unitOfWork.Repository<ContentItem>().QueryNoTracking().OrderBy(c => c.Title).ToListAsync());
+            Ok(await _unitOfWork.Repository<ContentItem>().QueryNoTracking()
+                .Where(c => c.Status == ContentPublishStatus.Published)
+                .OrderBy(c => c.Title).ToListAsync());
 
         [Authorize(Roles = Roles.ContentManagers)]
         [HttpPost("content-items")]
@@ -143,7 +167,7 @@ namespace MosqueOS.API.Controllers
             }
 
             await _unitOfWork.SaveChangesAsync();
-            return Ok(new { message = "Schedule saved." });
+            return Ok(new ApiMessageResponse { Message = "Schedule saved." });
         }
 
         [Authorize]
@@ -161,6 +185,21 @@ namespace MosqueOS.API.Controllers
         }
 
         // ---- Progress ----
+
+        /// <summary>Collection IDs the user marked complete today (UTC date).</summary>
+        [Authorize]
+        [HttpGet("completed-today")]
+        public async Task<IActionResult> CompletedToday()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var ids = await _unitOfWork.Repository<UserWirdProgress>().QueryNoTracking()
+                .Where(p => p.UserId == userId && p.Completed && p.LastCompletedAt != null
+                    && DateOnly.FromDateTime(p.LastCompletedAt.Value) == today)
+                .Select(p => p.CollectionId)
+                .ToListAsync();
+            return Ok(ids);
+        }
 
         [Authorize]
         [HttpPost("collections/{id:int}/complete")]
@@ -198,16 +237,26 @@ namespace MosqueOS.API.Controllers
                 .FirstOrDefaultAsync(s => s.UserId == userId && s.PrayerSlot == slot);
 
             if (scheduled != null)
-                return Ok(new { slot = slot.ToString(), collection = scheduled.Collection, mode = scheduled.Mode.ToString() });
+                return Ok(new RecommendedWirdResponse
+                {
+                    Slot = slot.ToString(),
+                    Collection = scheduled.Collection,
+                    Mode = scheduled.Mode.ToString()
+                });
 
             // Fall back to tariqa default
             var user = await _unitOfWork.Repository<ApplicationUser>().QueryNoTracking().FirstAsync(u => u.Id == userId);
             var fallback = await _unitOfWork.Repository<WirdCollection>().QueryNoTracking()
-                .Where(c => c.Type == WirdCollectionType.Daily)
+                .Where(c => c.Type == WirdCollectionType.Daily && c.Status == ContentPublishStatus.Published)
                 .OrderBy(c => c.Tariqa == user.Tariqa ? 0 : c.Tariqa == Tariqa.General ? 1 : 2)
                 .FirstOrDefaultAsync();
 
-            return Ok(new { slot = slot.ToString(), collection = fallback, mode = user.WirdMode.ToString() });
+            return Ok(new RecommendedWirdResponse
+            {
+                Slot = slot.ToString(),
+                Collection = fallback,
+                Mode = user.WirdMode.ToString()
+            });
         }
 
         private static PrayerSlot ResolveSlot(DateTime now)

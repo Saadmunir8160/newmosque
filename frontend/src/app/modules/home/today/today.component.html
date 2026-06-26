@@ -5,6 +5,11 @@
     <p>Loading your day…</p>
   </div>
 
+  <div *ngIf="!loading() && error() && !data()" class="today-panel today-panel--empty today-error">
+    <p>{{ error() }}</p>
+    <button type="button" class="today-btn-gold" (click)="retry()">Try again</button>
+  </div>
+
   <ng-container *ngIf="!loading() && data() as d">
 
     <!-- Header -->
@@ -17,7 +22,11 @@
             <span *ngIf="d.isFriday" class="today-friday-chip">Jumuah</span>
           </div>
           <h1 class="today-title">{{ d.isFriday ? 'Jumuah Mubarak' : 'Today' }}</h1>
-          <p class="today-subtitle">{{ d.date | date:'EEEE, d MMMM y' }}</p>
+          <p class="today-subtitle">
+            <ng-container *ngIf="authService.user()?.fullName as name">As-salamu alaykum, {{ name }} · </ng-container>
+            {{ d.date | date:'EEEE, d MMMM y' }}
+            <span *ngIf="mosqueName()"> · {{ mosqueName() }}</span>
+          </p>
         </div>
         <nav class="today-quick-nav" aria-label="Quick links">
           <a routerLink="/dashboard/prayer-times" class="today-quick-link">
@@ -37,6 +46,57 @@
     </header>
 
     <div *ngIf="error()" class="today-alert">{{ error() }}</div>
+
+    <!-- Member progress -->
+    <section *ngIf="isMember() && memberDash() as md" class="today-panel today-panel--admin">
+      <div class="today-panel-head">
+        <div>
+          <h2 class="today-panel-title">Your progress today</h2>
+          <p class="today-panel-desc">{{ md.mosqueName }} — spiritual & community activity</p>
+        </div>
+        <a routerLink="/dashboard/member/preferences" class="today-btn-ghost">Preferences</a>
+      </div>
+      <div class="today-stats-grid">
+        <a routerLink="/dashboard/member/wird" class="today-stat">
+          <div class="today-stat-icon-wrap">📿</div>
+          <div>
+            <p class="today-stat-label">Wird done</p>
+            <p class="today-stat-num">{{ md.progress.wirdCompletedToday }}</p>
+          </div>
+        </a>
+        <a routerLink="/dashboard/member/adhkar" class="today-stat">
+          <div class="today-stat-icon-wrap">🔢</div>
+          <div>
+            <p class="today-stat-label">Adhkar</p>
+            <p class="today-stat-num">{{ md.progress.adhkarCompletedToday }}</p>
+          </div>
+        </a>
+        <a routerLink="/dashboard/member/quran" class="today-stat">
+          <div class="today-stat-icon-wrap">📖</div>
+          <div>
+            <p class="today-stat-label">Quran paras</p>
+            <p class="today-stat-num">{{ md.progress.quranParasCompleted }}</p>
+          </div>
+        </a>
+        <a routerLink="/dashboard/participation" class="today-stat">
+          <div class="today-stat-icon-wrap">✋</div>
+          <div>
+            <p class="today-stat-label">Participation</p>
+            <p class="today-stat-num">{{ md.progress.participationRegistered }}</p>
+          </div>
+        </a>
+      </div>
+      <ul *ngIf="md.notifications.length" class="today-announce-list">
+        <li *ngFor="let n of md.notifications">
+          <div class="today-announce-dot"></div>
+          <div>
+            <div class="today-announce-head"><h4>{{ n.title }}</h4></div>
+            <p>{{ n.message }}</p>
+            <a *ngIf="n.route" [routerLink]="n.route" class="today-link">{{ n.type }}</a>
+          </div>
+        </li>
+      </ul>
+    </section>
 
     <!-- Super Admin platform -->
     <section *ngIf="isSuperAdmin() && platformStats() as ps" class="today-panel today-panel--admin">
@@ -135,7 +195,7 @@
             <article class="today-panel">
               <h3 class="today-card-heading">Qur'an plan</h3>
               <ng-container *ngIf="d.quranCard; else noQuran">
-                <p class="today-card-text">Today's para <strong class="text-white">{{ d.quranCard.todaysPara }}</strong></p>
+                <p class="today-card-text">Today's para <strong class="today-strong">{{ d.quranCard.todaysPara }}</strong></p>
                 <div class="today-progress-wrap">
                   <div class="today-progress-bar">
                     <div class="today-progress-fill" [style.width.%]="quranProgress(d.quranCard)"></div>
@@ -211,7 +271,7 @@
                 <h3 class="today-card-heading">{{ p.title }}</h3>
                 <p class="today-card-text">{{ p.description }}</p>
               </div>
-              <a routerLink="/dashboard/events" class="today-btn-ghost">Join</a>
+              <a routerLink="/dashboard/participation" class="today-btn-ghost">Join</a>
             </div>
           </article>
         </section>

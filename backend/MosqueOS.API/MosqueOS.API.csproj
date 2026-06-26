@@ -29,4 +29,9 @@
     <None Include="..\scripts\README.txt" Link="Database\README.txt" />
   </ItemGroup>
 
+  <!-- Auto-stop running API before build to avoid MSB3027 DLL file-lock errors -->
+  <Target Name="StopRunningApiBeforeBuild" BeforeTargets="Build" Condition="'$(OS)' == 'Windows_NT'">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\scripts\stop-api.ps1&quot;" IgnoreExitCode="true" ContinueOnError="true" />
+  </Target>
+
 </Project>

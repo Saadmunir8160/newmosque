@@ -8,7 +8,7 @@ import { TodayResponse } from '../models';
 export class TodayService {
   private http = inject(HttpClient);
 
-  getToday(mosqueId = environment.defaultMosqueId): Observable<TodayResponse> {
+  getToday(mosqueId: number): Observable<TodayResponse> {
     return this.http.get<TodayResponse>(`${environment.apiUrl}/today`, {
       params: { mosqueId: mosqueId.toString() }
     });

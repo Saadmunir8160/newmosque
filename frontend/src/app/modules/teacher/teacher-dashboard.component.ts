@@ -1,93 +1,115 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
+
 import { CommonModule } from '@angular/common';
+
 import { RouterModule } from '@angular/router';
-import { MadrassahService, MadrassahDashboard } from '../../core/services/madrassah.service';
+
+import { TeacherService, TeacherDashboard } from '../../core/services/teacher.service';
+
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+
 import { CardComponent } from '../../shared/ui/card.component';
 
+
+
 @Component({
+
   selector: 'app-teacher-dashboard',
+
   standalone: true,
+
   imports: [CommonModule, RouterModule, PageHeaderComponent, CardComponent],
+
   template: `
+
     <app-page-header [useAuthRole]="true" title="Teacher Dashboard"
-      subtitle="Your daily workflow — each step opens a working madrassah screen." />
 
-    <div class="grid md:grid-cols-3 gap-4 mb-8" *ngIf="dash() as d">
-      <app-card><p class="text-stat-label">Students</p><p class="text-3xl font-bold text-white">{{ d.totalStudents }}</p></app-card>
-      <app-card><p class="text-stat-label">Classes</p><p class="text-3xl font-bold text-white">{{ d.totalClasses }}</p></app-card>
-      <app-card><p class="text-stat-label">Attendance Rate</p><p class="text-3xl font-bold text-amber-400">{{ d.attendanceRate }}%</p></app-card>
+      subtitle="Manage your classes, attendance, progress, and assignments." />
+
+
+
+    <div class="mos-kpi-grid mb-8" *ngIf="dash() as d">
+
+      <app-card><p class="text-stat-label">My Classes</p><p class="mos-stat-value">{{ d.totalClasses }}</p></app-card>
+
+      <app-card><p class="text-stat-label">Students</p><p class="mos-stat-value">{{ d.totalStudents }}</p></app-card>
+
+      <app-card><p class="text-stat-label">Attendance Rate</p><p class="mos-stat-value mos-stat-value--accent">{{ d.attendanceRate }}%</p></app-card>
+
+      <app-card><p class="text-stat-label">Pending Grades</p><p class="mos-stat-value mos-stat-value--danger">{{ d.pendingGrades }}</p></app-card>
+
     </div>
 
-    <div class="space-y-4">
-      <a *ngFor="let link of links" [routerLink]="link.route"
-        class="block bg-[#064e3b] border border-emerald-800 rounded-2xl p-5 sm:p-6 hover:border-amber-400 transition-all hover:-translate-y-0.5">
-        <div class="flex items-start gap-3">
-          <span class="w-8 h-8 rounded-full bg-amber-400/15 border border-amber-400/40 text-amber-400 font-bold text-sm flex items-center justify-center shrink-0">{{ link.step }}</span>
-          <div class="flex-1 min-w-0">
-            <h3 class="text-white font-bold mb-1">{{ link.title }}</h3>
-            <p class="text-emerald-300 text-sm mb-3">{{ link.desc }}</p>
-            <ul class="teacher-task-steps">
-              <li *ngFor="let s of link.steps">{{ s }}</li>
-            </ul>
-          </div>
-          <span class="text-amber-400 text-sm font-bold shrink-0 hidden sm:inline">Open →</span>
-        </div>
+
+
+    <div class="mos-quick-grid mb-8">
+
+      <a *ngFor="let link of links" [routerLink]="link.route" class="mos-quick-link">
+
+        <h3 class="mos-quick-link__title">{{ link.title }}</h3>
+
+        <p class="mos-quick-link__desc">{{ link.desc }}</p>
+
       </a>
+
     </div>
+
+
+
+    <app-card *ngIf="dash()?.recentActivity?.length">
+
+      <h3 class="mos-dash-panel__title">Recent Activity</h3>
+
+      <div *ngFor="let a of dash()!.recentActivity" class="mos-activity-row">
+
+        <span class="mos-activity-badge">{{ a.type }}</span>
+
+        <div>
+
+          <p class="mos-activity-title">{{ a.title }}</p>
+
+          <p class="mos-activity-meta" *ngIf="a.detail">{{ a.detail }} · {{ a.at | date:'short' }}</p>
+
+        </div>
+
+      </div>
+
+    </app-card>
+
   `,
-  styles: [`
-    .teacher-task-steps {
-      list-style: disc;
-      margin: 0;
-      padding: 0 0 0 1.125rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-    .teacher-task-steps li {
-      font-size: 0.875rem;
-      color: #d1fae5;
-      line-height: 1.4;
-    }
-  `]
+
 })
+
 export class TeacherDashboardComponent implements OnInit {
-  private madrassah = inject(MadrassahService);
-  dash = signal<MadrassahDashboard | null>(null);
+
+  private teacher = inject(TeacherService);
+
+  dash = signal<TeacherDashboard | null>(null);
+
+
 
   links = [
-    {
-      step: 1,
-      route: '/dashboard/teacher/classes',
-      title: 'My Classes',
-      desc: 'See all classes assigned to you.',
-      steps: ['Open your class list', 'Tap a class to view students', 'Check schedule and room details'],
-    },
-    {
-      step: 2,
-      route: '/dashboard/teacher/attendance',
-      title: 'Record Attendance',
-      desc: 'Mark who attended today\'s session.',
-      steps: ['Select class and date', 'Mark each student present or absent', 'Save — parents can view in portal'],
-    },
-    {
-      step: 3,
-      route: '/dashboard/teacher/progress-notes',
-      title: 'Progress Notes',
-      desc: 'Add notes for each student and class.',
-      steps: ['Select class and student', 'Write lesson feedback', 'Save notes for parent/admin review'],
-    },
-    {
-      step: 4,
-      route: '/dashboard/teacher/reports',
-      title: 'Class Reports',
-      desc: 'Review attendance summary across your classes.',
-      steps: ['Open class attendance summary', 'Track present/absent/late split', 'Use trends for follow-up actions'],
-    },
+
+    { route: '/dashboard/teacher/classes', title: 'My Classes', desc: 'View assigned classes and students' },
+
+    { route: '/dashboard/teacher/attendance', title: 'Attendance', desc: 'Mark present, absent, or late' },
+
+    { route: '/dashboard/teacher/progress', title: 'Student Progress', desc: 'Quran, memorization, exams, notes' },
+
+    { route: '/dashboard/teacher/assignments', title: 'Assignments', desc: 'Homework, resources, grading' },
+
+    { route: '/dashboard/teacher/reports', title: 'Reports', desc: 'Class attendance summaries' },
+
   ];
 
+
+
   ngOnInit(): void {
-    this.madrassah.getDashboard().subscribe(d => this.dash.set(d));
+
+    this.teacher.getDashboard().subscribe(d => this.dash.set(d));
+
   }
+
 }
+
+

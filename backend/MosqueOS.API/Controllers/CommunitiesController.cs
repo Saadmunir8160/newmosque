@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.API.Models.Common;
 using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
@@ -18,11 +19,30 @@ namespace MosqueOS.API.Controllers
         public CommunitiesController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
 
         [HttpGet]
-        public async Task<IActionResult> GetAll([FromQuery] int? mosqueId)
+        public async Task<IActionResult> GetAll([FromQuery] int? mosqueId, [FromQuery] string? search, [FromQuery] string? type)
         {
             var query = _unitOfWork.Repository<Community>().QueryNoTracking().Where(c => c.IsPublic);
             if (mosqueId.HasValue) query = query.Where(c => c.MosqueId == mosqueId);
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim();
+                query = query.Where(c => c.Name.Contains(term) || (c.Description != null && c.Description.Contains(term)));
+            }
+            if (!string.IsNullOrWhiteSpace(type) && Enum.TryParse<CommunityType>(type, true, out var communityType))
+                query = query.Where(c => c.Type == communityType);
             return Ok(await query.OrderBy(c => c.Name).ToListAsync());
+        }
+
+        [Authorize]
+        [HttpGet("mine")]
+        public async Task<IActionResult> MyMemberships()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            var ids = await _unitOfWork.Repository<CommunityMember>().QueryNoTracking()
+                .Where(m => m.UserId == userId)
+                .Select(m => m.CommunityId)
+                .ToListAsync();
+            return Ok(ids);
         }
 
         [HttpGet("{id:int}")]
@@ -35,7 +55,7 @@ namespace MosqueOS.API.Controllers
             return community == null ? NotFound() : Ok(community);
         }
 
-        [Authorize(Roles = Roles.Admins)]
+        [Authorize(Roles = Roles.Admins + "," + Roles.Muqaddam)]
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] Community community)
         {
@@ -52,7 +72,7 @@ namespace MosqueOS.API.Controllers
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
             if (await _unitOfWork.Repository<CommunityMember>().Query()
                 .AnyAsync(m => m.CommunityId == id && m.UserId == userId))
-                return Conflict(new { message = "Already a member." });
+                return Conflict(new ApiMessageResponse { Message = "Already a member." });
 
             var member = new CommunityMember { CommunityId = id, UserId = userId, Role = CommunityRole.Member };
             _unitOfWork.Repository<CommunityMember>().Add(member);

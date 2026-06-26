@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.API.Models.Adhkar;
+using MosqueOS.API.Models.Common;
 using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
@@ -22,7 +24,8 @@ namespace MosqueOS.API.Controllers
         [HttpGet("items")]
         public async Task<IActionResult> GetItems([FromQuery] string? category)
         {
-            var query = _unitOfWork.Repository<AdhkarItem>().QueryNoTracking().AsQueryable();
+            var query = _unitOfWork.Repository<AdhkarItem>().QueryNoTracking()
+                .Where(a => !string.IsNullOrWhiteSpace(a.Title) && a.Status == ContentPublishStatus.Published);
             if (!string.IsNullOrWhiteSpace(category)) query = query.Where(a => a.Category == category);
             return Ok(await query.OrderBy(a => a.Title).ToListAsync());
         }
@@ -32,7 +35,27 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> CreateItem([FromBody] AdhkarItem item)
         {
             item.Id = 0;
+            item.Status = ContentPublishStatus.Draft;
             _unitOfWork.Repository<AdhkarItem>().Add(item);
+            await _unitOfWork.SaveChangesAsync();
+            return Ok(item);
+        }
+
+        [Authorize(Roles = Roles.ContentManagers)]
+        [HttpPut("items/{id:int}")]
+        public async Task<IActionResult> UpdateItem(int id, [FromBody] AdhkarItem input)
+        {
+            var item = await _unitOfWork.Repository<AdhkarItem>().FindAsync(id);
+            if (item == null) return NotFound();
+
+            item.Title = input.Title;
+            item.ArabicText = input.ArabicText;
+            item.Transliteration = input.Transliteration;
+            item.Translation = input.Translation;
+            item.DefaultCount = input.DefaultCount;
+            item.Category = input.Category;
+            item.UpdatedAt = DateTime.UtcNow;
+
             await _unitOfWork.SaveChangesAsync();
             return Ok(item);
         }
@@ -66,10 +89,10 @@ namespace MosqueOS.API.Controllers
                 .Where(l => ids.Contains(l.UserAdhkarId) && l.Date == today)
                 .ToListAsync();
 
-            return Ok(items.Select(i => new
+            return Ok(items.Select(i => new MyAdhkarItemResponse
             {
-                userAdhkar = i,
-                todayCount = logs.FirstOrDefault(l => l.UserAdhkarId == i.Id)?.CountCompleted ?? 0
+                UserAdhkar = i,
+                TodayCount = logs.FirstOrDefault(l => l.UserAdhkarId == i.Id)?.CountCompleted ?? 0
             }));
         }
 
@@ -79,6 +102,15 @@ namespace MosqueOS.API.Controllers
         {
             item.Id = 0;
             item.UserId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+
+            if (item.AdhkarItemId.HasValue)
+            {
+                var exists = await _unitOfWork.Repository<UserAdhkar>().QueryNoTracking()
+                    .AnyAsync(u => u.UserId == item.UserId && u.AdhkarItemId == item.AdhkarItemId);
+                if (exists)
+                    return Conflict(new ApiMessageResponse { Message = "This dhikr is already on your daily list." });
+            }
+
             _unitOfWork.Repository<UserAdhkar>().Add(item);
             await _unitOfWork.SaveChangesAsync();
             return Ok(item);
@@ -122,11 +154,11 @@ namespace MosqueOS.API.Controllers
             log.UpdatedAt = DateTime.UtcNow;
             await _unitOfWork.SaveChangesAsync();
 
-            return Ok(new
+            return Ok(new AdhkarIncrementResponse
             {
-                completed = log.CountCompleted,
-                target = item.TargetCount,
-                isComplete = log.CountCompleted >= item.TargetCount
+                Completed = log.CountCompleted,
+                Target = item.TargetCount,
+                IsComplete = log.CountCompleted >= item.TargetCount
             });
         }
     }

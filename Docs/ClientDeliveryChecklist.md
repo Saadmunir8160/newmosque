@@ -1,9 +1,11 @@
 # MosqueOS — Client Delivery Checklist
 
 ## Database
-- [ ] `Database/MosqueOS.sql` — Full schema script included
-- [ ] Database tested and restored successfully in SSMS
-- [ ] All tables, keys, and relationships verified
+- [x] EF Core **Code First** migrations (`MosqueOS.Infrastructure/Migrations/`)
+- [x] **SQL Server Express** (`mos_db` on `.\SQLEXPRESS`) — SSMS verified
+- [x] Repository Pattern + Unit of Work (`IRepository<T>`, `IUnitOfWork`)
+- [x] Clean Architecture (API / Application / Domain / Infrastructure)
+- [ ] `Database/MosqueOS.sql` — optional manual script (migrations are primary)
 
 ## Diagrams
 - [ ] `Diagrams/ERD.png` — Entity Relationship Diagram

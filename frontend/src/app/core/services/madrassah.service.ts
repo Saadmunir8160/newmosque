@@ -28,16 +28,23 @@ export class MadrassahService {
   private http = inject(HttpClient);
   private base = `${environment.apiUrl}/madrassah`;
 
-  getClasses(): Observable<MadrassahClass[]> {
-    return this.http.get<MadrassahClass[]>(`${this.base}/classes`);
+  getClasses(mosqueId?: number, search?: string): Observable<MadrassahClass[]> {
+    const params: Record<string, string> = {};
+    if (mosqueId) params['mosqueId'] = mosqueId.toString();
+    if (search?.trim()) params['search'] = search.trim();
+    return this.http.get<MadrassahClass[]>(`${this.base}/classes`, { params });
   }
 
-  getStudents(): Observable<Student[]> {
-    return this.http.get<Student[]>(`${this.base}/students`);
+  getStudents(mosqueId?: number, search?: string): Observable<Student[]> {
+    const params: Record<string, string> = {};
+    if (mosqueId) params['mosqueId'] = mosqueId.toString();
+    if (search?.trim()) params['search'] = search.trim();
+    return this.http.get<Student[]>(`${this.base}/students`, { params });
   }
 
-  getDashboard(): Observable<MadrassahDashboard> {
-    return this.http.get<MadrassahDashboard>(`${this.base}/dashboard`);
+  getDashboard(mosqueId?: number): Observable<MadrassahDashboard> {
+    const params = mosqueId ? { mosqueId: mosqueId.toString() } : undefined;
+    return this.http.get<MadrassahDashboard>(`${this.base}/dashboard`, { params });
   }
 
   getMyChildren(): Observable<ParentChildView[]> {

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MosqueOS.Application.Common.Interfaces;
+using MosqueOS.Domain.Entities;
 
 namespace MosqueOS.Infrastructure.Repositories;
 
@@ -37,7 +38,21 @@ public class Repository<T> : IRepository<T> where T : class
 
     public void Update(T entity) => _dbSet.Update(entity);
 
-    public void Remove(T entity) => _dbSet.Remove(entity);
+    public void Remove(T entity)
+    {
+        if (entity is BaseEntity soft)
+        {
+            soft.IsDeleted = true;
+            soft.DeletedAt = DateTime.UtcNow;
+            _dbSet.Update(entity);
+            return;
+        }
+        _dbSet.Remove(entity);
+    }
 
-    public void RemoveRange(IEnumerable<T> entities) => _dbSet.RemoveRange(entities);
+    public void RemoveRange(IEnumerable<T> entities)
+    {
+        foreach (var entity in entities)
+            Remove(entity);
+    }
 }

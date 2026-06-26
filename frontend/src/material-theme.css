@@ -1,0 +1,101 @@
+/**
+ * MosqueOS Angular Material theme overrides
+ * Maps Material components to design system tokens
+ */
+
+.mat-mdc-card {
+  background: var(--mos-surface) !important;
+  color: var(--mos-text-primary) !important;
+  border: 1px solid var(--mos-border) !important;
+  border-radius: var(--mos-radius-card) !important;
+  box-shadow: var(--mos-shadow-card) !important;
+}
+
+.mat-mdc-raised-button.mat-primary,
+.mat-mdc-unelevated-button.mat-primary,
+.mat-mdc-fab.mat-primary,
+.mat-mdc-mini-fab.mat-primary {
+  --mdc-protected-button-container-color: var(--mos-primary);
+  --mdc-protected-button-label-text-color: var(--mos-text-inverse);
+}
+
+.mat-mdc-raised-button.mat-primary:hover,
+.mat-mdc-unelevated-button.mat-primary:hover {
+  --mdc-protected-button-container-color: var(--mos-primary-hover);
+}
+
+.mat-mdc-outlined-button {
+  --mdc-outlined-button-outline-color: var(--mos-border-input);
+  --mdc-outlined-button-label-text-color: var(--mos-text-primary);
+}
+
+.mat-mdc-form-field {
+  --mdc-outlined-text-field-outline-color: var(--mos-border-input);
+  --mdc-outlined-text-field-focus-outline-color: var(--mos-primary);
+  --mdc-outlined-text-field-label-text-color: var(--mos-text-secondary);
+  --mdc-outlined-text-field-input-text-color: var(--mos-text-primary);
+  --mat-form-field-container-text-size: 0.875rem;
+}
+
+.mat-mdc-form-field.mat-focused .mdc-notched-outline {
+  box-shadow: var(--mos-focus-ring);
+}
+
+.mat-mdc-text-field-wrapper {
+  background: var(--mos-surface) !important;
+  border-radius: var(--mos-radius-input) !important;
+}
+
+.mat-mdc-table {
+  background: var(--mos-surface) !important;
+}
+
+.mat-mdc-header-row {
+  background: var(--mos-table-header-bg) !important;
+}
+
+.mat-mdc-header-cell {
+  color: var(--mos-table-header-text) !important;
+  font-weight: 600 !important;
+}
+
+.mat-mdc-row:hover {
+  background: var(--mos-table-row-hover) !important;
+}
+
+.mat-mdc-chip.mat-mdc-standard-chip {
+  --mdc-chip-elevated-container-color: var(--mos-bg);
+  --mdc-chip-label-text-color: var(--mos-text-primary);
+}
+
+.mat-mdc-snack-bar-container {
+  --mdc-snackbar-container-color: var(--mos-text-primary);
+}
+
+.mat-mdc-progress-spinner {
+  --mdc-circular-progress-active-indicator-color: var(--mos-primary);
+}
+
+.mat-expansion-panel {
+  background: var(--mos-surface) !important;
+  color: var(--mos-text-primary) !important;
+  border: 1px solid var(--mos-border) !important;
+  border-radius: var(--mos-radius-card) !important;
+  box-shadow: var(--mos-shadow-card) !important;
+}
+
+.mat-expansion-panel-header {
+  color: var(--mos-text-primary) !important;
+}
+
+.mat-mdc-select-panel {
+  background: var(--mos-surface) !important;
+}
+
+.mat-mdc-option {
+  color: var(--mos-text-primary) !important;
+}
+
+.mat-mdc-option.mdc-list-item--selected {
+  background: rgba(15, 118, 110, 0.08) !important;
+}

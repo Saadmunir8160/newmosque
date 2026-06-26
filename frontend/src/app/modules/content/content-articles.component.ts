@@ -11,7 +11,7 @@ import { CardComponent } from '../../shared/ui/card.component';
     <app-page-header badge="Content Editor" title="Articles" subtitle="Spiritual and educational content" />
     <app-card>
       <p class="text-white font-semibold mb-2">Article module</p>
-      <p class="text-emerald-300 text-sm">
+      <p class="text-mos-muted text-sm">
         Phase 1 includes basic article module placeholder for sidebar parity.
         Next step: add CRUD endpoints and editor workflow for publishing.
       </p>

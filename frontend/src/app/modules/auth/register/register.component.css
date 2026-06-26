@@ -1,0 +1,214 @@
+:host { display: block; min-height: 100dvh; }
+
+.auth-page {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: linear-gradient(165deg, #f8fafc 0%, #eef2f7 45%, #e8f5f1 100%);
+}
+
+.auth-shell {
+  width: min(100%, 520px);
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
+  padding: 1.5rem 1.5rem 1.25rem;
+}
+
+.auth-head h1 {
+  margin: 0.2rem 0 0.35rem;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.auth-eyebrow {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #1d6b57;
+}
+
+.auth-lead {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.auth-section {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.auth-section h2 {
+  margin: 0 0 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #334155;
+}
+
+.auth-form { margin-top: 1rem; }
+
+.auth-field {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.auth-field em { color: #dc2626; font-style: normal; }
+
+.auth-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  font-size: 0.875rem;
+  background: #fff;
+}
+
+.auth-input:focus {
+  outline: none;
+  border-color: #1d6b57;
+  box-shadow: 0 0 0 3px rgba(29, 107, 87, 0.12);
+}
+
+.auth-input--invalid { border-color: #f87171; }
+
+.auth-pass { display: flex; gap: 0.5rem; align-items: center; }
+.auth-pass .auth-input { flex: 1; }
+
+.auth-pass__toggle {
+  flex-shrink: 0;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-strength {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.auth-strength__bar {
+  flex: 1;
+  height: 5px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.auth-strength__bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #1d6b57);
+  transition: width 0.2s ease;
+}
+
+.auth-strength small {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.auth-check {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  font-size: 0.8125rem;
+  color: #334155;
+  cursor: pointer;
+}
+
+.auth-check--invalid { color: #b91c1c; }
+
+.auth-error {
+  color: #b91c1c;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.auth-alert {
+  margin-top: 1rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.auth-toast {
+  margin-top: 1rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.auth-toast--ok { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+.auth-toast--err { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+
+.auth-btn {
+  width: 100%;
+  margin-top: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.8rem 1rem;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #1d6b57, #0f4c3a);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-btn:disabled { opacity: 0.65; cursor: not-allowed; }
+
+.auth-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.auth-footer {
+  margin: 1rem 0 0;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+.auth-footer a {
+  color: #1d6b57;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.auth-footer a:hover { text-decoration: underline; }

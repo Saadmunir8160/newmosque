@@ -8,9 +8,9 @@ import { AuthService } from '../../../core/auth/auth.service';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div style="min-height:100dvh;display:flex;align-items:center;justify-content:center;background:#022c22;color:#a7f3d0;font-family:system-ui,sans-serif;">
+    <div style="min-height:100dvh;display:flex;align-items:center;justify-content:center;background:#0F172A;color:#a7f3d0;font-family:system-ui,sans-serif;">
       <div style="text-align:center;padding:2rem;">
-        <div *ngIf="!error()" style="width:40px;height:40px;border:3px solid #065f46;border-top-color:#f59e0b;border-radius:50%;margin:0 auto 1rem;animation:spin 0.8s linear infinite;"></div>
+        <div *ngIf="!error()" style="width:40px;height:40px;border:3px solid #F8FAFC;border-top-color:#f59e0b;border-radius:50%;margin:0 auto 1rem;animation:spin 0.8s linear infinite;"></div>
         <p style="margin:0;font-size:1rem;">{{ error() || 'Completing sign in...' }}</p>
       </div>
     </div>
@@ -41,7 +41,8 @@ export class AuthCallbackComponent implements OnInit {
 
     try {
       await this.authService.applyOAuthToken(token);
-      this.router.navigate(['/dashboard']);
+      const home = await this.authService.resolveHomeRoute();
+      this.router.navigate([home]);
     } catch {
       this.error.set('Could not complete sign in. Redirecting...');
       setTimeout(() => this.router.navigate(['/login']), 2500);

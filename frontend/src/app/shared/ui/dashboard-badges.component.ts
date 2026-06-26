@@ -33,14 +33,14 @@ import { currentDayName } from '../../core/utils/date.utils';
       line-height: 1.2;
     }
     .dash-badge--day {
-      color: #6ee7b7;
-      background: rgba(6, 78, 59, 0.55);
-      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: var(--mos-primary);
+      background: rgba(15, 118, 110, 0.08);
+      border: 1px solid rgba(15, 118, 110, 0.2);
     }
     .dash-badge--role {
-      color: #fbbf24;
-      background: rgba(6, 78, 59, 0.55);
-      border: 1px solid rgba(245, 158, 11, 0.45);
+      color: #92400E;
+      background: var(--mos-badge-pending-bg);
+      border: 1px solid rgba(217, 119, 6, 0.25);
     }
   `]
 })

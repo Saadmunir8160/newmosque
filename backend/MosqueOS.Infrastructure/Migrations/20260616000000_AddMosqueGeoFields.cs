@@ -1,9 +1,13 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using MosqueOS.Infrastructure;
 
 #nullable disable
 
 namespace MosqueOS.Infrastructure.Migrations
 {
+    [DbContext(typeof(ApplicationDbContext))]
+    [Migration("20260616000000_AddMosqueGeoFields")]
     public partial class AddMosqueGeoFields : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)

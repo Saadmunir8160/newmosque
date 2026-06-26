@@ -2,11 +2,12 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from './auth.service';
 
-/** Allows authenticated users or guests into the dashboard shell. */
-export const dashboardGuard: CanActivateFn = () => {
+/** Allows authenticated users, guests, or direct public guest URLs into the dashboard shell. */
+export const dashboardGuard: CanActivateFn = (_, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
   if (auth.isAuthenticated() || auth.isGuest()) return true;
+  if (state.url.startsWith('/dashboard/guest')) return true;
   return router.createUrlTree(['/login']);
 };
 

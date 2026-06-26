@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.API.Models.Madrassah;
 using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
@@ -22,8 +23,25 @@ namespace MosqueOS.API.Controllers
 
         [Authorize(Roles = Roles.MadrassahManagers)]
         [HttpGet("students")]
-        public async Task<IActionResult> GetStudents() =>
-            Ok(await _unitOfWork.Repository<Student>().QueryNoTracking().Include(s => s.Guardians).OrderBy(s => s.Name).ToListAsync());
+        public async Task<IActionResult> GetStudents([FromQuery] int? mosqueId, [FromQuery] string? search = null)
+        {
+            IQueryable<Student> query = _unitOfWork.Repository<Student>().QueryNoTracking().Include(s => s.Guardians);
+            if (mosqueId.HasValue)
+            {
+                var classIds = await _unitOfWork.Repository<MadrassahClass>().QueryNoTracking()
+                    .Where(c => c.MosqueId == mosqueId.Value).Select(c => c.Id).ToListAsync();
+                var studentIds = await _unitOfWork.Repository<Enrolment>().QueryNoTracking()
+                    .Where(e => classIds.Contains(e.ClassId))
+                    .Select(e => e.StudentId).Distinct().ToListAsync();
+                query = query.Where(s => studentIds.Contains(s.Id));
+            }
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim();
+                query = query.Where(s => s.Name.Contains(term));
+            }
+            return Ok(await query.OrderBy(s => s.Name).ToListAsync());
+        }
 
         [Authorize(Roles = Roles.MadrassahManagers)]
         [HttpPost("students")]
@@ -66,10 +84,19 @@ namespace MosqueOS.API.Controllers
 
         [Authorize(Roles = Roles.MadrassahManagers)]
         [HttpGet("classes")]
-        public async Task<IActionResult> GetClasses() =>
-            Ok(await _unitOfWork.Repository<MadrassahClass>().QueryNoTracking()
+        public async Task<IActionResult> GetClasses([FromQuery] int? mosqueId, [FromQuery] string? search = null)
+        {
+            var query = _unitOfWork.Repository<MadrassahClass>().QueryNoTracking()
                 .Include(c => c.Enrolments).ThenInclude(e => e.Student)
-                .ToListAsync());
+                .AsQueryable();
+            if (mosqueId.HasValue) query = query.Where(c => c.MosqueId == mosqueId);
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim();
+                query = query.Where(c => c.Name.Contains(term));
+            }
+            return Ok(await query.ToListAsync());
+        }
 
         [Authorize(Roles = Roles.Admins)]
         [HttpPost("classes")]
@@ -109,7 +136,7 @@ namespace MosqueOS.API.Controllers
 
         [Authorize(Roles = Roles.MadrassahManagers)]
         [HttpPost("sessions/{sessionId:int}/attendance")]
-        public async Task<IActionResult> RecordAttendance(int sessionId, [FromBody] List<AttendanceRecordDto> records)
+        public async Task<IActionResult> RecordAttendance(int sessionId, [FromBody] List<AttendanceRecordRequest> records)
         {
             var session = await _unitOfWork.Repository<AttendanceSession>().Query()
                 .Include(s => s.Records)
@@ -229,14 +256,30 @@ namespace MosqueOS.API.Controllers
 
         [Authorize(Roles = Roles.MadrassahManagers)]
         [HttpGet("dashboard")]
-        public async Task<IActionResult> Dashboard()
+        public async Task<IActionResult> Dashboard([FromQuery] int? mosqueId)
         {
-            var totalStudents = await _unitOfWork.Repository<Student>().Query().CountAsync();
-            var totalClasses = await _unitOfWork.Repository<MadrassahClass>().Query().CountAsync();
-            var totalRecords = await _unitOfWork.Repository<AttendanceRecord>().Query().CountAsync();
+            var classQuery = _unitOfWork.Repository<MadrassahClass>().Query();
+            if (mosqueId.HasValue) classQuery = classQuery.Where(c => c.MosqueId == mosqueId);
+
+            var classIds = await classQuery.Select(c => c.Id).ToListAsync();
+            var totalClasses = classIds.Count;
+
+            var studentIds = await _unitOfWork.Repository<Enrolment>().Query()
+                .Where(e => classIds.Contains(e.ClassId) && e.Status == EnrolmentStatus.Active)
+                .Select(e => e.StudentId).Distinct().ToListAsync();
+            var totalStudents = studentIds.Count;
+
+            var sessionIds = await _unitOfWork.Repository<AttendanceSession>().Query()
+                .Where(s => classIds.Contains(s.ClassId))
+                .Select(s => s.Id).ToListAsync();
+
+            var totalRecords = await _unitOfWork.Repository<AttendanceRecord>().Query()
+                .CountAsync(r => sessionIds.Contains(r.SessionId));
             var presentRecords = await _unitOfWork.Repository<AttendanceRecord>().Query()
-                .CountAsync(r => r.Status == AttendanceStatus.Present);
-            var unpaidFees = await _unitOfWork.Repository<Fee>().Query().CountAsync(f => f.Status == FeeStatus.Unpaid);
+                .CountAsync(r => sessionIds.Contains(r.SessionId) && r.Status == AttendanceStatus.Present);
+
+            var unpaidFees = await _unitOfWork.Repository<Fee>().Query()
+                .CountAsync(f => studentIds.Contains(f.StudentId) && f.Status == FeeStatus.Unpaid);
 
             return Ok(new
             {
@@ -246,11 +289,5 @@ namespace MosqueOS.API.Controllers
                 unpaidFees
             });
         }
-    }
-
-    public class AttendanceRecordDto
-    {
-        public int StudentId { get; set; }
-        public AttendanceStatus Status { get; set; }
     }
 }

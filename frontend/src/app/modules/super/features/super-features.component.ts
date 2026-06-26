@@ -1,9 +1,8 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
 import { AdminService } from '../../../core/services/admin.service';
-import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
-import { CardComponent } from '../../../shared/ui/card.component';
 import { Mosque, MosqueSetting } from '../../../core/models';
 
 const MODULE_LABELS: Record<string, string> = {
@@ -23,67 +22,129 @@ const MODULE_LABELS: Record<string, string> = {
   JourneyGuides: 'Umrah & Hajj guides',
 };
 
+const MODULE_ORDER = [
+  'PrayerTimes', 'Announcements', 'Events', 'Madrassah', 'Communities',
+  'Awrad', 'Adhkar', 'Duas', 'Quran', 'RitualGuides', 'Janaza',
+  'DeathReadings', 'Participation', 'JourneyGuides',
+];
+
 @Component({
   selector: 'app-super-features',
   standalone: true,
-  imports: [CommonModule, FormsModule, PageHeaderComponent, CardComponent],
-  template: `
-    <app-page-header
-      badge="Super Admin"
-      title="Module toggles"
-      subtitle="Turn features on or off for each mosque. Disabled modules are hidden from that mosque's menu." />
-
-    <app-card class="block mb-4">
-      <label class="block text-xs text-emerald-400 mb-1">Select mosque</label>
-      <select class="admin-input" [(ngModel)]="mosqueId" (ngModelChange)="loadSettings()">
-        <option [ngValue]="0">Choose a mosque…</option>
-        <option *ngFor="let m of mosques()" [ngValue]="m.id">{{ m.name }} ({{ m.city }})</option>
-      </select>
-    </app-card>
-
-    <div *ngIf="mosqueId && !settings().length" class="admin-empty">
-      <p class="admin-empty-title">No modules configured</p>
-      <p class="admin-empty-desc">This mosque has no feature flags yet.</p>
-    </div>
-
-    <div *ngIf="!mosqueId" class="admin-empty">
-      <p class="admin-empty-desc">Select a mosque above to manage its modules.</p>
-    </div>
-
-    <app-card *ngFor="let s of settings()" class="block mb-2" [interactive]="true">
-      <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-        <div>
-          <span class="text-white font-medium">{{ moduleLabel(s.moduleKey) }}</span>
-          <p class="text-xs text-emerald-600 m-0 mt-0.5">{{ s.moduleKey }}</p>
-        </div>
-        <button type="button" class="admin-btn shrink-0" [class.admin-btn--ghost]="!s.isEnabled"
-          [class.admin-btn--success]="s.isEnabled" (click)="toggle(s)">
-          {{ s.isEnabled ? 'Enabled' : 'Disabled' }}
-        </button>
-      </div>
-    </app-card>
-  `
+  imports: [CommonModule, FormsModule, RouterModule],
+  templateUrl: './super-features.component.html',
+  styleUrl: './super-features.component.css',
 })
 export class SuperFeaturesComponent implements OnInit {
   private admin = inject(AdminService);
+
   mosques = signal<Mosque[]>([]);
   settings = signal<MosqueSetting[]>([]);
+  loading = signal(false);
+  togglingKey = signal<string | null>(null);
+  showDisabledOnly = signal(false);
+  toast = signal('');
+  toastOk = signal(true);
+
   mosqueId = 0;
 
-  ngOnInit(): void { this.admin.getAllMosques().subscribe(m => this.mosques.set(m)); }
+  enabledCount = computed(() => this.settings().filter(s => s.isEnabled).length);
+  disabledCount = computed(() => this.settings().filter(s => !s.isEnabled).length);
+
+  selectedMosqueName = computed(() => {
+    const m = this.mosques().find(x => x.id === this.mosqueId);
+    return m ? `${m.name} (${m.city})` : '—';
+  });
+
+  filteredSettings = computed(() => {
+    const list = this.sortSettings(this.settings());
+    if (!this.showDisabledOnly()) return list;
+    return list.filter(s => !s.isEnabled);
+  });
+
+  ngOnInit(): void {
+    this.admin.getAllMosques().subscribe({
+      next: m => this.mosques.set(m),
+      error: () => this.showToast('Could not load mosques.', false),
+    });
+  }
 
   moduleLabel(key: string): string {
     return MODULE_LABELS[key] ?? key;
   }
 
   loadSettings(): void {
-    if (!this.mosqueId) { this.settings.set([]); return; }
-    this.admin.getSettings(this.mosqueId).subscribe(s => this.settings.set(s));
+    if (!this.mosqueId) {
+      this.settings.set([]);
+      this.showDisabledOnly.set(false);
+      return;
+    }
+    this.loading.set(true);
+    this.admin.getSettings(this.mosqueId).subscribe({
+      next: s => {
+        this.settings.set(this.sortSettings(s));
+        this.loading.set(false);
+      },
+      error: () => {
+        this.loading.set(false);
+        this.showToast('Could not load module settings.', false);
+      },
+    });
   }
 
   toggle(s: MosqueSetting): void {
-    this.admin.setModuleFlag(this.mosqueId, s.moduleKey, !s.isEnabled).subscribe(updated => {
-      this.settings.update(list => list.map(x => x.moduleKey === updated.moduleKey ? updated : x));
+    if (this.togglingKey()) return;
+    const next = !s.isEnabled;
+    this.togglingKey.set(s.moduleKey);
+    this.admin.setModuleFlag(this.mosqueId, s.moduleKey, next).subscribe({
+      next: updated => {
+        this.settings.update(list => list.map(x => x.moduleKey === updated.moduleKey ? updated : x));
+        this.togglingKey.set(null);
+        this.showToast(`${this.moduleLabel(updated.moduleKey)} ${updated.isEnabled ? 'enabled' : 'disabled'}.`, true);
+      },
+      error: () => {
+        this.togglingKey.set(null);
+        this.showToast('Could not update module.', false);
+      },
     });
+  }
+
+  enableAll(): void {
+    const disabled = this.settings().filter(s => !s.isEnabled);
+    if (!disabled.length) {
+      this.showToast('All modules are already enabled.', true);
+      return;
+    }
+    let done = 0;
+    disabled.forEach(s => {
+      this.admin.setModuleFlag(this.mosqueId, s.moduleKey, true).subscribe({
+        next: updated => {
+          this.settings.update(list => list.map(x => x.moduleKey === updated.moduleKey ? updated : x));
+          done++;
+          if (done === disabled.length) this.showToast('All modules enabled.', true);
+        },
+        error: () => this.showToast(`Could not enable ${this.moduleLabel(s.moduleKey)}.`, false),
+      });
+    });
+  }
+
+  toggleDisabledFilter(): void {
+    this.showDisabledOnly.update(v => !v);
+  }
+
+  private sortSettings(list: MosqueSetting[]): MosqueSetting[] {
+    return [...list].sort((a, b) => {
+      const ai = MODULE_ORDER.indexOf(a.moduleKey);
+      const bi = MODULE_ORDER.indexOf(b.moduleKey);
+      const aRank = ai === -1 ? 999 : ai;
+      const bRank = bi === -1 ? 999 : bi;
+      return aRank - bRank || a.moduleKey.localeCompare(b.moduleKey);
+    });
+  }
+
+  private showToast(msg: string, ok: boolean): void {
+    this.toastOk.set(ok);
+    this.toast.set(msg);
+    setTimeout(() => this.toast.set(''), 3200);
   }
 }

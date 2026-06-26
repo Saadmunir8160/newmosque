@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MosqueOS.Application.Common.Interfaces;
+using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
 
@@ -19,7 +20,8 @@ namespace MosqueOS.API.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] string? category)
         {
-            var query = _unitOfWork.Repository<Dua>().QueryNoTracking().AsQueryable();
+            var query = _unitOfWork.Repository<Dua>().QueryNoTracking()
+                .Where(d => d.Status == ContentPublishStatus.Published);
             if (!string.IsNullOrWhiteSpace(category)) query = query.Where(d => d.Category == category);
             return Ok(await query.OrderBy(d => d.Category).ThenBy(d => d.Title).ToListAsync());
         }
@@ -44,10 +46,12 @@ namespace MosqueOS.API.Controllers
             };
 
             var dua = await _unitOfWork.Repository<Dua>().QueryNoTracking()
-                .Where(d => d.Category == category)
+                .Where(d => d.Category == category && d.Status == ContentPublishStatus.Published)
                 .OrderBy(d => d.Id)
                 .FirstOrDefaultAsync()
-                ?? await _unitOfWork.Repository<Dua>().QueryNoTracking().OrderBy(d => d.Id).FirstOrDefaultAsync();
+                ?? await _unitOfWork.Repository<Dua>().QueryNoTracking()
+                    .Where(d => d.Status == ContentPublishStatus.Published)
+                    .OrderBy(d => d.Id).FirstOrDefaultAsync();
 
             return Ok(dua);
         }
@@ -55,7 +59,8 @@ namespace MosqueOS.API.Controllers
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Get(int id)
         {
-            var dua = await _unitOfWork.Repository<Dua>().QueryNoTracking().FirstOrDefaultAsync(d => d.Id == id);
+            var dua = await _unitOfWork.Repository<Dua>().QueryNoTracking()
+                .FirstOrDefaultAsync(d => d.Id == id && d.Status == ContentPublishStatus.Published);
             return dua == null ? NotFound() : Ok(dua);
         }
 
@@ -64,6 +69,7 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> Create([FromBody] Dua dua)
         {
             dua.Id = 0;
+            dua.Status = ContentPublishStatus.Draft;
             _unitOfWork.Repository<Dua>().Add(dua);
             await _unitOfWork.SaveChangesAsync();
             return CreatedAtAction(nameof(Get), new { id = dua.Id }, dua);

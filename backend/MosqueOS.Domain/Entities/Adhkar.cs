@@ -8,6 +8,9 @@ namespace MosqueOS.Domain.Entities
         public string? Translation { get; set; }
         public int DefaultCount { get; set; } = 1;
         public string? Category { get; set; }
+        public ContentPublishStatus Status { get; set; } = ContentPublishStatus.Published;
+        public DateTime? PublishedAt { get; set; }
+        public string? PublishedById { get; set; }
     }
 
     public class UserAdhkar : BaseEntity

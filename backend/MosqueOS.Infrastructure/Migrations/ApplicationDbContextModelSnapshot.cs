@@ -949,6 +949,49 @@ namespace MosqueOS.Infrastructure.Migrations
                     b.ToTable("JanazaAnnouncements");
                 });
 
+            modelBuilder.Entity("MosqueOS.Domain.Entities.JamaahTemplate", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeletedById")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("MosqueId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RecurringRulesJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MosqueId", "IsActive");
+
+                    b.ToTable("JamaahTemplates");
+                });
+
             modelBuilder.Entity("MosqueOS.Domain.Entities.JourneyGuide", b =>
                 {
                     b.Property<int>("Id")
@@ -2228,6 +2271,17 @@ namespace MosqueOS.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Guide");
+                });
+
+            modelBuilder.Entity("MosqueOS.Domain.Entities.JamaahTemplate", b =>
+                {
+                    b.HasOne("MosqueOS.Domain.Entities.Mosque", "Mosque")
+                        .WithMany()
+                        .HasForeignKey("MosqueId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Mosque");
                 });
 
             modelBuilder.Entity("MosqueOS.Domain.Entities.JumuahTime", b =>
