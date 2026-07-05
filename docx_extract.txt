@@ -1,0 +1,889 @@
+🕌
+MOSQUE OPERATING SYSTEM
+Role-Based Access Control
+Detailed Documentation — SQL Server Edition
+Version
+MVP v1.0
+Date
+June 2026
+Database
+Microsoft SQL Server
+Roles in System
+2 Roles: Mosque Owner, Mosque Admin
+Owner Credentials
+Username: owner | Password: Owner@123
+Admin Credentials
+Username: admin | Password: Admin@123
+1. Role Overview
+The Mosque Operating System (MOS) uses a simplified 2-role access control system. All other roles from the original specification have been consolidated into these two roles for clarity and ease of management.
+🏠 MOSQUE OWNER
+owner | Owner@123
+The Mosque Owner is the highest authority within a mosque's account. This role is responsible for claiming the mosque, configuring system-level settings, and delegating management to the Admin.
+Claim and own the mosque profile on the platform
+Enable or disable modules for the mosque
+Configure mosque-level settings (timezone, visibility, feature flags)
+Has all Admin permissions in addition to exclusive ownership rights
+Cannot be overridden by Admin — Owner is the final authority
+⚙️ MOSQUE ADMIN
+admin | Admin@123
+The Mosque Admin manages the day-to-day operations of the mosque platform. This includes prayer times, events, announcements, madrassah, and all content-related tasks.
+Manage all mosque content (prayer times, events, announcements)
+Manage madrassah students, attendance, and fees
+Post janaza announcements and community content
+Manage awrad, duas, and spiritual content library
+Create and manage communities and participation opportunities
+Cannot change mosque ownership or disable modules
+1.1 Role Credentials (SQL Server Seed)
+Role
+Username
+Password
+DB Role Name
+Mosque Owner
+owner
+Owner@123
+MosqueOwner
+Mosque Admin
+admin
+Admin@123
+MosqueAdmin
+1.2 Master Role-Permission Matrix
+Quick reference for all 15 modules:
+Module
+🏠 Owner
+⚙️ Admin
+Mosque Profile & Settings
+✓ YES
+✓ YES
+Prayer Times Management
+✓ YES
+✓ YES
+Announcements
+✓ YES
+✓ YES
+Events Management
+✓ YES
+✓ YES
+Madrassah Management
+✓ YES
+✓ YES
+Communities
+✓ YES
+✓ YES
+Awrad & Wird Content
+✓ YES
+✓ YES
+Daily Adhkar Content
+✓ YES
+✓ YES
+Duas Library
+✓ YES
+✓ YES
+Qur'an Reading Plans
+✓ YES
+✓ YES
+Ritual Guides
+✓ YES
+✓ YES
+Janaza Announcements
+✓ YES
+✓ YES
+Death Readings Campaigns
+✓ YES
+✓ YES
+Community Participation
+✓ YES
+✓ YES
+Umrah & Hajj Guides
+✓ YES
+✓ YES
+Enable/Disable Modules (Feature Flags)
+✓ YES
+✗ NO
+Transfer Mosque Ownership
+✓ YES
+✗ NO
+System Configuration
+✓ YES
+✗ NO
+2. SQL Server Database Setup
+Below is the complete seed script for SQL Server to create roles and users with correct credentials.
+2.1 Create Roles
+-- SQL Server: Insert Roles into ASP.NET Identity
+INSERT INTO [dbo].[AspNetRoles] (Id, Name, NormalizedName, ConcurrencyStamp)
+VALUES
+  (NEWID(), 'MosqueOwner', 'MOSQUEOWNER', NEWID()),
+  (NEWID(), 'MosqueAdmin', 'MOSQUEADMIN', NEWID());
+2.2 Create Users
+-- Users are created via ASP.NET Identity UserManager
+-- Use this C# seed in Program.cs or a DbSeeder class:
+var owner = new ApplicationUser { UserName = "owner", Email = "owner@mosque.com" };
+await userManager.CreateAsync(owner, "Owner@123");
+await userManager.AddToRoleAsync(owner, "MosqueOwner");
+var admin = new ApplicationUser { UserName = "admin", Email = "admin@mosque.com" };
+await userManager.CreateAsync(admin, "Admin@123");
+await userManager.AddToRoleAsync(admin, "MosqueAdmin");
+2.3 Connection String (SQL Server)
+// appsettings.json
+"ConnectionStrings": {
+  "DefaultConnection": "Server=.;Database=MosqueOS;Trusted_Connection=True;MultipleActiveResultSets=true"
+}
+// Program.cs — EF Core SQL Server registration
+builder.Services.AddDbContext<AppDbContext>(options =>
+  options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+🕌  Module 3.1: Mosque Profile
+The mosque profile is the core identity of the mosque on the platform. It includes contact information, branding, and system-level configuration.
+Permissions Table
+Action / Permission
+🏠 Owner
+⚙️ Admin
+Claim Mosque (UNCLAIMED → ACTIVE)
+✓ YES
+✗ NO
+Enable / Disable Feature Modules
+✓ YES
+✗ NO
+Transfer Mosque Ownership
+✓ YES
+✗ NO
+Edit Mosque Name, Address, Contact
+✓ YES
+✓ YES
+Upload Logo & Banner
+✓ YES
+✓ YES
+Update Description & Social Links
+✓ YES
+✓ YES
+View Mosque Profile (Public)
+✓ YES
+✓ YES
+🏠 Owner-Only Actions
+Claim mosque (status: UNCLAIMED → CLAIMED → ACTIVE)
+Enable or disable feature modules via mosque_settings
+Transfer ownership to another user
+Delete or deactivate mosque profile
+✅ Both Roles Can Do
+Edit mosque name, address, city, postcode
+Update phone, email, website, social links
+Upload logo and banner images
+Update mosque description and timezone
+SQL Server Table Schema
+CREATE TABLE Mosques (
+  Id          INT PRIMARY KEY IDENTITY,
+  Name        NVARCHAR(200) NOT NULL,
+  Slug        NVARCHAR(100) NOT NULL UNIQUE,
+  Address     NVARCHAR(300),
+  City        NVARCHAR(100),
+  Postcode    NVARCHAR(20),
+  Phone       NVARCHAR(50),
+  Email       NVARCHAR(200),
+  Website     NVARCHAR(300),
+  LogoUrl     NVARCHAR(500),
+  BannerUrl   NVARCHAR(500),
+  Description NVARCHAR(MAX),
+  Timezone    NVARCHAR(50) DEFAULT 'Europe/London',
+  Status      NVARCHAR(20) DEFAULT 'UNCLAIMED',
+  OwnerId     INT NULL REFERENCES AspNetUsers(Id)
+);
+ 
+CREATE TABLE MosqueSettings (
+  Id           INT PRIMARY KEY IDENTITY,
+  MosqueId     INT REFERENCES Mosques(Id),
+  ModuleKey    NVARCHAR(100),
+  IsEnabled    BIT DEFAULT 1
+);
+🕐  Module 3.2: Prayer Times
+Daily and monthly prayer timetable management including jamaah timings, Jumuah slots, and exception handling for Ramadan or special dates.
+Permissions Table
+Action / Permission
+🏠 Owner
+⚙️ Admin
+Enter / Edit Daily Prayer Times
+✓ YES
+✓ YES
+Set Jamaah Timings
+✓ YES
+✓ YES
+Configure Jumuah Slots (multiple)
+✓ YES
+✓ YES
+Create Recurring Jamaah Templates
+✓ YES
+✓ YES
+Add Ramadan / Special Date Exceptions
+✓ YES
+✓ YES
+View Prayer Time Audit Log
+✓ YES
+✓ YES
+Bulk Import Timetable Data
+✓ YES
+✓ YES
+✅ Both Roles Can Do
+Add and edit daily prayer times (Fajr to Isha)
+Set jamaah timings per prayer
+Configure Jumuah times (multiple slots supported)
+Create recurring jamaah templates
+Add exceptions for Ramadan, special dates
+View audit log of changes
+SQL Server Table Schema
+CREATE TABLE PrayerTimesDaily (
+  Id            INT PRIMARY KEY IDENTITY,
+  MosqueId      INT REFERENCES Mosques(Id),
+  Date          DATE NOT NULL,
+  FajrStart     TIME, FajrJamaat     TIME,
+  DhuhrStart    TIME, DhuhrJamaat    TIME,
+  AsrStart      TIME, AsrJamaat      TIME,
+  MaghribStart  TIME, MaghribJamaat  TIME,
+  IshaStart     TIME, IshaJamaat     TIME
+);
+ 
+CREATE TABLE JumuahTimes (
+  Id           INT PRIMARY KEY IDENTITY,
+  MosqueId     INT REFERENCES Mosques(Id),
+  KhutbahTime  TIME,
+  JamaatTime   TIME,
+  SlotNumber   INT DEFAULT 1
+);
+ 
+CREATE TABLE PrayerExceptions (
+  Id             INT PRIMARY KEY IDENTITY,
+  MosqueId       INT REFERENCES Mosques(Id),
+  Date           DATE,
+  Prayer         NVARCHAR(20),
+  OverrideValue  TIME,
+  Reason         NVARCHAR(200)
+);
+📢  Module 3.3: Announcements
+Mosque news, notices, and community updates. Supports draft/published workflow and featured announcements on the homepage.
+Permissions Table
+Action / Permission
+🏠 Owner
+⚙️ Admin
+Create New Announcement
+✓ YES
+✓ YES
+Edit Existing Announcement
+✓ YES
+✓ YES
+Delete Announcement
+✓ YES
+✓ YES
+Publish / Unpublish
+✓ YES
+✓ YES
+Set as Featured (Homepage)
+✓ YES
+✓ YES
+View Draft Announcements
+✓ YES
+✓ YES
+✅ Both Roles Can Do
+Create, edit, delete announcements
+Publish or unpublish announcements
+Set an announcement as featured (shown on homepage)
+Add title, summary, body, and optional image
+SQL Server Table Schema
+CREATE TABLE Announcements (
+  Id          INT PRIMARY KEY IDENTITY,
+  MosqueId    INT REFERENCES Mosques(Id),
+  Title       NVARCHAR(300) NOT NULL,
+  Summary     NVARCHAR(500),
+  Body        NVARCHAR(MAX),
+  ImageUrl    NVARCHAR(500),
+  Status      NVARCHAR(20) DEFAULT 'DRAFT',
+  IsFeatured  BIT DEFAULT 0,
+  PublishedAt DATETIME2 NULL,
+  CreatedBy   INT REFERENCES AspNetUsers(Id)
+);
+📅  Module 3.4: Events Management
+Mosque events including talks, Mawlid nights, Dhikr gatherings, and community classes. Supports multiple event types.
+Permissions Table
+Action / Permission
+🏠 Owner
+⚙️ Admin
+Create New Event
+✓ YES
+✓ YES
+Edit Event Details
+✓ YES
+✓ YES
+Delete Event
+✓ YES
+✓ YES
+Set Event Type (Mawlid, Dhikr, etc.)
+✓ YES
+✓ YES
+Link Event to Awrad Sequence
+✓ YES
+✓ YES
+View All Events
+✓ YES
+✓ YES
+✅ Both Roles Can Do
+Create, edit, delete events
+Set event type (Mawlid, Dhikr, Class, General, Jumuah)
+Assign date, time, location, and speaker
+Link event to guided awrad reading sequences
+SQL Server Table Schema
+CREATE TABLE Events (
+  Id          INT PRIMARY KEY IDENTITY,
+  MosqueId    INT REFERENCES Mosques(Id),
+  Title       NVARCHAR(300) NOT NULL,
+  Description NVARCHAR(MAX),
+  Date        DATE,
+  Time        TIME,
+  EndTime     TIME,
+  Location    NVARCHAR(300),
+  Speaker     NVARCHAR(200),
+  EventType   NVARCHAR(50)  -- GENERAL|MAWLID|DHIKR|CLASS|JUMUAH|OTHER
+              DEFAULT 'GENERAL',
+  Status      NVARCHAR(20)  DEFAULT 'ACTIVE'
+);
+📚  Module 3.5: Madrassah Management
+Student, class, attendance, fee, and progress management for the mosque's Islamic school.
+Permissions Table
+Action / Permission
+🏠 Owner
+⚙️ Admin
+Enable / Disable Madrassah Module
+✓ YES
+✗ NO
+Add / Edit / Delete Students
+✓ YES
+✓ YES
+Create Classes & Assign Teachers
+✓ YES
+✓ YES
+Enrol Students into Classes
+✓ YES
+✓ YES
+Record Session Attendance
+✓ YES
+✓ YES
+Track Student Fees
+✓ YES
+✓ YES
+Add Progress Notes
+✓ YES
+✓ YES
+View Attendance Dashboard
+✓ YES
+✓ YES
+🏠 Owner-Only Actions
+Enable or disable Madrassah module
+✅ Both Roles Can Do
+Add, edit, delete student records
+Create classes and assign teachers
+Enrol students into classes
+Record attendance per session (Present/Absent/Late)
+Track fees (paid/unpaid)
+Add progress notes per student
+View dashboard summaries
+SQL Server Table Schema
+CREATE TABLE Students (
+  Id         INT PRIMARY KEY IDENTITY,
+  MosqueId   INT REFERENCES Mosques(Id),
+  Name       NVARCHAR(200),
+  DateOfBirth DATE,
+  Gender     NVARCHAR(10)
+);
+CREATE TABLE Classes (
+  Id         INT PRIMARY KEY IDENTITY,
+  MosqueId   INT REFERENCES Mosques(Id),
+  Name       NVARCHAR(200),
+  TeacherId  INT NULL REFERENCES AspNetUsers(Id),
+  Schedule   NVARCHAR(200)
+);
+CREATE TABLE Enrolments (
+  Id           INT PRIMARY KEY IDENTITY,
+  StudentId    INT REFERENCES Students(Id),
+  ClassId      INT REFERENCES Classes(Id),
+  EnrolledAt   DATETIME2,
+  Status       NVARCHAR(20) DEFAULT 'ACTIVE'
+);
+CREATE TABLE AttendanceSessions (
+  Id       INT PRIMARY KEY IDENTITY,
+  ClassId  INT REFERENCES Classes(Id),
+  Date     DATE,
+  Notes    NVARCHAR(500)
+);
+CREATE TABLE AttendanceRecords (
+  Id         INT PRIMARY KEY IDENTITY,
+  SessionId  INT REFERENCES AttendanceSessions(Id),
+  StudentId  INT REFERENCES Students(Id),
+  Status     NVARCHAR(10)  -- PRESENT|ABSENT|LATE
+);
+CREATE TABLE Fees (
+  Id         INT PRIMARY KEY IDENTITY,
+  StudentId  INT REFERENCES Students(Id),
+  Amount     DECIMAL(10,2),
+  DueDate    DATE,
+  PaidAt     DATETIME2 NULL,
+  Status     NVARCHAR(20) DEFAULT 'UNPAID'
+);
+👥  Module 3.6: Communities
+Groups and circles within the mosque — Tariqa circles, youth groups, sisters groups, study circles, and madrassah groups.
+Permissions Table
+Action / Permission
+🏠 Owner
+⚙️ Admin
+Create Community Group
+✓ YES
+✓ YES
+Edit Community Details
+✓ YES
+✓ YES
+Delete Community
+✓ YES
+✓ YES
+Add / Remove Members
+✓ YES
+✓ YES
+Post Community Updates
+✓ YES
+✓ YES
+Add Community Resources
+✓ YES
+✓ YES
+Link to Events
+✓ YES
+✓ YES
+✅ Both Roles Can Do
+Create and manage community groups
+Set community type (Tariqa, Youth, Sisters, etc.)
+Add and remove members
+Post community updates and resources
+Link communities to events
+SQL Server Table Schema
+CREATE TABLE Communities (
+  Id          INT PRIMARY KEY IDENTITY,
+  MosqueId    INT NULL REFERENCES Mosques(Id),
+  Name        NVARCHAR(200),
+  Type        NVARCHAR(50),  -- TARIQA|CLASS|YOUTH|SISTERS|STUDY|MADRASSAH
+  Description NVARCHAR(MAX),
+  IsPublic    BIT DEFAULT 1
+);
+CREATE TABLE CommunityMembers (
+  Id           INT PRIMARY KEY IDENTITY,
+  CommunityId  INT REFERENCES Communities(Id),
+  UserId       INT REFERENCES AspNetUsers(Id),
+  Role         NVARCHAR(20) DEFAULT 'MEMBER'  -- ADMIN|TEACHER|MEMBER
+);
+CREATE TABLE CommunityPosts (
+  Id           INT PRIMARY KEY IDENTITY,
+  CommunityId  INT REFERENCES Communities(Id),
+  AuthorId     INT REFERENCES AspNetUsers(Id),
+  Content      NVARCHAR(MAX),
+  CreatedAt    DATETIME2 DEFAULT GETUTCDATE()
+);
+📿  Module 3.7: Awrad & Wird Content
+Structured daily and event-based spiritual reading collections. Supports Ba'alawi and Shadhili tariqa paths with ordered step-by-step content.
+Permissions Table
+Action / Permission
+🏠 Owner
+⚙️ Admin
+Create Wird Collection
+✓ YES
+✓ YES
+Add / Edit Content Steps
+✓ YES
+✓ YES
+Set Arabic Text, Transliteration, Translation
+✓ YES
+✓ YES
+Attach Audio URL to Items
+✓ YES
+✓ YES
+Assign to Prayer Slot
+✓ YES
+✓ YES
+Build Mawlid Event Sequences
+✓ YES
+✓ YES
+Set Tariqa Path (Ba'alawi / Shadhili)
+✓ YES
+✓ YES
+✅ Both Roles Can Do
+Create Wird collections (Khulasa, Mawlid sequences)
+Add steps with Arabic text, transliteration, translation
+Set repeat counts and audio URLs
+Assign collections to prayer slots
+Build Mawlid event reading sequences
+SQL Server Table Schema
+CREATE TABLE ContentItems (
+  Id                INT PRIMARY KEY IDENTITY,
+  Title             NVARCHAR(300),
+  ArabicText        NVARCHAR(MAX),
+  Transliteration   NVARCHAR(MAX),
+  Translation       NVARCHAR(MAX),
+  RepeatCount       INT DEFAULT 1,
+  AudioUrl          NVARCHAR(500),
+  SourceRef         NVARCHAR(200),
+  Type              NVARCHAR(50)
+);
+CREATE TABLE WirdCollections (
+  Id                INT PRIMARY KEY IDENTITY,
+  Name              NVARCHAR(200),
+  Tariqa            NVARCHAR(20),  -- BA_ALAWI|SHADHILI|GENERAL
+  Type              NVARCHAR(20),  -- DAILY|WEEKLY|EVENT
+  RecommendedTime   NVARCHAR(50)
+);
+CREATE TABLE WirdSteps (
+  Id                  INT PRIMARY KEY IDENTITY,
+  CollectionId        INT REFERENCES WirdCollections(Id),
+  ContentItemId       INT REFERENCES ContentItems(Id),
+  OrderIndex          INT,
+  CustomInstructions  NVARCHAR(500)
+);
+🤲  Module 3.8: Daily Adhkar
+Dhikr content library management. Admins add adhkar items; members personalise their own list (member-level feature).
+Permissions Table
+Action / Permission
+🏠 Owner
+⚙️ Admin
+Add Adhkar Items to Library
+✓ YES
+✓ YES
+Edit / Delete Adhkar Items
+✓ YES
+✓ YES
+Set Category & Occasion Filter
+✓ YES
+✓ YES
+Set Default Count
+✓ YES
+✓ YES
+View Adhkar Library
+✓ YES
+✓ YES
+✅ Both Roles Can Do
+Add adhkar items to the content library
+Set Arabic text, transliteration, translation
+Set default count and category
+Assign occasion filter (Always / Friday / Ramadan)
+SQL Server Table Schema
+CREATE TABLE AdhkarItems (
+  Id                INT PRIMARY KEY IDENTITY,
+  Title             NVARCHAR(300),
+  ArabicText        NVARCHAR(MAX),
+  Transliteration   NVARCHAR(MAX),
+  Translation       NVARCHAR(MAX),
+  DefaultCount      INT DEFAULT 33,
+  Category          NVARCHAR(100),
+  Occasion          NVARCHAR(50)  -- ALWAYS|FRIDAY|RAMADAN|SPECIAL
+);
+🤍  Module 3.9: Duas Library
+Curated supplication library with categories, collections, and contextual recommendations. Integrated with Wudu guide and event sequences.
+Permissions Table
+Action / Permission
+🏠 Owner
+⚙️ Admin
+Add / Edit / Delete Duas
+✓ YES
+✓ YES
+Set Category (Morning, Wudu, After Prayer, etc.)
+✓ YES
+✓ YES
+Create Dua Collections
+✓ YES
+✓ YES
+Link Duas to Wudu Steps
+✓ YES
+✓ YES
+Attach Audio URLs
+✓ YES
+✓ YES
+View Public Dua Library
+✓ YES
+✓ YES
+✅ Both Roles Can Do
+Add duas with Arabic, transliteration, translation
+Set source reference and category
+Create curated dua collections (Ghazali, Friday, etc.)
+Link duas to Wudu guide steps
+Attach audio URLs to duas
+SQL Server Table Schema
+CREATE TABLE Duas (
+  Id                INT PRIMARY KEY IDENTITY,
+  Title             NVARCHAR(300),
+  ArabicText        NVARCHAR(MAX),
+  Transliteration   NVARCHAR(MAX),
+  Translation       NVARCHAR(MAX),
+  SourceName        NVARCHAR(200),
+  SourceRef         NVARCHAR(200),
+  Category          NVARCHAR(100),
+  AudioUrl          NVARCHAR(500)
+);
+CREATE TABLE DuaCollections (
+  Id          INT PRIMARY KEY IDENTITY,
+  Name        NVARCHAR(200),
+  Description NVARCHAR(MAX),
+  Type        NVARCHAR(50)
+);
+CREATE TABLE DuaCollectionItems (
+  Id            INT PRIMARY KEY IDENTITY,
+  CollectionId  INT REFERENCES DuaCollections(Id),
+  DuaId         INT REFERENCES Duas(Id),
+  OrderIndex    INT
+);
+📖  Module 3.10: Qur'an Reading Plans
+30-day para reading plan tracker for mosque members. Admin manages the plan configuration.
+Permissions Table
+Action / Permission
+🏠 Owner
+⚙️ Admin
+Configure Reading Plan Defaults
+✓ YES
+✓ YES
+Set Minimum Daily Reading
+✓ YES
+✓ YES
+View Mosque-Wide Reading Stats
+✓ YES
+✓ YES
+✅ Both Roles Can Do
+Configure default Qur'an reading plans
+Set minimum daily reading amount
+View reading plan statistics
+SQL Server Table Schema
+CREATE TABLE QuranPlans (
+  Id         INT PRIMARY KEY IDENTITY,
+  UserId     INT REFERENCES AspNetUsers(Id),
+  Type       NVARCHAR(20) DEFAULT '30_DAY',
+  StartDate  DATE
+);
+CREATE TABLE QuranProgress (
+  Id           INT PRIMARY KEY IDENTITY,
+  PlanId       INT REFERENCES QuranPlans(Id),
+  ParaNumber   INT,
+  Completed    BIT DEFAULT 0,
+  CompletedAt  DATETIME2 NULL
+);
+💧  Module 3.11: Ritual Guides
+Step-by-step beginner-friendly guides for Wudu, Ghusl, and Salah. Each step can link to a relevant dua.
+Permissions Table
+Action / Permission
+🏠 Owner
+⚙️ Admin
+Create Ritual Guide (Wudu / Ghusl / Salah)
+✓ YES
+✓ YES
+Add / Edit Steps
+✓ YES
+✓ YES
+Upload Step Images
+✓ YES
+✓ YES
+Link Step to Dua
+✓ YES
+✓ YES
+Publish / Unpublish Guide
+✓ YES
+✓ YES
+✅ Both Roles Can Do
+Create and edit ritual guides (Wudu, Ghusl, Salah)
+Add ordered steps with title and description
+Add step images
+Link step to relevant dua
+SQL Server Table Schema
+CREATE TABLE RitualGuides (
+  Id    INT PRIMARY KEY IDENTITY,
+  Title NVARCHAR(200),
+  Type  NVARCHAR(20)  -- WUDU|GHUSL|SALAH|OTHER
+);
+CREATE TABLE RitualSteps (
+  Id          INT PRIMARY KEY IDENTITY,
+  GuideId     INT REFERENCES RitualGuides(Id),
+  OrderIndex  INT,
+  Title       NVARCHAR(200),
+  Description NVARCHAR(MAX),
+  ImageUrl    NVARCHAR(500),
+  DuaId       INT NULL REFERENCES Duas(Id)
+);
+🌿  Module 3.12: Janaza Announcements
+Respectful and dignified announcements for deaths and funeral prayers within the mosque community.
+Permissions Table
+Action / Permission
+🏠 Owner
+⚙️ Admin
+Post Janaza Announcement
+✓ YES
+✓ YES
+Edit Announcement Details
+✓ YES
+✓ YES
+Delete Announcement
+✓ YES
+✓ YES
+View Public Janaza List
+✓ YES
+✓ YES
+✅ Both Roles Can Do
+Post janaza announcements
+Set name of deceased, date, janaza time and location
+Add burial location details
+Include link to mosque website
+SQL Server Table Schema
+CREATE TABLE JanazaAnnouncements (
+  Id               INT PRIMARY KEY IDENTITY,
+  MosqueId         INT REFERENCES Mosques(Id),
+  Name             NVARCHAR(200),
+  DateOfDeath      DATE,
+  JanazaDate       DATE,
+  JanazaTime       TIME,
+  Location         NVARCHAR(300),
+  BurialLocation   NVARCHAR(300),
+  Notes            NVARCHAR(MAX),
+  MosqueSiteUrl    NVARCHAR(500)
+);
+📜  Module 3.13: Death Readings Allocation
+Community reading campaigns in memory of the deceased. Members are assigned Qur'an portions or duas to complete.
+Permissions Table
+Action / Permission
+🏠 Owner
+⚙️ Admin
+Create Reading Campaign
+✓ YES
+✓ YES
+Assign Reading Portions to Members
+✓ YES
+✓ YES
+Close / Archive Campaign
+✓ YES
+✓ YES
+View Completion Status
+✓ YES
+✓ YES
+✅ Both Roles Can Do
+Create reading campaign for deceased
+Assign reading portions to community members
+Mark campaigns as active/complete
+View campaign completion status
+SQL Server Table Schema
+CREATE TABLE ReadingCampaigns (
+  Id             INT PRIMARY KEY IDENTITY,
+  MosqueId       INT REFERENCES Mosques(Id),
+  DeceasedName   NVARCHAR(200),
+  CreatedBy      INT REFERENCES AspNetUsers(Id),
+  IsActive       BIT DEFAULT 1
+);
+CREATE TABLE ReadingAllocations (
+  Id           INT PRIMARY KEY IDENTITY,
+  CampaignId   INT REFERENCES ReadingCampaigns(Id),
+  UserId       INT REFERENCES AspNetUsers(Id),
+  Type         NVARCHAR(20),  -- YASEEN|PARA|DUA|ADHKAR
+  Description  NVARCHAR(200),
+  Status       NVARCHAR(20) DEFAULT 'ASSIGNED'  -- ASSIGNED|COMPLETED
+);
+🤝  Module 3.14: Community Participation
+Encourage real-world mosque engagement through volunteering, classes, projects, and events.
+Permissions Table
+Action / Permission
+🏠 Owner
+⚙️ Admin
+Post Participation Opportunity
+✓ YES
+✓ YES
+Edit / Delete Opportunity
+✓ YES
+✓ YES
+Activate / Deactivate Opportunity
+✓ YES
+✓ YES
+View Member Registrations
+✓ YES
+✓ YES
+✅ Both Roles Can Do
+Post volunteering and participation opportunities
+Set opportunity type (Class, Volunteering, Project, Event)
+Activate or deactivate opportunities
+View registrations
+SQL Server Table Schema
+CREATE TABLE ParticipationOpportunities (
+  Id          INT PRIMARY KEY IDENTITY,
+  MosqueId    INT REFERENCES Mosques(Id),
+  Title       NVARCHAR(300),
+  Type        NVARCHAR(30),  -- CLASS|VOLUNTEERING|PROJECT|EVENT|PRAYER
+  Description NVARCHAR(MAX),
+  Date        DATE NULL,
+  IsActive    BIT DEFAULT 1
+);
+CREATE TABLE ParticipationRegistrations (
+  Id               INT PRIMARY KEY IDENTITY,
+  OpportunityId    INT REFERENCES ParticipationOpportunities(Id),
+  UserId           INT REFERENCES AspNetUsers(Id),
+  RegisteredAt     DATETIME2 DEFAULT GETUTCDATE(),
+  Status           NVARCHAR(20) DEFAULT 'REGISTERED'
+);
+🕋  Module 3.15: Umrah & Hajj Guides
+Step-by-step spiritual journey guides for Umrah and Hajj. Mobile-first, calm reading experience with integrated duas.
+Permissions Table
+Action / Permission
+🏠 Owner
+⚙️ Admin
+Create Umrah Guide
+✓ YES
+✓ YES
+Create Hajj Guide
+✓ YES
+✓ YES
+Add / Edit Journey Stages
+✓ YES
+✓ YES
+Link Duas to Stages
+✓ YES
+✓ YES
+Publish / Unpublish Guide
+✓ YES
+✓ YES
+✅ Both Roles Can Do
+Create Umrah and Hajj guides
+Add journey stages with descriptions
+Link relevant duas and readings to each stage
+Add notes and guidance
+SQL Server Table Schema
+CREATE TABLE JourneyGuides (
+  Id    INT PRIMARY KEY IDENTITY,
+  Type  NVARCHAR(10),  -- UMRAH|HAJJ
+  Title NVARCHAR(200)
+);
+CREATE TABLE JourneyStages (
+  Id          INT PRIMARY KEY IDENTITY,
+  GuideId     INT REFERENCES JourneyGuides(Id),
+  OrderIndex  INT,
+  Title       NVARCHAR(200),
+  Description NVARCHAR(MAX),
+  Notes       NVARCHAR(MAX)
+);
+4. API Authorization Reference
+All API endpoints use ASP.NET Core Identity with JWT Bearer tokens and role-based authorization attributes.
+4.1 Role-Based Controller Attributes
+// Owner-only endpoint
+[Authorize(Roles = "MosqueOwner")]
+[HttpPost("mosque/claim")]
+public async Task<IActionResult> ClaimMosque(...) { }
+ 
+// Admin and Owner both allowed
+[Authorize(Roles = "MosqueOwner,MosqueAdmin")]
+[HttpPost("prayer-times")]
+public async Task<IActionResult> CreatePrayerTimes(...) { }
+ 
+// Public endpoint (no auth required)
+[AllowAnonymous]
+[HttpGet("mosque/{slug}")]
+public async Task<IActionResult> GetMosqueProfile(string slug) { }
+4.2 Angular Route Guards
+// app-routing.module.ts
+{
+  path: "admin/mosque/claim",
+  component: ClaimMosqueComponent,
+  canActivate: [RoleGuard],
+  data: { roles: ["MosqueOwner"] }
+},
+{
+  path: "admin/prayer-times",
+  component: PrayerTimesComponent,
+  canActivate: [RoleGuard],
+  data: { roles: ["MosqueOwner", "MosqueAdmin"] }
+}
