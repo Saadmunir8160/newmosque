@@ -7,13 +7,17 @@
   No mosque linked. Complete claim approval to manage modules.
 </div>
 
-  <div *ngIf="!loading() && mosque()">
+<div *ngIf="!loading() && mosque()">
   <div *ngIf="toast()" class="oms-toast" [class.oms-toast--ok]="toastOk()" [class.oms-toast--err]="!toastOk()">{{ toast() }}</div>
-  <div *ngIf="lockMessage()" class="oms-alert" [class.oms-alert--warn]="!canEdit()" [class.oms-alert--info]="canEdit() || mosque()?.status !== 'Active'">{{ lockMessage() }}</div>
+  <div *ngIf="lockMessage()" class="oms-alert" [class.oms-alert--warn]="!canEdit()" [class.oms-alert--info]="canEdit()">{{ lockMessage() }}</div>
 
   <p class="oms-lead">Enable or disable modules for your mosque. Disabled modules are hidden from your dashboard and the public website.</p>
 
-  <ul class="oms-list" [class.oms-list--locked]="!canEdit()">
+  <div *ngIf="!sortedModules().length" class="oms-alert oms-alert--info">
+    No modules found. Modules are seeded automatically when a mosque is activated. Contact your Super Admin if this is unexpected.
+  </div>
+
+  <ul class="oms-list" [class.oms-list--locked]="!canEdit()" *ngIf="sortedModules().length">
     <li *ngFor="let mod of sortedModules()" class="oms-row">
       <div>
         <p class="oms-row__name">{{ moduleLabel(mod.moduleKey) }}</p>
@@ -32,7 +36,7 @@
     </li>
   </ul>
 
-  <footer class="oms-footer">
+  <footer class="oms-footer" *ngIf="sortedModules().length">
     <button type="button" class="oms-btn" (click)="saveAll()" [disabled]="!canEdit() || saving()">
       <span *ngIf="saving()" class="oms-spinner oms-spinner--sm" aria-hidden="true"></span>
       {{ saving() ? 'Saving…' : 'Save Module Settings' }}

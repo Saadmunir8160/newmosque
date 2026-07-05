@@ -111,6 +111,7 @@ public class MosqueCreateDto
 public class MosqueUpdateDto
 {
     public string Name { get; set; } = string.Empty;
+    public string? Slug { get; set; }
     public string? Address { get; set; }
     public string City { get; set; } = string.Empty;
     public string? Postcode { get; set; }
@@ -130,6 +131,8 @@ public class MosqueUpdateDto
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
     public string? Timezone { get; set; }
+    public MosqueStatus? Status { get; set; }
+    public string? OwnerId { get; set; }
     public bool? AllowClaimRequests { get; set; }
     public bool? RequireManualApproval { get; set; }
     public bool? PublicProfileEnabled { get; set; }
@@ -183,6 +186,7 @@ public class MosquePublicDto
     public string? ParkingInfo { get; set; }
     public List<string> Gallery { get; set; } = new();
     public List<string> Services { get; set; } = new();
+    public List<MosqueLeadershipDto> Leadership { get; set; } = new();
 
     public static MosquePublicDto FromEntity(Mosque m, bool showPendingState = false) => new()
     {
@@ -225,7 +229,8 @@ public class MosquePublicDto
         History = m.History,
         ParkingInfo = m.ParkingInfo,
         Gallery = ParseStringList(m.GalleryJson),
-        Services = ParseStringList(m.ServicesJson)
+        Services = ParseStringList(m.ServicesJson),
+        Leadership = MosqueProfileJsonHelper.Parse(m.ProfileJson).Leadership
     };
 
     private static string MapPublicStatus(MosqueStatus status, bool showPendingState) => status switch
@@ -233,21 +238,26 @@ public class MosquePublicDto
         MosqueStatus.Unclaimed => nameof(MosqueStatus.Unclaimed),
         MosqueStatus.Claimed => nameof(MosqueStatus.Claimed),
         MosqueStatus.Active => nameof(MosqueStatus.Active),
-        MosqueStatus.ClaimPending or MosqueStatus.PendingReview when showPendingState
-            => nameof(MosqueStatus.ClaimPending),
-        _ => nameof(MosqueStatus.Active)
+        MosqueStatus.ClaimPending when showPendingState => nameof(MosqueStatus.ClaimPending),
+        MosqueStatus.PendingReview when showPendingState => nameof(MosqueStatus.PendingReview),
+        MosqueStatus.Suspended => nameof(MosqueStatus.Suspended),
+        MosqueStatus.Archived => nameof(MosqueStatus.Archived),
+        MosqueStatus.Invited => nameof(MosqueStatus.Invited),
+        // Never silently return Active for unknown/pending states — return actual status name
+        _ => status.ToString()
     };
 
     private static string MapStatusLabel(MosqueStatus status, bool showPendingState) => status switch
     {
         MosqueStatus.Unclaimed => "Unclaimed listing",
-        MosqueStatus.Claimed => "Claimed",
+        MosqueStatus.Claimed => "Claimed — awaiting activation",
         MosqueStatus.Active => "Active",
-        MosqueStatus.ClaimPending or MosqueStatus.PendingReview when showPendingState
-            => "Verification pending",
+        MosqueStatus.ClaimPending when showPendingState => "Verification pending",
+        MosqueStatus.PendingReview when showPendingState => "Under review",
         MosqueStatus.Suspended => "Suspended",
         MosqueStatus.Archived => "Archived",
-        _ => "Active"
+        MosqueStatus.Invited => "Invitation sent",
+        _ => status.ToString()
     };
 
     private static List<string> ParseFacilities(string? json) => ParseJsonStringList(json);
@@ -497,4 +507,15 @@ public class DonationFundAdminDto
 public class UpdateDonationFundsRequest
 {
     public List<DonationFundAdminDto> Funds { get; set; } = new();
+}
+
+public class UpdateClaimRequest
+{
+    public string? FullName { get; set; }
+    public string? Phone { get; set; }
+    public string? Position { get; set; }
+    public string? Organization { get; set; }
+    public string? RelationshipToMosque { get; set; }
+    public int? YearsAssociated { get; set; }
+    public string? Reason { get; set; }
 }

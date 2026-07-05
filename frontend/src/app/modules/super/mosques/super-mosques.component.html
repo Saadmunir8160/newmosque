@@ -107,7 +107,7 @@
   </div>
 
   <div class="mp-grid" *ngIf="!loading() && listings().length && viewMode() === 'grid'">
-    <article *ngFor="let m of listings()" class="mp-card">
+    <article *ngFor="let m of pagedListings()" class="mp-card">
       <div class="mp-card__top">
         <div class="mp-card__avatar" aria-hidden="true">{{ mosqueInitial(m.name) }}</div>
         <div class="mp-card__info">
@@ -147,8 +147,9 @@
           [title]="publicLinkTitle(m.status)">
           {{ isPublicVisible(m.status) ? 'Public' : 'Preview' }}
         </a>
-        <a [routerLink]="['/dashboard/admin/mosque']" [queryParams]="{ mosqueId: m.id }" class="mp-btn mp-btn--ghost mp-btn--sm">Edit</a>
-        <button *ngIf="m.status === 'Claimed'" type="button" class="mp-btn mp-btn--success mp-btn--sm" (click)="activate(m.id)">Activate</button>
+        <a [routerLink]="['/dashboard/super/mosques', m.id, 'edit']" class="mp-btn mp-btn--ghost mp-btn--sm">Edit</a>
+        <button *ngIf="m.status === 'Claimed' || m.status === 'PendingReview'" type="button" class="mp-btn mp-btn--success mp-btn--sm" (click)="activate(m.id)">Activate</button>
+        <button type="button" class="mp-btn mp-btn--danger mp-btn--sm" (click)="openDeleteDialog(m)">Delete</button>
       </footer>
     </article>
   </div>
@@ -167,7 +168,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let m of listings()">
+          <tr *ngFor="let m of pagedListings()">
             <td>
               <div class="mp-table__mosque">
                 <span class="mp-table__avatar" aria-hidden="true">{{ mosqueInitial(m.name) }}</span>
@@ -208,13 +209,49 @@
                 [title]="publicLinkTitle(m.status)">
                 {{ isPublicVisible(m.status) ? 'Public' : 'Preview' }}
               </a>
-              <a [routerLink]="['/dashboard/admin/mosque']" [queryParams]="{ mosqueId: m.id }" class="mp-btn mp-btn--ghost mp-btn--sm">Edit</a>
-              <button *ngIf="m.status === 'Claimed'" type="button" class="mp-btn mp-btn--success mp-btn--sm" (click)="activate(m.id)">Activate</button>
+              <a [routerLink]="['/dashboard/super/mosques', m.id, 'edit']" class="mp-btn mp-btn--ghost mp-btn--sm">Edit</a>
+              <button *ngIf="m.status === 'Claimed' || m.status === 'PendingReview'" type="button" class="mp-btn mp-btn--success mp-btn--sm" (click)="activate(m.id)">Activate</button>
+              <button type="button" class="mp-btn mp-btn--danger mp-btn--sm" (click)="openDeleteDialog(m)">Delete</button>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
+  </div>
+
+  <nav *ngIf="!loading() && listings().length" class="mp-pagination" aria-label="Mosque pagination">
+    <p class="mp-pagination__summary">
+      Showing {{ pageStart() }}-{{ pageEnd() }} of {{ listings().length }} mosques
+    </p>
+    <div class="mp-pagination__controls">
+      <button type="button" class="mp-page-btn" (click)="setPage(page() - 1)" [disabled]="page() <= 1">
+        Previous
+      </button>
+      <span class="mp-pagination__page">Page {{ page() }} of {{ totalPages() }}</span>
+      <button type="button" class="mp-page-btn" (click)="setPage(page() + 1)" [disabled]="page() >= totalPages()">
+        Next
+      </button>
+    </div>
+  </nav>
+
+  <div *ngIf="deleteTarget() as target" class="mp-dialog-backdrop" role="presentation" (click)="closeDeleteDialog()">
+    <section class="mp-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-mosque-title" (click)="$event.stopPropagation()">
+      <h2 id="delete-mosque-title" class="mp-dialog__title">Delete mosque</h2>
+      <p class="mp-dialog__body">
+        Delete <strong>{{ target.name }}</strong>? This removes it from admin lists and public surfaces.
+      </p>
+      <div class="mp-dialog__meta">
+        <span class="mp-status" [ngClass]="statusClass(target.status)">{{ formatStatus(target.status) }}</span>
+        <span>{{ target.city || 'No city' }}</span>
+        <span>/{{ target.slug }}</span>
+      </div>
+      <footer class="mp-dialog__actions">
+        <button type="button" class="mp-btn mp-btn--ghost" (click)="closeDeleteDialog()" [disabled]="deleting()">Cancel</button>
+        <button type="button" class="mp-btn mp-btn--danger" (click)="confirmDelete()" [disabled]="deleting()">
+          {{ deleting() ? 'Deleting...' : 'Delete Mosque' }}
+        </button>
+      </footer>
+    </section>
   </div>
 
   <app-add-mosque-drawer

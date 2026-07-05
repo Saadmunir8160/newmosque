@@ -2,12 +2,41 @@
   <header class="oml-header">
     <div>
       <h1 class="oml-title">Mosque Listings</h1>
-      <p class="oml-sub">Browse unclaimed and active mosques. Open a listing to submit an ownership claim.</p>
+      <p class="oml-sub">Browse unclaimed mosques to claim, or register a new listing for super-admin review.</p>
     </div>
     <div class="oml-header__actions">
+      <button
+        *ngIf="canRegisterNew()"
+        type="button"
+        class="oml-btn"
+        (click)="toggleRegister()">
+        {{ showRegister() ? 'Cancel registration' : 'Register a new mosque' }}
+      </button>
       <a routerLink="/dashboard/owner/my-claims" class="oml-btn oml-btn--ghost">My claims</a>
     </div>
   </header>
+
+  <section *ngIf="registerBlockMessage()" class="oml-alert oml-alert--warn" role="status">
+    {{ registerBlockMessage() }}
+  </section>
+
+  <section *ngIf="showRegister() && canRegisterNew()" class="oml-panel oml-register">
+    <h2 class="oml-register__title">Register a new mosque</h2>
+    <p class="oml-register__sub">Your listing will be reviewed by the platform team before it goes live.</p>
+    <div class="oml-register__grid">
+      <label class="oml-field">Mosque name *<input class="oml-input" [(ngModel)]="registerForm.name" /></label>
+      <label class="oml-field">City *<input class="oml-input" [(ngModel)]="registerForm.city" /></label>
+      <label class="oml-field">Postcode<input class="oml-input" [(ngModel)]="registerForm.postcode" /></label>
+      <label class="oml-field">Phone<input class="oml-input" [(ngModel)]="registerForm.phone" /></label>
+      <label class="oml-field oml-field--full">Address<input class="oml-input" [(ngModel)]="registerForm.address" /></label>
+      <label class="oml-field">Email<input class="oml-input" type="email" [(ngModel)]="registerForm.email" /></label>
+      <label class="oml-field oml-field--full">Description<textarea class="oml-input oml-textarea" rows="3" [(ngModel)]="registerForm.description"></textarea></label>
+    </div>
+    <p *ngIf="registerMsg()" class="oml-register__msg" [class.oml-register__msg--err]="!registerOk()">{{ registerMsg() }}</p>
+    <button type="button" class="oml-btn" (click)="submitRegister()" [disabled]="saving()">
+      {{ saving() ? 'Submitting…' : 'Submit for review' }}
+    </button>
+  </section>
 
   <section class="oml-panel">
     <div class="oml-filters">

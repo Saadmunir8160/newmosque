@@ -50,10 +50,10 @@ namespace MosqueOS.Infrastructure.Migrations
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     Label = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Route = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Section = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Route = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Section = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     Icon = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    RequiredRole = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    RequiredRole = table.Column<string>(type: "nvarchar(450)", nullable: true),
                     RequiredPermission = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     SortOrder = table.Column<int>(type: "int", nullable: false),
                     IsActive = table.Column<bool>(type: "bit", nullable: false),

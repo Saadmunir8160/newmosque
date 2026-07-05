@@ -38,25 +38,89 @@ import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
 
       <section class="super-dash__kpis" aria-label="Mosque summary">
         <a routerLink="/dashboard/super/mosques" class="kpi">
-          <p class="kpi__label">Total mosques</p>
+          <p class="kpi__label">Total Mosques</p>
           <p class="kpi__value">{{ d.mosques.total }}</p>
-        </a>
-        <a routerLink="/dashboard/super/mosques" [queryParams]="{ status: 'Unclaimed' }" class="kpi kpi--amber">
-          <p class="kpi__label">Unclaimed</p>
-          <p class="kpi__value">{{ d.mosques.unclaimed }}</p>
-        </a>
-        <a routerLink="/dashboard/super/claims" class="kpi kpi--amber">
-          <p class="kpi__label">Pending claims</p>
-          <p class="kpi__value">{{ d.mosques.pendingClaims ?? d.needsAttention.pendingClaims }}</p>
-        </a>
-        <a routerLink="/dashboard/super/mosques" [queryParams]="{ status: 'Claimed' }" class="kpi">
-          <p class="kpi__label">Claimed</p>
-          <p class="kpi__value">{{ d.mosques.byStatus?.['Claimed'] ?? 0 }}</p>
         </a>
         <a routerLink="/dashboard/super/mosques" [queryParams]="{ status: 'Active' }" class="kpi kpi--green">
           <p class="kpi__label">Active</p>
           <p class="kpi__value">{{ d.mosques.active }}</p>
         </a>
+        <a routerLink="/dashboard/super/mosques" [queryParams]="{ status: 'Claimed' }" class="kpi">
+          <p class="kpi__label">Claimed</p>
+          <p class="kpi__value">{{ d.mosques.byStatus?.['Claimed'] ?? 0 }}</p>
+        </a>
+        <a routerLink="/dashboard/super/mosques" [queryParams]="{ status: 'Unclaimed' }" class="kpi kpi--amber">
+          <p class="kpi__label">Unclaimed</p>
+          <p class="kpi__value">{{ d.mosques.unclaimed }}</p>
+        </a>
+        <a routerLink="/dashboard/super/mosques/add" class="kpi kpi--action">
+          <p class="kpi__label">Add Mosque</p>
+          <p class="kpi__value">+</p>
+        </a>
+      </section>
+
+      <section class="stats-card" aria-label="Statistics">
+        <div>
+          <p class="stats-card__eyebrow">Statistics</p>
+          <h2 class="stats-card__title">Mosque network overview</h2>
+        </div>
+        <dl class="stats-card__grid">
+          <div>
+            <dt>Total Mosques</dt>
+            <dd>{{ d.mosques.total }}</dd>
+          </div>
+          <div>
+            <dt>Active</dt>
+            <dd>{{ d.mosques.active }}</dd>
+          </div>
+          <div>
+            <dt>Claimed</dt>
+            <dd>{{ d.mosques.byStatus?.['Claimed'] ?? 0 }}</dd>
+          </div>
+          <div>
+            <dt>Unclaimed</dt>
+            <dd>{{ d.mosques.unclaimed }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="claim-requests" aria-label="Claim Requests">
+        <div class="claim-requests__head">
+          <div>
+            <p class="claim-requests__eyebrow">Claim Requests</p>
+            <h2>Admin claim dashboard</h2>
+            <p>Verify pending ownership claims, assign owners, update mosque status, and review audit history.</p>
+          </div>
+          <a routerLink="/dashboard/super/claims" class="claim-requests__action">Open claim requests</a>
+        </div>
+
+        <div class="claim-requests__stats">
+          <a routerLink="/dashboard/super/claims" class="claim-stat claim-stat--warn">
+            <span>Pending Claims</span>
+            <strong>{{ d.needsAttention.pendingClaims }}</strong>
+          </a>
+          <a routerLink="/dashboard/super/mosques" [queryParams]="{ status: 'ClaimPending' }" class="claim-stat">
+            <span>Claim Pending Listings</span>
+            <strong>{{ d.mosques.pendingClaims ?? 0 }}</strong>
+          </a>
+          <a routerLink="/dashboard/super/claims" class="claim-stat claim-stat--muted">
+            <span>Rejected Claims</span>
+            <strong>{{ d.mosques.rejectedClaims ?? 0 }}</strong>
+          </a>
+        </div>
+
+        <div class="claim-requests__list" *ngIf="pendingClaims().length; else noClaimRequests">
+          <a *ngFor="let c of pendingClaims()" [routerLink]="['/dashboard/super/claims', c.claimId]" class="claim-request-row">
+            <div>
+              <strong>{{ c.mosqueName }}</strong>
+              <span>{{ c.claimReference || ('Claim #' + c.claimId) }} · {{ c.claimantName }} · {{ c.city || 'No city' }}</span>
+            </div>
+            <span class="claim-request-row__status">Verify</span>
+          </a>
+        </div>
+        <ng-template #noClaimRequests>
+          <p class="empty">No pending claim requests need verification.</p>
+        </ng-template>
       </section>
 
       <section class="super-dash__nav" aria-label="Quick navigation">
@@ -80,6 +144,28 @@ import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
             <span class="nav-card__icon" aria-hidden="true">{{ navIcon(item.icon) }}</span>
             <span class="nav-card__label">{{ item.label }}</span>
             <span class="nav-card__meta" *ngIf="item.route === '/dashboard/super/users'">{{ d.users.total }} users</span>
+          </a>
+        </div>
+
+        <h2 class="super-dash__section-title">Oversight</h2>
+        <div class="nav-grid">
+          <a
+            *ngFor="let item of oversightNavItems"
+            [routerLink]="item.route"
+            class="nav-card">
+            <span class="nav-card__icon" aria-hidden="true">{{ navIcon(item.icon) }}</span>
+            <span class="nav-card__label">{{ item.label }}</span>
+          </a>
+        </div>
+
+        <h2 class="super-dash__section-title">System</h2>
+        <div class="nav-grid">
+          <a
+            *ngFor="let item of systemNavItems"
+            [routerLink]="item.route"
+            class="nav-card">
+            <span class="nav-card__icon" aria-hidden="true">{{ navIcon(item.icon) }}</span>
+            <span class="nav-card__label">{{ item.label }}</span>
           </a>
         </div>
       </section>
@@ -119,7 +205,7 @@ import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
               <p class="claim-row__name">{{ c.mosqueName }}</p>
               <p class="claim-row__meta">{{ c.city }} · {{ c.claimantName }}</p>
             </div>
-            <a routerLink="/dashboard/super/claims" class="claim-row__btn">Review</a>
+            <a [routerLink]="['/dashboard/super/claims', c.claimId]" class="claim-row__btn">Review</a>
           </div>
         </section>
       </div>
@@ -201,6 +287,65 @@ import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
     }
     .kpi--amber .kpi__value { color: #B45309; }
     .kpi--green .kpi__value { color: #047857; }
+    .kpi--action {
+      border-color: rgba(15, 76, 58, 0.28);
+      background: rgba(15, 76, 58, 0.06);
+    }
+    .kpi--action .kpi__value { color: var(--mos-primary); }
+
+    .stats-card {
+      display: grid;
+      gap: 1rem;
+      padding: 1.125rem 1.25rem;
+      border-radius: var(--mos-radius-card);
+      border: 1px solid var(--mos-border);
+      background: var(--mos-surface);
+    }
+    @media (min-width: 900px) {
+      .stats-card {
+        grid-template-columns: minmax(12rem, 0.7fr) 1.3fr;
+        align-items: center;
+      }
+    }
+    .stats-card__eyebrow {
+      margin: 0 0 0.25rem;
+      font-size: 0.6875rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--mos-text-secondary);
+    }
+    .stats-card__title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--mos-text-primary);
+    }
+    .stats-card__grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.75rem;
+      margin: 0;
+    }
+    @media (min-width: 640px) { .stats-card__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+    .stats-card__grid div {
+      min-width: 0;
+      padding: 0.75rem;
+      border-radius: 8px;
+      background: rgba(15, 76, 58, 0.04);
+    }
+    .stats-card__grid dt {
+      margin: 0;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--mos-text-secondary);
+    }
+    .stats-card__grid dd {
+      margin: 0.25rem 0 0;
+      font-size: 1.125rem;
+      font-weight: 800;
+      color: var(--mos-primary);
+    }
 
     .super-dash__section-title {
       margin: 0 0 0.625rem;
@@ -211,6 +356,116 @@ import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
       color: var(--mos-text-secondary);
     }
     .super-dash__nav { display: flex; flex-direction: column; gap: 1rem; }
+
+    .claim-requests {
+      display: grid;
+      gap: 1rem;
+      padding: 1.125rem 1.25rem;
+      border-radius: var(--mos-radius-card);
+      border: 1px solid rgba(180, 83, 9, 0.24);
+      background: #fff;
+    }
+    .claim-requests__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+    .claim-requests__eyebrow {
+      margin: 0 0 0.25rem;
+      color: #b45309;
+      font-size: 0.6875rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .claim-requests h2 {
+      margin: 0 0 0.35rem;
+      color: var(--mos-text-primary);
+      font-size: 1.1rem;
+      font-weight: 800;
+    }
+    .claim-requests p {
+      margin: 0;
+      color: var(--mos-text-secondary);
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    .claim-requests__action {
+      flex-shrink: 0;
+      padding: 0.55rem 0.9rem;
+      border-radius: 8px;
+      background: var(--mos-primary);
+      color: #fff;
+      font-size: 0.8125rem;
+      font-weight: 800;
+      text-decoration: none;
+    }
+    .claim-requests__stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.75rem;
+    }
+    .claim-stat {
+      padding: 0.85rem 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--mos-border);
+      background: #f8fafc;
+      color: inherit;
+      text-decoration: none;
+    }
+    .claim-stat span {
+      display: block;
+      color: var(--mos-text-secondary);
+      font-size: 0.7rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .claim-stat strong {
+      display: block;
+      margin-top: 0.25rem;
+      color: var(--mos-primary);
+      font-size: 1.35rem;
+      font-weight: 850;
+    }
+    .claim-stat--warn strong { color: #b45309; }
+    .claim-stat--muted strong { color: #64748b; }
+    .claim-requests__list {
+      display: grid;
+      gap: 0.55rem;
+    }
+    .claim-request-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 0.85rem;
+      border: 1px solid var(--mos-border);
+      border-radius: 8px;
+      color: inherit;
+      text-decoration: none;
+      background: #f8fafc;
+    }
+    .claim-request-row strong {
+      display: block;
+      color: var(--mos-text-primary);
+      font-size: 0.875rem;
+    }
+    .claim-request-row span {
+      display: block;
+      margin-top: 0.2rem;
+      color: var(--mos-text-secondary);
+      font-size: 0.75rem;
+    }
+    .claim-request-row__status {
+      margin-top: 0 !important;
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      background: #fef3c7;
+      color: #92400e !important;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
 
     .nav-grid {
       display: grid;
@@ -328,6 +583,14 @@ import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
       color: var(--mos-text-secondary);
       font-size: 0.875rem;
     }
+    @media (max-width: 760px) {
+      .claim-requests__head,
+      .claim-request-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .claim-requests__stats { grid-template-columns: 1fr; }
+    }
   `],
 })
 export class SuperDashboardComponent implements OnInit {
@@ -341,6 +604,8 @@ export class SuperDashboardComponent implements OnInit {
   readonly formatStatus = formatMosqueStatus;
   readonly mosqueNavItems = SUPER_ADMIN_NAV_SECTIONS.find(s => s.title === 'Mosques')?.items ?? [];
   readonly accessNavItems = SUPER_ADMIN_NAV_SECTIONS.find(s => s.title === 'Access')?.items ?? [];
+  readonly oversightNavItems = SUPER_ADMIN_NAV_SECTIONS.find(s => s.title === 'Oversight')?.items ?? [];
+  readonly systemNavItems = SUPER_ADMIN_NAV_SECTIONS.find(s => s.title === 'System')?.items ?? [];
   readonly TABLE_ROW_LIMIT = 5;
 
   greeting = computed(() => {

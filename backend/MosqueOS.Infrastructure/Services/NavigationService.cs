@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Application.DTOs;
+using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
 
@@ -13,10 +14,16 @@ public class NavigationService : INavigationService
     public NavigationService(ApplicationDbContext db) => _db = db;
 
     public async Task<IReadOnlyList<NavigationSectionDto>> GetMenuForRolesAsync(
-        IEnumerable<string> roles, IEnumerable<string> permissions)
+        IEnumerable<string> roles,
+        IEnumerable<string> permissions,
+        IEnumerable<MosqueStatus> ownedMosqueStatuses)
     {
         var roleSet = roles.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var permSet = permissions.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var statusList = ownedMosqueStatuses.ToList();
+        var hasActiveMosque = statusList.Any(s => s == MosqueStatus.Active);
+        var restrictByMosqueStatus = !hasActiveMosque
+            && (roleSet.Contains(Roles.MosqueOwner) || roleSet.Contains(Roles.MosqueAdmin));
 
         if (roleSet.Contains(Roles.SuperAdmin))
         {
@@ -40,6 +47,8 @@ public class NavigationService : INavigationService
                 return false;
             if (string.IsNullOrEmpty(n.RequiredRole) && string.IsNullOrEmpty(n.RequiredPermission))
                 return roleSet.Contains(Roles.Member) || roleSet.Contains(Roles.Parent);
+            if (restrictByMosqueStatus && n.RequiresActiveMosque)
+                return false;
             return true;
         }).ToList();
 

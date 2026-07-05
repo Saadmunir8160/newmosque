@@ -52,6 +52,7 @@ import {
 import { navForGuest, navForRoles, navIcon, navSections, navIsSuperAdmin, navIsMosqueOwner, navIsMosqueAdmin, navIsPrayerEditor, navIsTeacher, navIsMuqaddam, navIsContentEditor, navIsMember, NavItem } from '../../core/config/nav.config';
 import { MosqueContextService } from '../../core/services/mosque-context.service';
 import { MosqueSwitcherComponent } from '../../shared/components/mosque-switcher/mosque-switcher.component';
+import { BreadcrumbsComponent } from '../../shared/ui/breadcrumbs.component';
 
 const SIDEBAR_KEY = 'mos_sidebar_collapsed';
 const SECTIONS_KEY = 'mos_nav_sections';
@@ -59,7 +60,7 @@ const SECTIONS_KEY = 'mos_nav_sections';
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterModule, MosqueSwitcherComponent],
+  imports: [CommonModule, RouterOutlet, RouterModule, MosqueSwitcherComponent, BreadcrumbsComponent],
   styles: [`
     .shell-layout {
       background: var(--mos-bg);
@@ -410,6 +411,7 @@ const SECTIONS_KEY = 'mos_nav_sections';
           <div class="app-page app-section w-full max-w-full min-w-0 py-4 sm:py-6 lg:py-8"
             style="padding-bottom: max(1rem, env(safe-area-inset-bottom))">
             <app-mosque-switcher *ngIf="showMosqueSwitcher()" />
+            <app-breadcrumbs />
             <router-outlet></router-outlet>
           </div>
         </div>
@@ -575,6 +577,7 @@ export class ShellComponent {
     'Dashboard': '▦',
     'Prayer Times': '🕌',
     'Overview': '▦',
+    'Mosque': '⌂',
     'Mosques': '⌂',
     'Access': '👥',
     'Content': '📖',

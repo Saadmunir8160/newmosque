@@ -10,6 +10,7 @@ import { NavigationService } from '../services/navigation.service';
 import { MosqueContextService } from '../services/mosque-context.service';
 import { AdminService } from '../services/admin.service';
 import { LoginResponse, UserProfile } from '../models';
+import { InvitePreview } from '../services/platform.service';
 
 const GUEST_KEY = 'mosque_os_guest';
 
@@ -143,6 +144,66 @@ export class AuthService {
         params: { userId, token },
       })
     );
+  }
+
+  async getInvitePreview(token: string): Promise<InvitePreview> {
+    return firstValueFrom(
+      this.http.get<InvitePreview>(
+        `${environment.apiUrl}/auth/invite/${encodeURIComponent(token)}`
+      )
+    );
+  }
+
+  async acceptInvite(token: string): Promise<{ message: string }> {
+    return firstValueFrom(
+      this.http.post<{ message: string }>(`${environment.apiUrl}/auth/accept-invite`, { token })
+    );
+  }
+
+  async registerFromInvite(data: {
+    token: string;
+    password: string;
+    confirmPassword: string;
+    fullName?: string;
+  }): Promise<void> {
+    const res = await firstValueFrom(
+      this.http.post<LoginResponse>(`${environment.apiUrl}/auth/register-from-invite`, {
+        token: data.token,
+        password: data.password,
+        confirmPassword: data.confirmPassword,
+        fullName: data.fullName,
+      })
+    );
+    localStorage.setItem('mosque_os_token', res.token);
+    this.clearGuestMode();
+    const loginRoles = this.normalizeRoles(res.roles);
+    this.applyRoles(loginRoles);
+    this.isAuthenticated.set(true);
+    this.user.set({
+      id: '',
+      userName: res.username,
+      email: '',
+      fullName: res.fullName,
+      tariqa: '',
+      level: '',
+      displayPreference: '',
+      wirdMode: '',
+      homeMosqueId: null,
+      searchRadiusKm: 0,
+      interests: null,
+      roles: loginRoles,
+    });
+    try {
+      const profile = await firstValueFrom(
+        this.http.get<UserProfile>(`${environment.apiUrl}/auth/me`)
+      );
+      this.user.set(profile);
+      this.applyRoles(profile.roles, loginRoles);
+    } catch {
+      // keep login response profile
+    }
+    await this.navigation.load();
+    await this.mosqueContext().resolve(true);
   }
 
   async resendVerification(email: string): Promise<{ message: string }> {

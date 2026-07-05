@@ -15,6 +15,8 @@ public static class EnterpriseSeeder
         await SeedPermissionsAsync(db, roleManager);
         await SeedNavigationAsync(db);
         await RepairSuperAdminNavigationAsync(db);
+        await RepairNavigationRequiresActiveMosqueAsync(db);
+        await RepairSuperAdminOversightNavAsync(db);
         await SeedMemberNavigationIfMissingAsync(db);
         await SeedPrayerEditorNavigationIfMissingAsync(db);
         await SeedTeacherNavigationIfMissingAsync(db);
@@ -161,7 +163,7 @@ public static class EnterpriseSeeder
         var items = new List<NavigationMenuItem>();
         int order = 0;
 
-        void Add(string section, string label, string route, string? icon, string? role, string? perm = null)
+        void Add(string section, string label, string route, string? icon, string? role, string? perm = null, bool requiresActiveMosque = false)
         {
             items.Add(new NavigationMenuItem
             {
@@ -171,7 +173,8 @@ public static class EnterpriseSeeder
                 Icon = icon,
                 RequiredRole = role,
                 RequiredPermission = perm,
-                SortOrder = order++
+                SortOrder = order++,
+                RequiresActiveMosque = requiresActiveMosque,
             });
         }
 
@@ -179,6 +182,7 @@ public static class EnterpriseSeeder
         Add("Overview", "Dashboard", "/dashboard/super", "dashboard", Roles.SuperAdmin);
         Add("Mosques", "Mosque listings", "/dashboard/super/mosques", "mosque", Roles.SuperAdmin);
         Add("Mosques", "Verify claims", "/dashboard/super/claims", "stamp", Roles.SuperAdmin);
+        Add("Mosques", "Invitations", "/dashboard/super/invitations", "mail", Roles.SuperAdmin);
         Add("Mosques", "Mosque data", "/dashboard/super/mosque-data", "database", Roles.SuperAdmin);
         Add("Access", "Users & roles", "/dashboard/super/users", "users", Roles.SuperAdmin);
         Add("Content", "Awrad library", "/dashboard/content/awrad", "awrad", Roles.SuperAdmin);
@@ -186,7 +190,9 @@ public static class EnterpriseSeeder
         Add("Content", "Adhkar library", "/dashboard/content/adhkar", "adhkar", Roles.SuperAdmin);
         Add("Content", "Ritual guides", "/dashboard/content/ritual-guides", "route", Roles.SuperAdmin);
         Add("Content", "Content reviews", "/dashboard/content/reviews", "reviews", Roles.SuperAdmin);
-        Add("Oversight", "Janaza oversight", "/dashboard/admin/janaza", "flower", Roles.SuperAdmin);
+        Add("Oversight", "Janaza oversight", "/dashboard/super/oversight/janaza", "flower", Roles.SuperAdmin);
+        Add("Oversight", "Prayer times oversight", "/dashboard/super/oversight/prayer-times", "clock", Roles.SuperAdmin);
+        Add("Oversight", "Announcements oversight", "/dashboard/super/oversight/announcements", "speaker", Roles.SuperAdmin);
         Add("Oversight", "Death readings", "/dashboard/muqaddam/readings", "readings", Roles.SuperAdmin);
         Add("System", "Module flags", "/dashboard/super/features", "toggle", Roles.SuperAdmin);
         Add("System", "Audit logs", "/dashboard/super/audit", "history", Roles.SuperAdmin);
@@ -194,38 +200,40 @@ public static class EnterpriseSeeder
         Add("System", "Reports", "/dashboard/super/reports", "chart", Roles.SuperAdmin);
 
         order = 0;
-        // Mosque Owner
+        // Mosque Owner — pre-active: profile, verification, listings only
         Add("Mosque Owner", "Dashboard", "/dashboard/owner", "dashboard", Roles.MosqueOwner);
         Add("Mosque Owner", "Mosque Profile", "/dashboard/owner/profile", "mosque", Roles.MosqueOwner);
-        Add("Mosque Owner", "Verification", "/dashboard/owner/verification", "stamp", Roles.MosqueOwner);
-        Add("Mosque Owner", "Admin Management", "/dashboard/owner/staff", "users", Roles.MosqueOwner);
-        Add("Mosque Owner", "Prayer Times", "/dashboard/admin/prayer-times", "clock", Roles.MosqueOwner);
-        Add("Mosque Owner", "Announcements", "/dashboard/admin/announcements", "speaker", Roles.MosqueOwner);
-        Add("Mosque Owner", "Events", "/dashboard/admin/events", "calendar", Roles.MosqueOwner);
-        Add("Mosque Owner", "Janaza", "/dashboard/admin/janaza", "flower", Roles.MosqueOwner);
-        Add("Mosque Owner", "Madrassah", "/dashboard/admin/madrassah", "book", Roles.MosqueOwner);
-        Add("Mosque Owner", "Communities", "/dashboard/admin/communities", "community", Roles.MosqueOwner);
-        Add("Mosque Owner", "Participation", "/dashboard/admin/participation", "hand", Roles.MosqueOwner);
-        Add("Mosque Owner", "Reports", "/dashboard/admin/reports", "chart", Roles.MosqueOwner);
-        Add("Mosque Owner", "Settings", "/dashboard/admin/settings/contact", "settings", Roles.MosqueOwner);
+        Add("Mosque Owner", "My claims", "/dashboard/owner/my-claims", "stamp", Roles.MosqueOwner);
+        Add("Mosque Owner", "Mosque listings", "/dashboard/owner/mosque-listings", "listings", Roles.MosqueOwner);
+        Add("Mosque Owner", "Module settings", "/dashboard/owner/settings", "toggle", Roles.MosqueOwner, requiresActiveMosque: true);
+        Add("Mosque Owner", "Admin Management", "/dashboard/owner/staff", "users", Roles.MosqueOwner, requiresActiveMosque: true);
+        Add("Mosque Owner", "Prayer Times", "/dashboard/admin/prayer-times", "clock", Roles.MosqueOwner, requiresActiveMosque: true);
+        Add("Mosque Owner", "Announcements", "/dashboard/admin/announcements", "speaker", Roles.MosqueOwner, requiresActiveMosque: true);
+        Add("Mosque Owner", "Events", "/dashboard/admin/events", "calendar", Roles.MosqueOwner, requiresActiveMosque: true);
+        Add("Mosque Owner", "Janaza", "/dashboard/admin/janaza", "flower", Roles.MosqueOwner, requiresActiveMosque: true);
+        Add("Mosque Owner", "Madrassah", "/dashboard/admin/madrassah", "book", Roles.MosqueOwner, requiresActiveMosque: true);
+        Add("Mosque Owner", "Communities", "/dashboard/admin/communities", "community", Roles.MosqueOwner, requiresActiveMosque: true);
+        Add("Mosque Owner", "Participation", "/dashboard/admin/participation", "hand", Roles.MosqueOwner, requiresActiveMosque: true);
+        Add("Mosque Owner", "Reports", "/dashboard/admin/reports", "chart", Roles.MosqueOwner, requiresActiveMosque: true);
+        Add("Mosque Owner", "Settings", "/dashboard/admin/settings/contact", "settings", Roles.MosqueOwner, requiresActiveMosque: true);
 
         order = 0;
         // Mosque Admin
-        Add("Dashboard", "Dashboard", "/dashboard/admin", "dashboard", Roles.MosqueAdmin);
-        Add("Mosque Management", "Mosque Profile", "/dashboard/admin/mosque", "mosque", Roles.MosqueAdmin);
-        Add("Mosque Management", "Prayer Times", "/dashboard/admin/prayer-times", "clock", Roles.MosqueAdmin);
-        Add("Mosque Management", "Announcements", "/dashboard/admin/announcements", "speaker", Roles.MosqueAdmin);
-        Add("Mosque Management", "Events", "/dashboard/admin/events", "calendar", Roles.MosqueAdmin);
-        Add("Mosque Management", "Janaza", "/dashboard/admin/janaza", "flower", Roles.MosqueAdmin);
-        Add("Mosque Management", "Communities", "/dashboard/admin/communities", "community", Roles.MosqueAdmin);
-        Add("Mosque Management", "Participation", "/dashboard/admin/participation", "hand", Roles.MosqueAdmin);
-        Add("Mosque Management", "Madrassah", "/dashboard/admin/madrassah", "book", Roles.MosqueAdmin);
-        Add("Mosque Management", "Module Settings", "/dashboard/admin/settings", "toggle", Roles.MosqueAdmin);
-        Add("Users", "Teachers", "/dashboard/admin/users/teachers", "teacher", Roles.MosqueAdmin);
-        Add("Users", "Parents", "/dashboard/admin/users/parents", "parent", Roles.MosqueAdmin);
-        Add("Users", "Members", "/dashboard/admin/users/members", "users", Roles.MosqueAdmin);
-        Add("Reports", "Reports", "/dashboard/admin/reports", "chart", Roles.MosqueAdmin);
-        Add("Settings", "Settings", "/dashboard/admin/settings/contact", "settings", Roles.MosqueAdmin);
+        Add("Mosque", "Dashboard", "/dashboard/admin", "dashboard", Roles.MosqueAdmin, requiresActiveMosque: true);
+        Add("Mosque", "Mosque profile", "/dashboard/admin/mosque", "mosque", Roles.MosqueAdmin);
+        Add("Mosque", "Module settings", "/dashboard/admin/modules", "settings", Roles.MosqueAdmin, requiresActiveMosque: true);
+        Add("Mosque Management", "Prayer Times", "/dashboard/admin/prayer-times", "clock", Roles.MosqueAdmin, requiresActiveMosque: true);
+        Add("Mosque Management", "Announcements", "/dashboard/admin/announcements", "speaker", Roles.MosqueAdmin, requiresActiveMosque: true);
+        Add("Mosque Management", "Events", "/dashboard/admin/events", "calendar", Roles.MosqueAdmin, requiresActiveMosque: true);
+        Add("Mosque Management", "Janaza", "/dashboard/admin/janaza", "flower", Roles.MosqueAdmin, requiresActiveMosque: true);
+        Add("Mosque Management", "Communities", "/dashboard/admin/communities", "community", Roles.MosqueAdmin, requiresActiveMosque: true);
+        Add("Mosque Management", "Participation", "/dashboard/admin/participation", "hand", Roles.MosqueAdmin, requiresActiveMosque: true);
+        Add("Mosque Management", "Madrassah", "/dashboard/admin/madrassah", "book", Roles.MosqueAdmin, requiresActiveMosque: true);
+        Add("Users", "Teachers", "/dashboard/admin/users/teachers", "teacher", Roles.MosqueAdmin, requiresActiveMosque: true);
+        Add("Users", "Parents", "/dashboard/admin/users/parents", "parent", Roles.MosqueAdmin, requiresActiveMosque: true);
+        Add("Users", "Members", "/dashboard/admin/users/members", "users", Roles.MosqueAdmin, requiresActiveMosque: true);
+        Add("Reports", "Reports", "/dashboard/admin/reports", "chart", Roles.MosqueAdmin, requiresActiveMosque: true);
+        Add("Settings", "Settings", "/dashboard/admin/settings/contact", "settings", Roles.MosqueAdmin, requiresActiveMosque: true);
 
         db.NavigationMenuItems.AddRange(items);
         await db.SaveChangesAsync();
@@ -265,6 +273,7 @@ public static class EnterpriseSeeder
         Add("Overview", "Dashboard", "/dashboard/super", "dashboard");
         Add("Mosques", "Mosque listings", "/dashboard/super/mosques", "mosque");
         Add("Mosques", "Verify claims", "/dashboard/super/claims", "stamp");
+        Add("Mosques", "Invitations", "/dashboard/super/invitations", "mail");
         Add("Mosques", "Mosque data", "/dashboard/super/mosque-data", "database");
         Add("Access", "Users & roles", "/dashboard/super/users", "users");
         Add("Content", "Awrad library", "/dashboard/content/awrad", "awrad");
@@ -272,7 +281,9 @@ public static class EnterpriseSeeder
         Add("Content", "Adhkar library", "/dashboard/content/adhkar", "adhkar");
         Add("Content", "Ritual guides", "/dashboard/content/ritual-guides", "route");
         Add("Content", "Content reviews", "/dashboard/content/reviews", "reviews");
-        Add("Oversight", "Janaza oversight", "/dashboard/admin/janaza", "flower");
+        Add("Oversight", "Janaza oversight", "/dashboard/super/oversight/janaza", "flower");
+        Add("Oversight", "Prayer times oversight", "/dashboard/super/oversight/prayer-times", "clock");
+        Add("Oversight", "Announcements oversight", "/dashboard/super/oversight/announcements", "speaker");
         Add("Oversight", "Death readings", "/dashboard/muqaddam/readings", "readings");
         Add("System", "Module flags", "/dashboard/super/features", "toggle");
         Add("System", "Audit logs", "/dashboard/super/audit", "history");
@@ -444,6 +455,131 @@ public static class EnterpriseSeeder
         Add("Content", "Content Reviews", "/dashboard/content/reviews", "reviews");
 
         db.NavigationMenuItems.AddRange(items);
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>Marks operational nav items that require an Active owned mosque (existing DBs).</summary>
+    private static async Task RepairNavigationRequiresActiveMosqueAsync(ApplicationDbContext db)
+    {
+        var ownerAdminItems = await db.NavigationMenuItems
+            .Where(n => n.RequiredRole == Roles.MosqueOwner || n.RequiredRole == Roles.MosqueAdmin)
+            .ToListAsync();
+        if (ownerAdminItems.Count == 0) return;
+
+        var allowedWithoutActive = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "/dashboard/owner",
+            "/dashboard/owner/profile",
+            "/dashboard/owner/verification",
+            "/dashboard/owner/my-claims",
+            "/dashboard/owner/mosque-listings",
+            "/dashboard/admin/mosque",
+        };
+
+        foreach (var item in ownerAdminItems)
+        {
+            item.RequiresActiveMosque = !allowedWithoutActive.Contains(item.Route);
+        }
+
+        // Ensure owner listings + module settings exist on upgraded DBs
+        if (!await db.NavigationMenuItems.AnyAsync(n =>
+                n.RequiredRole == Roles.MosqueOwner && n.Route == "/dashboard/owner/mosque-listings"))
+        {
+            var maxOrder = await db.NavigationMenuItems
+                .Where(n => n.RequiredRole == Roles.MosqueOwner)
+                .MaxAsync(n => (int?)n.SortOrder) ?? 0;
+            db.NavigationMenuItems.Add(new NavigationMenuItem
+            {
+                Section = "Mosque Owner",
+                Label = "Mosque listings",
+                Route = "/dashboard/owner/mosque-listings",
+                Icon = "listings",
+                RequiredRole = Roles.MosqueOwner,
+                SortOrder = maxOrder + 1,
+                RequiresActiveMosque = false,
+            });
+        }
+
+        if (!await db.NavigationMenuItems.AnyAsync(n =>
+                n.RequiredRole == Roles.MosqueOwner && n.Route == "/dashboard/owner/settings"))
+        {
+            var maxOrder = await db.NavigationMenuItems
+                .Where(n => n.RequiredRole == Roles.MosqueOwner)
+                .MaxAsync(n => (int?)n.SortOrder) ?? 0;
+            db.NavigationMenuItems.Add(new NavigationMenuItem
+            {
+                Section = "Mosque Owner",
+                Label = "Module settings",
+                Route = "/dashboard/owner/settings",
+                Icon = "toggle",
+                RequiredRole = Roles.MosqueOwner,
+                SortOrder = maxOrder + 1,
+                RequiresActiveMosque = true,
+            });
+        }
+
+        if (!await db.NavigationMenuItems.AnyAsync(n =>
+                n.RequiredRole == Roles.MosqueAdmin && n.Route == "/dashboard/admin/modules"))
+        {
+            var maxOrder = await db.NavigationMenuItems
+                .Where(n => n.RequiredRole == Roles.MosqueAdmin)
+                .MaxAsync(n => (int?)n.SortOrder) ?? 0;
+            db.NavigationMenuItems.Add(new NavigationMenuItem
+            {
+                Section = "Mosque",
+                Label = "Module settings",
+                Route = "/dashboard/admin/modules",
+                Icon = "settings",
+                RequiredRole = Roles.MosqueAdmin,
+                SortOrder = maxOrder + 1,
+                RequiresActiveMosque = true,
+            });
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>Upgrades Super Admin oversight + invitations nav on existing databases.</summary>
+    private static async Task RepairSuperAdminOversightNavAsync(ApplicationDbContext db)
+    {
+        var routeUpdates = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["/dashboard/admin/janaza"] = "/dashboard/super/oversight/janaza",
+        };
+
+        var superItems = await db.NavigationMenuItems
+            .Where(n => n.RequiredRole == Roles.SuperAdmin)
+            .ToListAsync();
+
+        foreach (var item in superItems)
+        {
+            if (routeUpdates.TryGetValue(item.Route, out var newRoute))
+                item.Route = newRoute;
+        }
+
+        var maxOrder = await db.NavigationMenuItems
+            .Where(n => n.RequiredRole == Roles.SuperAdmin)
+            .MaxAsync(n => (int?)n.SortOrder) ?? 0;
+
+        void Ensure(string section, string label, string route, string? icon)
+        {
+            if (superItems.Any(i => i.Route.Equals(route, StringComparison.OrdinalIgnoreCase)))
+                return;
+            db.NavigationMenuItems.Add(new NavigationMenuItem
+            {
+                Section = section,
+                Label = label,
+                Route = route,
+                Icon = icon,
+                RequiredRole = Roles.SuperAdmin,
+                SortOrder = ++maxOrder,
+            });
+        }
+
+        Ensure("Mosques", "Invitations", "/dashboard/super/invitations", "mail");
+        Ensure("Oversight", "Prayer times oversight", "/dashboard/super/oversight/prayer-times", "clock");
+        Ensure("Oversight", "Announcements oversight", "/dashboard/super/oversight/announcements", "speaker");
+
         await db.SaveChangesAsync();
     }
 }

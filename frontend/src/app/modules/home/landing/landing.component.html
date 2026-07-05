@@ -15,6 +15,7 @@
         <button type="button" (click)="scrollTo('home')" class="mos-nav-pill" [class.active]="isActive('home')">Home</button>
         <button type="button" (click)="scrollTo('features')" class="mos-nav-pill" [class.active]="isActive('features')">Features</button>
         <a routerLink="/demo" class="mos-nav-pill" (click)="menuOpen.set(false)">Demo</a>
+        <a routerLink="/mosques" class="mos-nav-pill" (click)="menuOpen.set(false)">Find a Mosque</a>
         <button type="button" (click)="scrollTo('pricing')" class="mos-nav-pill" [class.active]="isActive('pricing')">Pricing</button>
         <button type="button" (click)="scrollTo('contact')" class="mos-nav-pill" [class.active]="isActive('contact')">Contact</button>
       </nav>
@@ -36,6 +37,7 @@
         <button type="button" (click)="scrollTo('home')" class="mos-mobile-link" [class.active]="isActive('home')">Home</button>
         <button type="button" (click)="scrollTo('features')" class="mos-mobile-link" [class.active]="isActive('features')">Features</button>
         <a routerLink="/demo" class="mos-mobile-link" (click)="menuOpen.set(false)">Demo Mosque</a>
+        <a routerLink="/mosques" class="mos-mobile-link" (click)="menuOpen.set(false)">Find a Mosque</a>
         <button type="button" (click)="scrollTo('pricing')" class="mos-mobile-link" [class.active]="isActive('pricing')">Pricing</button>
         <button type="button" (click)="scrollTo('contact')" class="mos-mobile-link" [class.active]="isActive('contact')">Contact</button>
         <div class="mos-mobile-cta">

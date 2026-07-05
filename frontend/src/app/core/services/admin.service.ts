@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { SKIP_UNAUTHORIZED_REDIRECT } from '../http/http-context.tokens';
 import { Announcement, JanazaAnnouncement, Mosque, MosqueEvent, MosqueSetting, MosqueStaffMember, ParticipationOpportunity, PrayerTimesDaily } from '../models';
@@ -23,14 +24,18 @@ export class AdminService {
 
   // Super Admin — mosques
   getAllMosques(): Observable<Mosque[]> {
-    return this.http.get<Mosque[]>(`${this.base}/mosques`, { params: { adminList: 'true' } });
+    return this.http.get<any>(`${this.base}/mosques`, { params: { adminList: 'true' } }).pipe(
+      map(res => Array.isArray(res) ? res : (res?.items ?? []))
+    );
   }
 
-  /** Public directory — Active and Unclaimed only (pending claims hidden). */
+  /** Public directory — Active and Unclaimed only. */
   getDirectoryMosques(city?: string): Observable<Mosque[]> {
     const params: Record<string, string> = {};
     if (city) params['city'] = city;
-    return this.http.get<Mosque[]>(`${this.base}/mosques`, { params });
+    return this.http.get<any>(`${this.base}/mosques`, { params }).pipe(
+      map(res => Array.isArray(res) ? res : (res?.items ?? []))
+    );
   }
 
   createMosque(mosque: Partial<Mosque>): Observable<Mosque> {
@@ -51,8 +56,27 @@ export class AdminService {
     }>(`${this.base}/mosques/my-mosque`, { params, context: this.mutationContext });
   }
 
-  getMyClaims(): Observable<unknown[]> {
-    return this.http.get<unknown[]>(`${this.base}/mosques/my-claims`);
+  getMyClaims(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/mosques/my-claims`).pipe(
+      map(items => (items ?? []).map((c: any) => ({
+        ...c,
+        reviewStatus: c.reviewStatus ?? c.status ?? 'Pending',
+        mosqueStatus: c.mosqueStatus ?? 'Unknown',
+      })))
+    );
+  }
+
+  /** Member/owner submits a new mosque listing for super-admin review. */
+  submitNewMosqueListing(body: Partial<Mosque>): Observable<unknown> {
+    return this.http.post(`${this.base}/mosques/submit`, body, { context: this.mutationContext });
+  }
+
+  submitMosqueForReview(mosqueId: number): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      `${this.base}/mosques/${mosqueId}/submit-for-review`,
+      {},
+      { context: this.mutationContext },
+    );
   }
 
   submitClaim(mosqueId: number, body: Record<string, unknown>): Observable<unknown> {
@@ -82,6 +106,13 @@ export class AdminService {
     form.append('file', file);
     return this.http.post<{ url: string; field: string }>(
       `${this.base}/mosques/${mosqueId}/upload-image?field=${field}`, form
+    );
+  }
+
+  deleteMosqueImage(mosqueId: number, field: 'logo' | 'banner'): Observable<{ message: string; field: string }> {
+    return this.http.delete<{ message: string; field: string }>(
+      `${this.base}/mosques/${mosqueId}/image?field=${field}`,
+      { context: this.mutationContext },
     );
   }
 

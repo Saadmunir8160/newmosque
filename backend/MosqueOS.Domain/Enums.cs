@@ -10,6 +10,16 @@ namespace MosqueOS.Domain
         Archived = 5,
         /// <summary>Ownership claim submitted — awaiting super admin approval.</summary>
         ClaimPending = 6,
+        /// <summary>Owner invitation sent — awaiting invitee acceptance.</summary>
+        Invited = 7,
+    }
+
+    public enum InvitationStatus
+    {
+        Pending = 0,
+        Accepted = 1,
+        Revoked = 2,
+        Expired = 3,
     }
 
     public enum OwnershipClaimStatus

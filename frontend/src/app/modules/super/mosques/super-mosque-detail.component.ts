@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute } from '@angular/router';
 import { PlatformService, MosqueDetailResponse, PendingOwnershipClaim } from '../../../core/services/platform.service';
+import { ROLES } from '../../../core/constants/roles';
 import { formatMosqueStatus, isMosquePubliclyVisible, statusClass } from '../../../core/utils/mosque-status.util';
 import { MosqueProfileCompleteness } from '../../../core/utils/mosque-profile.util';
 import { slugifyMosqueName } from '../../../core/utils/mosque-slug.util';
@@ -21,6 +22,11 @@ export class SuperMosqueDetailComponent implements OnInit {
   detail = signal<MosqueDetailResponse | null>(null);
   loading = signal(false);
   error = signal('');
+  inviteEmail = signal('');
+  inviteName = signal('');
+  inviting = signal(false);
+  inviteMsg = signal('');
+  lastInviteLink = signal('');
   readonly formatStatus = formatMosqueStatus;
   readonly statusClass = statusClass;
   readonly isPublicVisible = isMosquePubliclyVisible;
@@ -67,6 +73,46 @@ export class SuperMosqueDetailComponent implements OnInit {
     this.platform.activateMosque(id).subscribe({
       next: () => this.load(id),
       error: (err) => this.error.set(err?.error?.message ?? 'Activation failed.'),
+    });
+  }
+
+  deactivate(id: number): void {
+    this.platform.deactivateMosque(id).subscribe({
+      next: () => this.load(id),
+      error: (err) => this.error.set(err?.error?.message ?? 'Deactivation failed.'),
+    });
+  }
+
+  canInviteOwner(status: string): boolean {
+    return status === 'Unclaimed' || status === 'Invited';
+  }
+
+  sendInvite(mosqueId: number): void {
+    const email = this.inviteEmail().trim();
+    if (!email) {
+      this.inviteMsg.set('Enter an email address.');
+      return;
+    }
+    this.inviting.set(true);
+    this.inviteMsg.set('');
+    this.platform.sendMosqueInvite(mosqueId, {
+      email,
+      name: this.inviteName().trim() || undefined,
+      role: ROLES.MosqueOwner,
+    }).subscribe({
+      next: (res) => {
+        this.inviting.set(false);
+        this.inviteMsg.set(res.message || 'Invitation sent.');
+        if (res.acceptLink) {
+          this.lastInviteLink.set(res.acceptLink);
+          void navigator.clipboard?.writeText(res.acceptLink);
+        }
+        this.load(mosqueId);
+      },
+      error: (err) => {
+        this.inviting.set(false);
+        this.inviteMsg.set(err?.error?.message ?? 'Could not send invitation.');
+      },
     });
   }
 

@@ -25,6 +25,8 @@ namespace MosqueOS.API.Controllers
         private readonly SlugService _slugService;
         private readonly MosqueModuleSeedService _moduleSeed;
         private readonly OwnershipClaimService _claimService;
+        private readonly MosqueInvitationService _invitationService;
+        private readonly IAuditService _audit;
         private readonly IWebHostEnvironment _env;
 
         public MosquesController(
@@ -35,6 +37,8 @@ namespace MosqueOS.API.Controllers
             SlugService slugService,
             MosqueModuleSeedService moduleSeed,
             OwnershipClaimService claimService,
+            MosqueInvitationService invitationService,
+            IAuditService audit,
             IWebHostEnvironment env)
         {
             _unitOfWork = unitOfWork;
@@ -44,32 +48,74 @@ namespace MosqueOS.API.Controllers
             _slugService = slugService;
             _moduleSeed = moduleSeed;
             _claimService = claimService;
+            _invitationService = invitationService;
+            _audit = audit;
             _env = env;
         }
 
-        /// <summary>Public mosque directory — only registered (Active) and Unclaimed listings.</summary>
+        /// <summary>Public mosque directory â€” Active and Unclaimed listings only. Returns safe public DTO (no internal fields).</summary>
         [HttpGet]
         public async Task<IActionResult> GetAll(
             [FromQuery] string? city,
             [FromQuery] string? name,
+            [FromQuery] string? postcode,
+            [FromQuery] string? country,
             [FromQuery] MosqueStatus? status,
-            [FromQuery] bool adminList = false)
+            [FromQuery] bool adminList = false,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
         {
+            return await SearchMosques(city, name, postcode, country, status, adminList, page, pageSize);
+        }
+
+        /// <summary>Explicit search alias for mosque directory and admin listing queries.</summary>
+        [HttpGet("search")]
+        public async Task<IActionResult> Search(
+            [FromQuery] string? city,
+            [FromQuery] string? name,
+            [FromQuery] string? postcode,
+            [FromQuery] string? country,
+            [FromQuery] MosqueStatus? status,
+            [FromQuery] bool adminList = false,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
+        {
+            return await SearchMosques(city, name, postcode, country, status, adminList, page, pageSize);
+        }
+
+        private async Task<IActionResult> SearchMosques(
+            string? city,
+            string? name,
+            string? postcode,
+            string? country,
+            MosqueStatus? status,
+            bool adminList,
+            int page,
+            int pageSize)
+        {
+            pageSize = Math.Clamp(pageSize, 1, 100);
+            page = Math.Max(1, page);
+
             var query = _unitOfWork.Repository<Mosque>().QueryNoTracking()
+                .Include(m => m.Settings)
                 .Where(m => !m.IsDeleted);
 
             if (adminList)
             {
                 if (User.Identity?.IsAuthenticated != true || !User.IsInRole(Roles.SuperAdmin))
-                    return Forbid();
+                    return StatusCode(403, new ApiMessageResponse { Message = "Super admin access is required for admin mosque listings." });
             }
             else
             {
-                query = query.Where(m => m.Status == MosqueStatus.Active);
+                // Public directory: only Active and Unclaimed mosques
+                query = query.Where(m => m.Status == MosqueStatus.Active || m.Status == MosqueStatus.Unclaimed);
             }
 
             if (!string.IsNullOrWhiteSpace(city))
-                query = query.Where(m => m.City == city);
+            {
+                var cityTerm = city.Trim();
+                query = query.Where(m => m.City.Contains(cityTerm));
+            }
 
             if (!string.IsNullOrWhiteSpace(name))
             {
@@ -77,10 +123,36 @@ namespace MosqueOS.API.Controllers
                 query = query.Where(m => m.Name.Contains(term));
             }
 
+            if (!string.IsNullOrWhiteSpace(postcode)) { var pTerm = postcode.Trim(); query = query.Where(m => m.Postcode.Contains(pTerm)); }
+
+            if (!string.IsNullOrWhiteSpace(country))
+            {
+                var countryTerm = country.Trim();
+                query = query.Where(m => m.Country.Contains(countryTerm));
+            }
+
             if (status.HasValue)
                 query = query.Where(m => m.Status == status.Value);
 
-            return Ok(await query.OrderBy(m => m.Name).ToListAsync());
+            var total = await query.CountAsync();
+            var mosques = await query
+                .OrderBy(m => m.Name)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            // Admin list returns raw data; public returns safe DTO only
+            if (adminList)
+                return Ok(new { total, page, pageSize, items = mosques });
+
+            return Ok(new
+            {
+                total,
+                page,
+                pageSize,
+                totalPages = (int)Math.Ceiling((double)total / pageSize),
+                items = mosques.Select(m => MosquePublicDto.FromEntity(m))
+            });
         }
 
         /// <summary>All mosques owned by the current user.</summary>
@@ -122,19 +194,19 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> GetPublicBySlug(string slug)
         {
             if (int.TryParse(slug, out _))
-                return NotFound();
+                return NotFound(new ApiMessageResponse { Message = "Mosque not found." });
 
             var mosque = await _unitOfWork.Repository<Mosque>().QueryNoTracking()
                 .Include(m => m.Settings)
                 .FirstOrDefaultAsync(m => m.Slug == slug && !m.IsDeleted);
 
-            if (mosque == null) return NotFound();
+            if (mosque == null) return NotFound(new ApiMessageResponse { Message = "Mosque not found." });
 
             if (!MosquePublicVisibility.IsPubliclyVisible(mosque.Status))
-                return NotFound();
+                return NotFound(new ApiMessageResponse { Message = "Mosque not found." });
 
             if (!mosque.PublicProfileEnabled)
-                return NotFound();
+                return NotFound(new ApiMessageResponse { Message = "Mosque not found." });
 
             return Ok(MosquePublicDto.FromEntity(mosque));
         }
@@ -234,13 +306,13 @@ namespace MosqueOS.API.Controllers
                 }
             }
 
-            if (mosque == null && !User.IsInRole(Roles.MosqueAdmin))
+            if (mosque == null)
             {
                 var user = await _userManager.FindByIdAsync(userId);
                 if (user?.HomeMosqueId != null)
                 {
                     mosque = await _unitOfWork.Repository<Mosque>().QueryNoTracking()
-                        .FirstOrDefaultAsync(m => m.Id == user.HomeMosqueId);
+                        .FirstOrDefaultAsync(m => m.Id == user.HomeMosqueId && !m.IsDeleted);
                 }
             }
 
@@ -307,7 +379,11 @@ namespace MosqueOS.API.Controllers
         {
             var errors = MosqueValidation.ValidateCreate(dto);
             if (errors.Count > 0)
-                return BadRequest(new ApiMessageResponse { Message = string.Join(" ", errors) });
+                return BadRequest(new ApiErrorResponse
+                {
+                    Message = "Mosque validation failed.",
+                    Errors = errors
+                });
 
             var slug = string.IsNullOrWhiteSpace(dto.Slug)
                 ? await _slugService.GenerateUniqueAsync(dto.Name)
@@ -337,7 +413,7 @@ namespace MosqueOS.API.Controllers
 
             await LogMosqueAuditAsync("MOSQUE_CREATED", User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system",
                 mosque.Id, $"Super admin created mosque '{mosque.Name}' in {mosque.City}.");
-            return CreatedAtAction(nameof(GetById), new { id = mosque.Id }, mosque);
+            return CreatedAtAction(nameof(GetById), new { id = mosque.Id }, MosqueAdminProfileDto.FromEntity(mosque));
         }
 
         [Authorize(Roles = Roles.SuperAdmin + "," + Roles.Admins + "," + Roles.MosqueOwner)]
@@ -346,20 +422,51 @@ namespace MosqueOS.API.Controllers
         {
             var errors = MosqueValidation.ValidateUpdate(dto);
             if (errors.Count > 0)
-                return BadRequest(new ApiMessageResponse { Message = string.Join(" ", errors) });
+                return BadRequest(new ApiErrorResponse
+                {
+                    Message = "Mosque validation failed.",
+                    Errors = errors
+                });
 
             var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
-            if (mosque == null || mosque.IsDeleted) return NotFound();
+            if (mosque == null || mosque.IsDeleted) return NotFound(new ApiMessageResponse { Message = "Mosque not found." });
 
             if (!await _mosqueAccess.CanEditMosqueAsync(User, mosque))
-                return Forbid();
+                return StatusCode(403, new ApiMessageResponse { Message = "You do not have permission to update this mosque." });
 
-            MosqueProfileFieldMapper.ApplyUpdate(mosque, dto);
+            string? newSlug = null;
+            if (!string.IsNullOrWhiteSpace(dto.Slug))
+            {
+                var normalized = SlugService.Normalize(dto.Slug);
+                if (normalized != mosque.Slug)
+                {
+                    if (await _slugService.IsSlugTakenAsync(normalized, excludeMosqueId: id))
+                        return Conflict(new ApiMessageResponse { Message = "This slug is already in use." });
+                    newSlug = normalized;
+                }
+            }
+
+            // Only SuperAdmin can change status or owner
+            if (!User.IsInRole(Roles.SuperAdmin))
+            {
+                dto.Status = null;
+                dto.OwnerId = null;
+                dto.Slug = null;
+                dto.AllowClaimRequests = null;
+                dto.RequireManualApproval = null;
+                dto.PublicProfileEnabled = null;
+                dto.Gallery = null;
+                dto.Services = null;
+                dto.Leadership = null;
+                dto.StatsOverride = null;
+            }
+
+            MosqueProfileFieldMapper.ApplyUpdate(mosque, dto, newSlug);
 
             await _unitOfWork.SaveChangesAsync();
 
             var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
-            await LogMosqueAuditAsync("Profile Updated", actorId, mosque.Id,
+            await LogMosqueAuditAsync("MOSQUE_UPDATED", actorId, mosque.Id,
                 $"Mosque profile updated for '{mosque.Name}'.");
 
             return Ok(MosqueAdminProfileDto.FromEntity(mosque));
@@ -370,7 +477,7 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> SoftDelete(int id)
         {
             var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
-            if (mosque == null) return NotFound();
+            if (mosque == null) return NotFound(new ApiMessageResponse { Message = "Mosque not found." });
 
             if (mosque.IsDeleted)
                 return Ok(new ApiMessageResponse { Message = "Mosque already archived." });
@@ -407,12 +514,26 @@ namespace MosqueOS.API.Controllers
             if (!file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
                 return BadRequest(new ApiMessageResponse { Message = "Only image files are allowed." });
 
+            var allowedTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "image/jpeg", "image/png", "image/webp", "image/gif"
+            };
+            if (!allowedTypes.Contains(file.ContentType))
+                return BadRequest(new ApiMessageResponse { Message = "Only JPG, PNG, WEBP, or GIF images are allowed." });
+
+            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var allowedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ".jpg", ".jpeg", ".png", ".webp", ".gif"
+            };
+            if (string.IsNullOrWhiteSpace(ext) || !allowedExtensions.Contains(ext))
+                return BadRequest(new ApiMessageResponse { Message = "Image file extension must be JPG, PNG, WEBP, or GIF." });
+
             var uploadsRoot = Path.Combine(
                 _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot"),
                 "uploads", "mosques", id.ToString());
             Directory.CreateDirectory(uploadsRoot);
 
-            var ext = Path.GetExtension(file.FileName);
             var storedName = $"{field}-{Guid.NewGuid():N}{ext}";
             var fullPath = Path.Combine(uploadsRoot, storedName);
 
@@ -425,7 +546,37 @@ namespace MosqueOS.API.Controllers
             mosque.UpdatedAt = DateTime.UtcNow;
 
             await _unitOfWork.SaveChangesAsync();
+
+            var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
+            await LogMosqueAuditAsync("IMAGE_UPLOADED", actorId, mosque.Id,
+                $"Uploaded {field} image for '{mosque.Name}'.");
+
             return Ok(new MosqueUploadResponse { Url = url, Field = field });
+        }
+
+        [Authorize(Roles = Roles.Admins)]
+        [HttpDelete("{id:int}/image")]
+        public async Task<IActionResult> DeleteImage(int id, [FromQuery] string field = "logo")
+        {
+            if (field is not ("logo" or "banner"))
+                return BadRequest(new ApiMessageResponse { Message = "Field must be 'logo' or 'banner'." });
+
+            if (await MosqueAccessHelper.RequireAccessAsync(_mosqueAccess, User, id) is { } denied) return denied;
+
+            var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
+            if (mosque == null || mosque.IsDeleted) return NotFound();
+
+            if (field == "logo") mosque.LogoUrl = null;
+            else mosque.BannerUrl = null;
+
+            mosque.UpdatedAt = DateTime.UtcNow;
+            await _unitOfWork.SaveChangesAsync();
+
+            var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
+            await LogMosqueAuditAsync("IMAGE_DELETED", actorId, mosque.Id,
+                $"Deleted {field} image for '{mosque.Name}'.");
+
+            return Ok(new { message = $"{field} image removed.", field });
         }
 
         /// <summary>Staff linked to this mosque (home mosque + roles).</summary>
@@ -489,6 +640,10 @@ namespace MosqueOS.API.Controllers
             if (user == null) return NotFound();
 
             await _userManager.RemoveFromRoleAsync(user, role);
+            var actorIdForAudit = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
+            await LogMosqueAuditAsync("STAFF_REMOVED", actorIdForAudit, id,
+                $"Removed {role} from {user.UserName} at '{mosque.Name}'.");
+
             return Ok(new ApiMessageResponse { Message = $"Removed {role} from {user.UserName}." });
         }
 
@@ -577,7 +732,7 @@ namespace MosqueOS.API.Controllers
 
             if (changes.Count > 0)
             {
-                await LogMosqueAuditAsync("Module Settings Updated", actorId, id,
+                await LogMosqueAuditAsync("MODULE_FLAG_CHANGED", actorId, id,
                     $"Updated modules for '{mosque.Name}': {string.Join(", ", changes)}.");
             }
 
@@ -589,9 +744,15 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> SetModuleFlag(int id, string moduleKey, [FromQuery] bool enabled)
         {
             if (await MosqueAccessHelper.RequireAccessAsync(_mosqueAccess, User, id) is { } denied) return denied;
+            var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
+            if (mosque == null || mosque.IsDeleted) return NotFound();
+            if (!User.IsInRole(Roles.SuperAdmin) && mosque.Status != MosqueStatus.Active)
+                return BadRequest(new ApiMessageResponse { Message = "Module settings are available only for active mosques." });
+
             var setting = await _unitOfWork.Repository<MosqueSetting>().Query()
                 .FirstOrDefaultAsync(s => s.MosqueId == id && s.ModuleKey == moduleKey);
 
+            var changed = setting == null || setting.IsEnabled != enabled;
             if (setting == null)
             {
                 setting = new MosqueSetting { MosqueId = id, ModuleKey = moduleKey, IsEnabled = enabled };
@@ -604,6 +765,14 @@ namespace MosqueOS.API.Controllers
             }
 
             await _unitOfWork.SaveChangesAsync();
+
+            if (changed)
+            {
+                var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
+                await LogMosqueAuditAsync("MODULE_FLAG_CHANGED", actorId, id,
+                    $"Set module {moduleKey}={(enabled ? "enabled" : "disabled")} for '{mosque.Name}'.");
+            }
+
             return Ok(setting);
         }
 
@@ -650,22 +819,161 @@ namespace MosqueOS.API.Controllers
                 await _userManager.UpdateAsync(user);
             }
 
+            await LogMosqueAuditAsync("STAFF_ASSIGNED", actorId ?? "system", id,
+                $"Assigned {dto.Role} to {user.UserName} at '{mosque.Name}'.");
+
             return Ok(new ApiMessageResponse { Message = $"{dto.Role} assigned to {user.UserName}." });
+        }
+
+        /// <summary>Invite a user by email to become mosque owner or admin.</summary>
+        [Authorize]
+        [HttpPost("{id:int}/invite")]
+        public async Task<IActionResult> InviteUser(int id, [FromBody] SendMosqueInviteRequest dto)
+        {
+            var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(actorId))
+                return Unauthorized();
+
+            var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
+            if (!isSuperAdmin)
+            {
+                var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
+                if (mosque == null || mosque.IsDeleted)
+                    return NotFound();
+                if (mosque.OwnerId != actorId)
+                    return Forbid();
+                if (dto.Role == Roles.MosqueOwner)
+                    return Forbid();
+            }
+
+            var (invitation, error, code, emailSent) = await _invitationService.SendInvitationAsync(
+                id, dto.Email, dto.Name, dto.Role, actorId);
+            if (error != null)
+                return StatusCode(code, new ApiMessageResponse { Message = error });
+
+            await LogMosqueAuditAsync("MOSQUE_INVITE_SENT", actorId, id,
+                $"Invitation sent to {dto.Email.Trim()} as {dto.Role}.");
+
+            var smtpConfigured = _invitationService.IsSmtpConfigured();
+            var message = emailSent
+                ? "Invitation sent by email."
+                : smtpConfigured
+                    ? "Invitation created but email could not be delivered. Copy the accept link below â€” check Gmail App Password in appsettings.Local.json."
+                    : "Invitation created. SMTP is not configured â€” copy the accept link below (also logged in API console).";
+
+            return Ok(new
+            {
+                message,
+                invitationId = invitation!.Id,
+                expiresAt = invitation.ExpiresAt,
+                inviteEmail = invitation.InviteEmail,
+                acceptLink = _invitationService.BuildAcceptLink(invitation.Token),
+                emailDelivery = emailSent ? "smtp" : "console",
+            });
+        }
+
+        /// <summary>Owner submits a claimed mosque listing for super-admin review.</summary>
+        [Authorize(Roles = Roles.MosqueOwner)]
+        [HttpPost("{id:int}/submit-for-review")]
+        public async Task<IActionResult> SubmitForReview(int id)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized();
+
+            var mosque = await _unitOfWork.Repository<Mosque>().Query()
+                .FirstOrDefaultAsync(m => m.Id == id && !m.IsDeleted);
+            if (mosque == null)
+                return NotFound();
+
+            if (mosque.OwnerId != userId)
+                return Forbid();
+
+            if (mosque.Status is not (MosqueStatus.Claimed or MosqueStatus.Invited))
+                return BadRequest(new ApiMessageResponse
+                {
+                    Message = "Only invited or claimed listings can be submitted for review."
+                });
+
+            var (completeness, _) = MosqueProfileCompleteness.Calculate(mosque);
+            if (completeness < 40)
+                return BadRequest(new ApiMessageResponse
+                {
+                    Message = "Complete more of your mosque profile (contact details, description) before submitting."
+                });
+
+            mosque.Status = MosqueStatus.PendingReview;
+            mosque.UpdatedAt = DateTime.UtcNow;
+            await _unitOfWork.SaveChangesAsync();
+
+            await LogMosqueAuditAsync("MOSQUE_STATUS_CHANGED", userId, id,
+                $"Mosque '{mosque.Name}' submitted for super admin review.");
+
+            return Ok(new ApiMessageResponse
+            {
+                Message = "Mosque submitted for super admin review. You will be notified when it is approved."
+            });
+        }
+
+
+        /// <summary>Claim history for a mosque — owner/admin/super admin only.</summary>
+        [Authorize(Roles = Roles.SuperAdmin + "," + Roles.MosqueOwner + "," + Roles.MosqueAdmin)]
+        [HttpGet("{id:int}/claims")]
+        public async Task<IActionResult> GetMosqueClaims(int id, [FromQuery] string? status = null)
+        {
+            var mosque = await _unitOfWork.Repository<Mosque>().QueryNoTracking()
+                .FirstOrDefaultAsync(m => m.Id == id && !m.IsDeleted);
+            if (mosque == null) return NotFound();
+
+            if (!User.IsInRole(Roles.SuperAdmin))
+            {
+                if (!await _mosqueAccess.CanAccessMosqueAsync(User, id))
+                    return Forbid();
+            }
+
+            OwnershipClaimStatus? filter = status?.ToLowerInvariant() switch
+            {
+                "pending" => OwnershipClaimStatus.Pending,
+                "approved" => OwnershipClaimStatus.Approved,
+                "rejected" => OwnershipClaimStatus.Rejected,
+                _ => null
+            };
+
+            var claims = await _claimService.GetClaimsAsync(filter);
+            var mosqueClaims = claims
+                .Where(c => c.MosqueId == id)
+                .Select(c => new
+                {
+                    c.ClaimId,
+                    c.ClaimReference,
+                    c.MosqueId,
+                    c.MosqueName,
+                    c.ApplicantName,
+                    c.ApplicantEmail,
+                    c.Position,
+                    c.Status,
+                    c.MosqueStatus,
+                    c.SubmittedDate,
+                    c.DecidedDate,
+                    c.RejectionReason
+                })
+                .ToList();
+
+            return Ok(new { total = mosqueClaims.Count, items = mosqueClaims });
         }
 
         private async Task LogMosqueAuditAsync(string action, string actorId, int mosqueId, string description)
         {
             var actor = await _userManager.FindByIdAsync(actorId);
-            _unitOfWork.Repository<PlatformAuditLog>().Add(new PlatformAuditLog
-            {
-                Action = action,
-                ActorId = actorId,
-                ActorName = actor?.UserName,
-                TargetType = "Mosque",
-                TargetId = mosqueId,
-                Description = description
-            });
-            await _unitOfWork.SaveChangesAsync();
+            await _audit.LogAsync(
+                action,
+                "Mosque",
+                actorId,
+                actor?.FullName ?? actor?.UserName,
+                "Mosque",
+                mosqueId,
+                description,
+                HttpContext.Connection.RemoteIpAddress?.ToString());
         }
     }
 }

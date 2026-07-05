@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -26,15 +26,27 @@ export class SuperMosquesComponent implements OnInit {
   showSeed = signal(false);
   toast = signal('');
   toastOk = signal(true);
+  page = signal(1);
+  deleting = signal(false);
+  deleteTarget = signal<MosqueListing | null>(null);
 
   searchQ = '';
   statusFilter = '';
   missingOwnerOnly = false;
   sortBy = '';
+  readonly pageSize = 12;
   readonly formatStatus = formatMosqueStatus;
   readonly statusClass = statusClass;
 
   viewMode = signal<'grid' | 'list'>(this.readStoredViewMode());
+
+  totalPages = computed(() => Math.max(1, Math.ceil(this.listings().length / this.pageSize)));
+  pageStart = computed(() => this.listings().length ? ((this.page() - 1) * this.pageSize) + 1 : 0);
+  pageEnd = computed(() => Math.min(this.page() * this.pageSize, this.listings().length));
+  pagedListings = computed(() => {
+    const start = (this.page() - 1) * this.pageSize;
+    return this.listings().slice(start, start + this.pageSize);
+  });
 
   private readStoredViewMode(): 'grid' | 'list' {
     try {
@@ -53,6 +65,12 @@ export class SuperMosquesComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.route.data.subscribe(data => {
+      if (data['openAddMosque']) {
+        this.showSeed.set(true);
+      }
+    });
+
     this.route.queryParams.subscribe(p => {
       this.statusFilter = p['status'] ?? '';
       this.searchQ = p['q'] ?? '';
@@ -73,6 +91,7 @@ export class SuperMosquesComponent implements OnInit {
     }).subscribe({
       next: (res) => {
         this.listings.set(res.items ?? []);
+        this.page.set(1);
         const s = res.summary as Record<string, number> | undefined;
         this.summary.set(s ? {
           unclaimed: s['unclaimed'] ?? 0,
@@ -101,6 +120,7 @@ export class SuperMosquesComponent implements OnInit {
   }
 
   applyFilters(): void {
+    this.page.set(1);
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {
@@ -119,12 +139,26 @@ export class SuperMosquesComponent implements OnInit {
 
   closeSeed(): void {
     this.showSeed.set(false);
+    if (this.route.snapshot.data['openAddMosque']) {
+      void this.router.navigate(['/dashboard/super/mosques'], {
+        queryParams: this.route.snapshot.queryParams,
+      });
+    }
   }
 
   onMosqueCreated(event: MosqueCreatedEvent): void {
     this.showToast('Mosque created successfully.', true);
+    if (event.inviteMessage) {
+      setTimeout(() => this.showToast(event.inviteMessage!, !event.inviteLink), 600);
+    }
+    if (event.inviteLink) {
+      setTimeout(() => {
+        this.showToast(`Owner invite link: ${event.inviteLink}`, true);
+        void navigator.clipboard?.writeText(event.inviteLink!);
+      }, 1200);
+    }
     if (event.uploadWarning) {
-      setTimeout(() => this.showToast(event.uploadWarning!, false), 400);
+      setTimeout(() => this.showToast(event.uploadWarning!, false), event.inviteLink ? 2400 : 400);
     }
     this.load();
   }
@@ -133,6 +167,39 @@ export class SuperMosquesComponent implements OnInit {
     this.platform.activateMosque(id).subscribe({
       next: () => this.load(),
       error: (err) => this.error.set(err?.error?.message ?? 'Activation failed.'),
+    });
+  }
+
+  setPage(page: number): void {
+    const next = Math.max(1, Math.min(page, this.totalPages()));
+    this.page.set(next);
+  }
+
+  openDeleteDialog(mosque: MosqueListing): void {
+    this.deleteTarget.set(mosque);
+  }
+
+  closeDeleteDialog(): void {
+    if (this.deleting()) return;
+    this.deleteTarget.set(null);
+  }
+
+  confirmDelete(): void {
+    const mosque = this.deleteTarget();
+    if (!mosque || this.deleting()) return;
+
+    this.deleting.set(true);
+    this.platform.deleteMosque(mosque.id).subscribe({
+      next: (res) => {
+        this.deleting.set(false);
+        this.deleteTarget.set(null);
+        this.showToast(res.message || 'Mosque deleted.', true);
+        this.load();
+      },
+      error: (err) => {
+        this.deleting.set(false);
+        this.showToast(err?.error?.message ?? 'Delete failed.', false);
+      },
     });
   }
 

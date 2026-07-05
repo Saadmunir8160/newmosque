@@ -56,15 +56,20 @@ public class MosqueEmailSender : IEmailSender
             {
                 From = new MailAddress(fromAddress, _options.FromName),
                 Subject = subject,
-                Body = htmlBody,
-                IsBodyHtml = true
             };
             message.To.Add(to);
 
             if (!string.IsNullOrWhiteSpace(plainTextBody))
             {
-                message.AlternateViews.Add(
-                    AlternateView.CreateAlternateViewFromString(plainTextBody, null, "text/plain"));
+                message.Body = plainTextBody;
+                message.IsBodyHtml = false;
+                var htmlView = AlternateView.CreateAlternateViewFromString(htmlBody, null, "text/html");
+                message.AlternateViews.Add(htmlView);
+            }
+            else
+            {
+                message.Body = htmlBody;
+                message.IsBodyHtml = true;
             }
 
             await client.SendMailAsync(message);

@@ -34,7 +34,7 @@
     </section>
 
     <div class="mp-toolbar">
-      <a [routerLink]="['/dashboard/admin/mosque']" [queryParams]="{ mosqueId: d.mosque.id }" class="mp-btn">Edit mosque</a>
+      <a [routerLink]="['/dashboard/super/mosques', d.mosque.id, 'edit']" class="mp-btn">Edit mosque</a>
       <a
         [routerLink]="['/mosque', resolvePublicSlug(d.mosque)]"
         [queryParams]="publicPreviewQuery(d.mosque)"
@@ -43,7 +43,8 @@
         class="mp-btn mp-btn--ghost">
         {{ isPublicVisible(d.mosque.status) ? 'Public profile' : 'Admin preview' }}
       </a>
-      <button *ngIf="d.mosque.status === 'Claimed'" type="button" class="mp-btn mp-btn--success" (click)="activate(d.mosque.id)">Activate mosque</button>
+      <button *ngIf="d.mosque.status === 'Claimed' || d.mosque.status === 'PendingReview'" type="button" class="mp-btn mp-btn--success" (click)="activate(d.mosque.id)">Activate mosque</button>
+      <button *ngIf="d.mosque.status === 'Active'" type="button" class="mp-btn mp-btn--danger" (click)="deactivate(d.mosque.id)">Deactivate</button>
       <a routerLink="/dashboard/super/claims" class="mp-btn mp-btn--ghost" *ngIf="d.pendingClaim">Review claim</a>
     </div>
 
@@ -133,6 +134,33 @@
               <p style="margin:0.25rem 0 0;font-size:0.8125rem;color:var(--mp-muted)">{{ o.email }}</p>
             </ng-container>
             <p *ngIf="!d.owner" class="mp-alert mp-alert--warn" style="margin:0">No owner assigned to this mosque.</p>
+
+            <div *ngIf="canInviteOwner(d.mosque.status) && !d.owner" style="margin-top:0.875rem">
+              <p style="margin:0 0 0.5rem;font-size:0.8125rem;font-weight:700;color:var(--mp-text)">Invite owner by email</p>
+              <input
+                type="email"
+                class="mp-input"
+                placeholder="owner@example.com"
+                [value]="inviteEmail()"
+                (input)="inviteEmail.set($any($event.target).value)"
+                style="width:100%;margin-bottom:0.5rem;padding:0.5rem 0.65rem;border-radius:0.5rem;border:1px solid var(--mp-border)">
+              <input
+                type="text"
+                class="mp-input"
+                placeholder="Full name (optional)"
+                [value]="inviteName()"
+                (input)="inviteName.set($any($event.target).value)"
+                style="width:100%;margin-bottom:0.5rem;padding:0.5rem 0.65rem;border-radius:0.5rem;border:1px solid var(--mp-border)">
+              <button type="button" class="mp-btn" (click)="sendInvite(d.mosque.id)" [disabled]="inviting()">
+                {{ inviting() ? 'Sending…' : 'Send invitation' }}
+              </button>
+              <p *ngIf="inviteMsg()" style="margin:0.5rem 0 0;font-size:0.75rem;color:var(--mp-muted)">{{ inviteMsg() }}</p>
+              <p *ngIf="lastInviteLink()" style="margin:0.5rem 0 0;font-size:0.75rem;word-break:break-all">
+                <strong>Accept link:</strong>
+                <a [href]="lastInviteLink()" target="_blank" rel="noopener">{{ lastInviteLink() }}</a>
+              </p>
+            </div>
+
             <p style="margin:0.75rem 0 0;font-size:0.8125rem;color:var(--mp-muted)">
               <strong style="color:var(--mp-text)">{{ d.userCount }}</strong> users linked
             </p>

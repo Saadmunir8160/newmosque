@@ -275,10 +275,15 @@ export class AdminDashboardComponent implements OnInit {
 
 
   refresh(): void {
-
     this.loading.set(true);
 
     this.mosqueCtx.resolve().then(mosqueId => {
+      if (!mosqueId || mosqueId <= 0) {
+        // MosqueAdmin with no homeMosqueId assigned yet — show empty state
+        this.loading.set(false);
+        return;
+      }
+
       this.adminApi.getOwnerMosque(mosqueId).subscribe({
         next: (res) => {
           this.mosque.set(res.mosque);
@@ -308,15 +313,10 @@ export class AdminDashboardComponent implements OnInit {
       });
 
       this.admin.getDashboard(mosqueId).subscribe({
-
         next: d => { this.data.set(d); this.loading.set(false); },
-
         error: () => this.loading.set(false),
-
       });
-
     });
-
   }
 
 

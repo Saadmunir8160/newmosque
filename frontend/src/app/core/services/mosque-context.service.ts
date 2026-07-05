@@ -48,6 +48,19 @@ export class MosqueContextService {
 
         if (active) {
           await this.loadMosqueContext(active);
+        } else if (this.auth.hasRole(ROLES.MosqueAdmin)) {
+          // MosqueAdmin has no owned mosques — resolve via my-mosque (homeMosqueId)
+          try {
+            const res = await firstValueFrom(
+              this.http.get<{ mosque: Mosque | null }>(`${environment.apiUrl}/mosques/my-mosque`)
+            );
+            if (res.mosque?.id) {
+              this.mosqueId.set(res.mosque.id);
+              this.mosque.set(res.mosque);
+              this.ownerNeedsSetup.set(false);
+              sessionStorage.setItem(ACTIVE_MOSQUE_KEY, String(res.mosque.id));
+            }
+          } catch { /* keep default */ }
         } else {
           this.ownerNeedsSetup.set(this.auth.hasRole(ROLES.MosqueOwner));
           this.mosque.set(null);

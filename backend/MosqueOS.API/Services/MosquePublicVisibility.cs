@@ -6,7 +6,7 @@ namespace MosqueOS.API.Services;
 public static class MosquePublicVisibility
 {
     public static bool IsPubliclyVisible(MosqueStatus status) =>
-        status is MosqueStatus.Unclaimed or MosqueStatus.Claimed or MosqueStatus.Active;
+        status is MosqueStatus.Unclaimed or MosqueStatus.Active;
 
     public static bool CanEditProfile(MosqueStatus status, bool isSuperAdmin) =>
         isSuperAdmin || status is MosqueStatus.Claimed or MosqueStatus.Active;

@@ -171,3 +171,23 @@
   font-size: 0.8125rem; font-weight: 600; margin-bottom: 1rem;
 }
 .oml-alert--error { background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
+.oml-alert--warn { background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; }
+
+.oml-register { margin-bottom: 1.25rem; }
+.oml-register__title { margin: 0 0 0.25rem; font-size: 1.0625rem; font-weight: 800; }
+.oml-register__sub { margin: 0 0 1rem; font-size: 0.8125rem; color: var(--oml-muted); }
+.oml-register__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.oml-field { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.75rem; font-weight: 600; color: var(--oml-muted); }
+.oml-field--full { grid-column: 1 / -1; }
+.oml-textarea { min-height: 4.5rem; resize: vertical; }
+.oml-register__msg { margin: 0 0 0.75rem; font-size: 0.8125rem; font-weight: 600; color: var(--oml-secondary); }
+.oml-register__msg--err { color: #B91C1C; }
+
+@media (max-width: 640px) {
+  .oml-register__grid { grid-template-columns: 1fr; }
+}

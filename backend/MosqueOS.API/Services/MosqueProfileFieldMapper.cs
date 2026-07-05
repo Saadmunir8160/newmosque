@@ -1,13 +1,20 @@
 using System.Text.Json;
 using MosqueOS.API.Models.Mosques;
+using MosqueOS.Domain;
 using MosqueOS.Domain.Entities;
 
 namespace MosqueOS.API.Services;
 
 public static class MosqueProfileFieldMapper
 {
-    public static void ApplyUpdate(Mosque mosque, MosqueUpdateDto dto)
+    public static void ApplyUpdate(Mosque mosque, MosqueUpdateDto dto, string? newSlug = null)
     {
+        if (newSlug != null)
+            mosque.Slug = newSlug;
+        if (dto.Status.HasValue)
+            mosque.Status = dto.Status.Value;
+        if (dto.OwnerId != null)
+            mosque.OwnerId = string.IsNullOrWhiteSpace(dto.OwnerId) ? null : dto.OwnerId;
         if (!string.IsNullOrWhiteSpace(dto.Name))
             mosque.Name = dto.Name.Trim();
         if (dto.Address != null)

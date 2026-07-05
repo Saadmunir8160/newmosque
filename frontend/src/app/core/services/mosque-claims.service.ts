@@ -20,6 +20,8 @@ export interface MyClaimItem {
   status: string;
   reviewStatus: string;
   submittedDate: string;
+  lastUpdated?: string | null;
+  rejectionReason?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })

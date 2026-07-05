@@ -99,7 +99,7 @@ namespace MosqueOS.Infrastructure
             }
 
             // Idempotent: ensure at least one unclaimed listing exists for claim flow testing
-            if (!await db.Mosques.AnyAsync(m => m.Status == MosqueStatus.Unclaimed))
+            if (!await db.Mosques.AnyAsync(m => m.Slug == "masjid-al-huda-leeds"))
             {
                 db.Mosques.Add(new Mosque
                 {
@@ -115,7 +115,7 @@ namespace MosqueOS.Infrastructure
                 await db.SaveChangesAsync();
             }
 
-            if (await db.Mosques.AnyAsync()) return; // demo data already seeded
+            if (await db.Mosques.AnyAsync(m => m.Slug == "masjid-al-noor-bradford")) return; // demo data already seeded
 
             // ---- 3.1 Sample mosque (Bradford) ----
             var mosque = new Mosque
@@ -138,6 +138,8 @@ namespace MosqueOS.Infrastructure
 
             owner.HomeMosqueId = mosque.Id;
             await userManager.UpdateAsync(owner);
+            mosqueAdmin.HomeMosqueId = mosque.Id;
+            await userManager.UpdateAsync(mosqueAdmin);
             member.HomeMosqueId = mosque.Id;
             await userManager.UpdateAsync(member);
             prayerEditor.HomeMosqueId = mosque.Id;
@@ -146,19 +148,6 @@ namespace MosqueOS.Infrastructure
             await userManager.UpdateAsync(teacher);
             muqaddam.HomeMosqueId = mosque.Id;
             await userManager.UpdateAsync(muqaddam);
-
-            // Unclaimed listing for owner claim flow demos
-            db.Mosques.Add(new Mosque
-            {
-                Name = "Masjid Al-Huda Leeds",
-                Slug = "masjid-al-huda-leeds",
-                Address = "45 Roundhay Road",
-                City = "Leeds",
-                Postcode = "LS8 5AN",
-                Country = "United Kingdom",
-                Description = "Community mosque in Leeds — awaiting an owner to claim this listing.",
-                Status = MosqueStatus.Unclaimed
-            });
             await db.SaveChangesAsync();
 
             // Module feature flags

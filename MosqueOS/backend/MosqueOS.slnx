@@ -1,6 +1,0 @@
-<Solution>
-  <Project Path="MosqueOS.API/MosqueOS.API.csproj" />
-  <Project Path="MosqueOS.Application/MosqueOS.Application.csproj" />
-  <Project Path="MosqueOS.Domain/MosqueOS.Domain.csproj" />
-  <Project Path="MosqueOS.Infrastructure/MosqueOS.Infrastructure.csproj" />
-</Solution>

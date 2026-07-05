@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
 using MosqueOS.API.Models.Mosques;
+using MosqueOS.Domain;
 
 namespace MosqueOS.API.Services;
 
@@ -13,7 +14,20 @@ public static class MosqueValidation
     public static IReadOnlyList<string> ValidateCreate(MosqueCreateDto dto)
     {
         var errors = new List<string>();
-        ValidateCore(dto.Name, dto.City, dto.Email, dto.Phone, dto.Website, errors);
+        ValidateCore(
+            dto.Name,
+            dto.City,
+            dto.Email,
+            dto.Phone,
+            dto.Website,
+            dto.Slug,
+            dto.Timezone,
+            dto.Status,
+            latitude: null,
+            longitude: null,
+            establishedYear: null,
+            capacity: null,
+            errors);
 
         if (string.IsNullOrWhiteSpace(dto.Slug) && string.IsNullOrWhiteSpace(dto.Name))
             errors.Add("Name or slug is required.");
@@ -24,7 +38,20 @@ public static class MosqueValidation
     public static IReadOnlyList<string> ValidateUpdate(MosqueUpdateDto dto)
     {
         var errors = new List<string>();
-        ValidateCore(dto.Name, dto.City, dto.Email, dto.Phone, dto.Website, errors);
+        ValidateCore(
+            dto.Name,
+            dto.City,
+            dto.Email,
+            dto.Phone,
+            dto.Website,
+            dto.Slug,
+            dto.Timezone,
+            dto.Status,
+            dto.Latitude,
+            dto.Longitude,
+            dto.EstablishedYear,
+            dto.Capacity,
+            errors);
         return errors;
     }
 
@@ -35,7 +62,20 @@ public static class MosqueValidation
         return uri.Scheme is "http" or "https";
     }
 
-    private static void ValidateCore(string? name, string? city, string? email, string? phone, string? website, List<string> errors)
+    private static void ValidateCore(
+        string? name,
+        string? city,
+        string? email,
+        string? phone,
+        string? website,
+        string? slug,
+        string? timezone,
+        MosqueStatus? status,
+        double? latitude,
+        double? longitude,
+        int? establishedYear,
+        int? capacity,
+        List<string> errors)
     {
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length < 3)
             errors.Add("Name is required (minimum 3 characters).");
@@ -49,6 +89,33 @@ public static class MosqueValidation
         if (!string.IsNullOrWhiteSpace(website) && !IsValidWebsite(website))
             errors.Add("Website must be a valid URL.");
 
+        if (!string.IsNullOrWhiteSpace(slug))
+        {
+            var normalized = SlugService.Normalize(slug);
+            if (normalized.Length is < 3 or > 120)
+                errors.Add("Slug must be between 3 and 120 URL-safe characters.");
+            if (!string.Equals(slug.Trim(), normalized, StringComparison.OrdinalIgnoreCase))
+                errors.Add("Slug may contain only letters, numbers, and hyphens.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(timezone) && !IsValidTimezone(timezone))
+            errors.Add("Timezone must be a valid IANA or system timezone id.");
+
+        if (status.HasValue && !Enum.IsDefined(typeof(MosqueStatus), status.Value))
+            errors.Add("Status is invalid.");
+
+        if (latitude is < -90 or > 90)
+            errors.Add("Latitude must be between -90 and 90.");
+
+        if (longitude is < -180 or > 180)
+            errors.Add("Longitude must be between -180 and 180.");
+
+        if (establishedYear is < 600 or > 2100)
+            errors.Add("Established year must be between 600 and 2100.");
+
+        if (capacity is < 0)
+            errors.Add("Capacity cannot be negative.");
+
         if (!string.IsNullOrWhiteSpace(phone))
         {
             var normalized = phone.Replace(" ", "").Replace("-", "");
@@ -56,6 +123,9 @@ public static class MosqueValidation
                 errors.Add("Phone must be a valid UK number (+44 or 0 prefix).");
         }
     }
+
+    private static bool IsValidTimezone(string timezone) =>
+        TimeZoneInfo.TryFindSystemTimeZoneById(timezone.Trim(), out _);
 
     private static readonly HashSet<string> AllowedClaimRoles = new(StringComparer.OrdinalIgnoreCase)
     {

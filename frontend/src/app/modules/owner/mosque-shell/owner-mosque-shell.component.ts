@@ -18,10 +18,10 @@ import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
       <nav mat-tab-nav-bar [tabPanel]="tabPanel" class="owner-tabs">
         <a mat-tab-link routerLink="/dashboard/owner" routerLinkActive #overview="routerLinkActive"
           [active]="overview.isActive">Overview</a>
-        <a mat-tab-link routerLink="/dashboard/owner/profile" routerLinkActive #profile="routerLinkActive"
-          [active]="profile.isActive">Profile</a>
-        <a mat-tab-link routerLink="/dashboard/owner/settings" routerLinkActive #settings="routerLinkActive"
-          [active]="settings.isActive">Settings</a>
+        <a mat-tab-link routerLink="/dashboard/owner/my-mosque" routerLinkActive #profile="routerLinkActive"
+          [active]="profile.isActive">My Mosque</a>
+        <a mat-tab-link routerLink="/dashboard/owner/modules" routerLinkActive #settings="routerLinkActive"
+          [active]="settings.isActive">Modules</a>
       </nav>
       <mat-tab-nav-panel #tabPanel>
         <div class="owner-shell__content">

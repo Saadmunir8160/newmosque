@@ -6,14 +6,15 @@ import { AdminService } from '../../../core/services/admin.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { NavigationService } from '../../../core/services/navigation.service';
 import { Mosque, MosqueSetting } from '../../../core/models';
-import { MODULE_LABELS, resolveModuleKey } from '../../../core/constants/mosque-form.constants';
 import { ROLES } from '../../../core/constants/roles';
 
-/** Owner-facing module keys shown in Step 7 UI (subset + all seeded modules). */
-const DISPLAY_ORDER = [
-  'PrayerTimes', 'Events', 'Donations', 'Courses', 'Madrassah',
-  'Participation', 'Announcements', 'Janaza', 'Duas', 'Quran', 'Awrad',
-  'VolunteerManagement', 'Fundraising', 'Communities',
+const OWNER_MODULES = [
+  { key: 'PrayerTimes', label: 'Prayer' },
+  { key: 'Events', label: 'Events' },
+  { key: 'Donations', label: 'Donations' },
+  { key: 'Courses', label: 'Education' },
+  { key: 'VolunteerManagement', label: 'Volunteers' },
+  { key: 'Announcements', label: 'Announcements' },
 ];
 
 @Component({
@@ -45,7 +46,7 @@ export class OwnerModuleSettingsComponent implements OnInit {
   lockMessage = computed(() => {
     const m = this.mosque();
     if (!m) return 'Link a mosque to configure modules.';
-    if (m.status !== 'Active') return 'Module settings unlock when your mosque is Active.';
+    if (m.status !== 'Active') return 'Modules unlock when your mosque is Active.';
     if (!this.auth.hasRole(ROLES.MosqueOwner) && !this.auth.isSuperAdmin()) {
       return 'Only the mosque owner can change module settings. You can view the current configuration below.';
     }
@@ -68,30 +69,24 @@ export class OwnerModuleSettingsComponent implements OnInit {
   }
 
   moduleLabel(key: string): string {
-    const canonical = resolveModuleKey(key);
-    const label = MODULE_LABELS[canonical] ?? MODULE_LABELS[key];
-    if (label) return label;
-    if (key === 'Janaza') return 'Funeral';
-    if (key === 'VolunteerManagement') return 'Volunteers';
-    if (key === 'Madrassah') return 'Courses';
-    if (key === 'Quran') return 'Library';
-    return key;
+    return OWNER_MODULES.find(m => m.key === key)?.label ?? key;
   }
 
   sortedModules(): MosqueSetting[] {
     const list = this.modules();
-    return [...list].sort((a, b) => {
-      const ai = DISPLAY_ORDER.indexOf(a.moduleKey);
-      const bi = DISPLAY_ORDER.indexOf(b.moduleKey);
-      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    return OWNER_MODULES.map(item => {
+      const existing = list.find(m => m.moduleKey === item.key);
+      return existing ?? { id: 0, mosqueId: this.mosqueId, moduleKey: item.key, isEnabled: false };
     });
   }
 
   toggle(mod: MosqueSetting): void {
     if (!this.canEdit()) return;
-    this.modules.update(list =>
-      list.map(m => m.moduleKey === mod.moduleKey ? { ...m, isEnabled: !m.isEnabled } : m),
-    );
+    this.modules.update(list => {
+      const exists = list.some(m => m.moduleKey === mod.moduleKey);
+      if (!exists) return [...list, { ...mod, isEnabled: !mod.isEnabled }];
+      return list.map(m => m.moduleKey === mod.moduleKey ? { ...m, isEnabled: !m.isEnabled } : m);
+    });
   }
 
   async saveAll(): Promise<void> {
@@ -99,11 +94,14 @@ export class OwnerModuleSettingsComponent implements OnInit {
     this.saving.set(true);
     this.toast.set('');
     try {
-      const payload = this.modules().map(m => ({ moduleKey: m.moduleKey, isEnabled: m.isEnabled }));
+      const visibleKeys = new Set(OWNER_MODULES.map(m => m.key));
+      const visible = this.sortedModules();
+      const hidden = this.modules().filter(m => !visibleKeys.has(m.moduleKey));
+      const payload = [...visible, ...hidden].map(m => ({ moduleKey: m.moduleKey, isEnabled: m.isEnabled }));
       const updated = await firstValueFrom(this.admin.updateMosqueModules(this.mosqueId, payload));
       this.modules.set(updated);
       await this.navigation.load();
-      this.showToast('Module settings saved successfully.', true);
+      this.showToast('Modules saved successfully.', true);
     } catch {
       this.showToast('Unable to save module settings. Please try again.', false);
     } finally {

@@ -3,6 +3,7 @@ export const MOSQUE_STATUSES = [
   'Unclaimed',
   'ClaimPending',
   'Claimed',
+  'Invited',
   'Active',
   'Suspended',
   'Archived',
@@ -18,6 +19,7 @@ const STATUS_LABELS: Record<string, string> = {
   Unclaimed: 'Unclaimed',
   ClaimPending: 'Claim Pending',
   Claimed: 'Claimed',
+  Invited: 'Invited',
   Active: 'Active',
   Suspended: 'Suspended',
   Archived: 'Archived',
@@ -36,6 +38,7 @@ export function statusClass(status: string): string {
     Unclaimed: 'status--unclaimed',
     ClaimPending: 'status--claimed',
     Claimed: 'status--claimed',
+    Invited: 'status--invited',
     Active: 'status--active',
     Suspended: 'status--suspended',
     Archived: 'status--archived',
@@ -45,7 +48,7 @@ export function statusClass(status: string): string {
 
 /** Public `/mosque/{slug}` is visible for these statuses. */
 export function isMosquePubliclyVisible(status: string): boolean {
-  return status === 'Unclaimed' || status === 'Claimed' || status === 'Active';
+  return status === 'Unclaimed' || status === 'Active';
 }
 
 export interface PublicStatusCard {
@@ -56,6 +59,12 @@ export interface PublicStatusCard {
 
 export function publicStatusCard(status: string): PublicStatusCard {
   switch (status) {
+    case 'ClaimPending':
+      return {
+        label: 'Claim Under Review',
+        description: 'An ownership claim for this mosque is currently being reviewed by our team.',
+        tone: 'blue',
+      };
     case 'Claimed':
       return {
         label: 'Claimed',

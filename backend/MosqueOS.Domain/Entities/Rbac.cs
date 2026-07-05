@@ -31,6 +31,8 @@ public class NavigationMenuItem : BaseEntity
     public string? RequiredPermission { get; set; }
     public int SortOrder { get; set; }
     public bool IsActive { get; set; } = true;
+    /// <summary>When true, item is hidden until the user owns at least one Active mosque.</summary>
+    public bool RequiresActiveMosque { get; set; }
     public int? ParentId { get; set; }
     public NavigationMenuItem? Parent { get; set; }
 }

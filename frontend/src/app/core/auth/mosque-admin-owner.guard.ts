@@ -1,26 +1,26 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { map, catchError, of } from 'rxjs';
 import { AuthService } from './auth.service';
-import { AdminService } from '../services/admin.service';
 import { ROLES } from '../constants/roles';
 
-/** Ensures Mosque Admin users only access mosques they own (OwnerId match). */
+/** Ensures Mosque Admin users only access their assigned mosque scope. */
 export const mosqueAdminOwnerGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
-  const admin = inject(AdminService);
   const router = inject(Router);
 
-  if (!auth.isAuthenticated() || !auth.hasRole(ROLES.MosqueAdmin)) {
+  if (!auth.isAuthenticated()) {
     return router.createUrlTree(['/auth/login']);
   }
 
-  return admin.getOwnerMosque().pipe(
-    map(res => {
-      const userId = auth.user()?.id;
-      if (res.mosque && userId && res.mosque.ownerId === userId) return true;
-      return router.createUrlTree(['/dashboard']);
-    }),
-    catchError(() => of(router.createUrlTree(['/dashboard'])))
-  );
+  // SuperAdmin and MosqueOwner always pass — they have their own dashboards
+  if (auth.hasRole(ROLES.SuperAdmin) || auth.hasRole(ROLES.MosqueOwner)) {
+    return true;
+  }
+
+  // MosqueAdmin: allow if they have the role (homeMosqueId resolved at runtime by AdminDashboard)
+  if (auth.hasRole(ROLES.MosqueAdmin)) {
+    return true;
+  }
+
+  return router.createUrlTree(['/auth/login']);
 };

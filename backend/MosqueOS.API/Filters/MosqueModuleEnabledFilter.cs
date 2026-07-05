@@ -39,14 +39,15 @@ public class MosqueModuleEnabledFilter : IAsyncActionFilter
         var setting = await _unitOfWork.Repository<MosqueSetting>().QueryNoTracking()
             .FirstOrDefaultAsync(s => s.MosqueId == mosqueId && s.ModuleKey == _moduleKey);
 
-        if (setting is not { IsEnabled: true })
+        // If no setting row exists, allow by default (module not explicitly disabled)
+        if (setting != null && !setting.IsEnabled)
         {
             context.Result = new ObjectResult(new ApiMessageResponse
             {
                 Message = $"Module '{_moduleKey}' is not enabled for this mosque."
             })
             {
-                StatusCode = StatusCodes.Status403Forbidden
+                StatusCode = StatusCodes.Status404NotFound
             };
             return;
         }

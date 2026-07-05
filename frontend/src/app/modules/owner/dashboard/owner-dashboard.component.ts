@@ -60,6 +60,12 @@ interface OwnerNotice {
           <p class="owner-notice__body">{{ n.message }}</p>
           <a *ngIf="n.route" [routerLink]="n.route" class="owner-notice__link">{{ n.action }}</a>
         </article>
+        <div *ngIf="canSubmitForReview()" class="owner-submit-row">
+          <button type="button" class="owner-btn" (click)="submitForReview()" [disabled]="submittingReview()">
+            {{ submittingReview() ? 'Submitting…' : 'Submit mosque for admin approval' }}
+          </button>
+          <p *ngIf="submitReviewMsg()" class="owner-submit-msg" [class.owner-submit-msg--err]="submitReviewErr()">{{ submitReviewMsg() }}</p>
+        </div>
       </div>
 
       <article *ngIf="mosque() as m" class="owner-panel">
@@ -68,8 +74,8 @@ interface OwnerNotice {
         <p *ngIf="missing().length" class="owner-panel__warn">
           Missing: {{ missing().join(', ') }}
         </p>
-        <a *ngIf="m.slug && isActive()" routerLink="/dashboard/owner/profile" class="owner-link">
-          Open mosque profile →
+        <a *ngIf="m.slug && isActive()" routerLink="/dashboard/owner/my-mosque" class="owner-link">
+          Open My Mosque
         </a>
       </article>
 
@@ -79,15 +85,15 @@ interface OwnerNotice {
       </article>
 
       <div class="owner-quick-grid">
-        <a routerLink="/dashboard/owner/profile" class="owner-quick">
+        <a routerLink="/dashboard/owner/my-mosque" class="owner-quick">
           <span class="owner-quick__icon">⌂</span>
-          <h3 class="owner-quick__title">Mosque profile</h3>
+          <h3 class="owner-quick__title">My Mosque</h3>
           <p class="owner-quick__desc">Edit name, contact, logo &amp; banner</p>
         </a>
-        <a routerLink="/dashboard/owner/settings" class="owner-quick"
+        <a routerLink="/dashboard/owner/modules" class="owner-quick"
           [class.owner-quick--disabled]="!isActive()">
           <span class="owner-quick__icon">⚙</span>
-          <h3 class="owner-quick__title">Module settings</h3>
+          <h3 class="owner-quick__title">Modules</h3>
           <p class="owner-quick__desc">{{ isActive() ? 'Enable prayer times, events, donations' : 'Available after mosque is Active' }}</p>
         </a>
         <a routerLink="/dashboard/owner/staff" class="owner-quick"
@@ -105,6 +111,11 @@ interface OwnerNotice {
           <span class="owner-quick__icon">📋</span>
           <h3 class="owner-quick__title">Mosque listings</h3>
           <p class="owner-quick__desc">Browse unclaimed mosques to claim</p>
+        </a>
+        <a routerLink="/dashboard/owner/onboarding" class="owner-quick">
+          <span class="owner-quick__icon">🧭</span>
+          <h3 class="owner-quick__title">Getting started</h3>
+          <p class="owner-quick__desc">Step-by-step setup guide</p>
         </a>
         <a *ngIf="mosque()?.slug && isActive()" [routerLink]="['/mosque', mosque()!.slug]" target="_blank" class="owner-quick">
           <span class="owner-quick__icon">🌐</span>
@@ -446,8 +457,37 @@ export class OwnerDashboardComponent implements OnInit {
   enabledModules = signal(0);
   totalModules = signal(0);
   notifications = signal<OwnerNotice[]>([]);
+  submittingReview = signal(false);
+  submitReviewMsg = signal('');
+
+  submitReviewErr = signal(false);
 
   ngOnInit(): void { this.load(); }
+
+  canSubmitForReview(): boolean {
+    const s = this.status();
+    return s === 'Claimed' || s === 'Invited';
+  }
+
+  submitForReview(): void {
+    const m = this.mosque();
+    if (!m?.id) return;
+    this.submittingReview.set(true);
+    this.submitReviewMsg.set('');
+    this.submitReviewErr.set(false);
+    this.admin.submitMosqueForReview(m.id).subscribe({
+      next: (res) => {
+        this.submittingReview.set(false);
+        this.submitReviewMsg.set(res.message || 'Submitted for review.');
+        this.load();
+      },
+      error: (err) => {
+        this.submittingReview.set(false);
+        this.submitReviewErr.set(true);
+        this.submitReviewMsg.set(err?.error?.message ?? 'Could not submit for review.');
+      },
+    });
+  }
 
   load(): void {
     this.admin.getOwnerMosque().subscribe((res) => {
@@ -489,13 +529,31 @@ export class OwnerDashboardComponent implements OnInit {
   ): OwnerNotice[] {
     const notices: OwnerNotice[] = [];
 
+    if (mosque?.status === 'Claimed' || mosque?.status === 'Invited') {
+      notices.push({
+        type: 'warn',
+        title: 'Complete your mosque profile',
+        message: 'Add contact details, description, and branding. Then submit for super admin approval.',
+        route: '/dashboard/owner/my-mosque/edit-profile',
+        action: 'Edit profile',
+      });
+    }
+
+    if (mosque?.status === 'PendingReview') {
+      notices.push({
+        type: 'info',
+        title: 'Awaiting admin approval',
+        message: 'Your mosque listing has been submitted. A super admin will review and activate it.',
+      });
+    }
+
     if (mosque?.status === 'Active' && completeness < 60) {
       notices.push({
         type: 'info',
         title: 'Complete your profile',
         message: `Profile is ${completeness}% complete. Add contact details and branding.`,
-        route: '/dashboard/owner/profile',
-        action: 'Complete profile →',
+        route: '/dashboard/owner/my-mosque/edit-profile',
+        action: 'Complete profile',
       });
     }
 
@@ -504,8 +562,8 @@ export class OwnerDashboardComponent implements OnInit {
         type: 'success',
         title: 'Mosque is active',
         message: `${mosque.name} is ready to manage.`,
-        route: '/dashboard/owner/profile',
-        action: 'Open profile →',
+        route: '/dashboard/owner/my-mosque',
+        action: 'Open My Mosque',
       });
     }
 

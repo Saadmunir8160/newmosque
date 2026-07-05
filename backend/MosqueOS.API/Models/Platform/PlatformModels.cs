@@ -208,3 +208,9 @@ public class PendingClaimsResponse
     public PendingClaimsSummaryResponse Summary { get; set; } = new();
     public List<PendingOwnershipClaimResponse> Items { get; set; } = [];
 }
+
+public class BulkMosqueStatusRequest
+{
+    public int[] Ids { get; set; } = Array.Empty<int>();
+    public string Status { get; set; } = string.Empty;
+}

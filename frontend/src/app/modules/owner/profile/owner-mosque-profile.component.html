@@ -12,14 +12,30 @@
 
   <div *ngIf="!canEdit()" class="omp-alert omp-alert--warn" role="alert">{{ lockMessage() }}</div>
 
+  <!-- Tab nav -->
+  <nav class="omp-tabs" aria-label="Profile sections">
+    <button type="button" class="omp-tab" [class.omp-tab--active]="activeTab() === 'basic'" (click)="activeTab.set('basic')">Basic</button>
+    <button type="button" class="omp-tab" [class.omp-tab--active]="activeTab() === 'address'" (click)="activeTab.set('address')">Address</button>
+    <button type="button" class="omp-tab" [class.omp-tab--active]="activeTab() === 'social'" (click)="activeTab.set('social')">Social</button>
+    <button type="button" class="omp-tab" [class.omp-tab--active]="activeTab() === 'location'" (click)="activeTab.set('location')">Location</button>
+    <button type="button" class="omp-tab" [class.omp-tab--active]="activeTab() === 'about'" (click)="activeTab.set('about')">About</button>
+    <button type="button" class="omp-tab" [class.omp-tab--active]="activeTab() === 'media'" (click)="activeTab.set('media')">Media</button>
+  </nav>
+
   <div class="omp-form" [class.omp-form--locked]="!canEdit()">
-    <section class="omp-section">
+
+    <!-- BASIC TAB -->
+    <section *ngIf="activeTab() === 'basic'" class="omp-section">
       <h2>Basic information</h2>
       <div class="omp-grid">
         <label class="omp-field omp-field--full">
           <span>Mosque name <em>*</em></span>
           <input class="omp-input" [(ngModel)]="m.name" [disabled]="!canEdit() || saving()">
           <small *ngIf="fieldErrors()['name']" class="omp-error">{{ fieldErrors()['name'] }}</small>
+        </label>
+        <label class="omp-field omp-field--full">
+          <span>Short description</span>
+          <input class="omp-input" [(ngModel)]="m.shortDescription" placeholder="One-line summary shown in listings" [disabled]="!canEdit() || saving()">
         </label>
         <label class="omp-field">
           <span>Phone</span>
@@ -33,14 +49,29 @@
           <span>Website</span>
           <input class="omp-input" [(ngModel)]="m.website" placeholder="https://" [disabled]="!canEdit() || saving()">
         </label>
+        <label class="omp-field">
+          <span>Established year</span>
+          <input class="omp-input" type="number" [(ngModel)]="m.establishedYear" [min]="1800" [max]="currentYear" placeholder="e.g. 1985" [disabled]="!canEdit() || saving()">
+        </label>
+        <label class="omp-field">
+          <span>Capacity</span>
+          <input class="omp-input" type="number" [(ngModel)]="m.capacity" min="1" placeholder="Max worshippers" [disabled]="!canEdit() || saving()">
+        </label>
+        <label class="omp-field">
+          <span>Timezone</span>
+          <select class="omp-input" [(ngModel)]="m.timezone" [disabled]="!canEdit() || saving()">
+            <option *ngFor="let tz of timezones" [value]="tz">{{ tz }}</option>
+          </select>
+        </label>
       </div>
     </section>
 
-    <section class="omp-section">
+    <!-- ADDRESS TAB -->
+    <section *ngIf="activeTab() === 'address'" class="omp-section">
       <h2>Address</h2>
       <div class="omp-grid">
         <label class="omp-field omp-field--full">
-          <span>Address</span>
+          <span>Street address</span>
           <input class="omp-input" [(ngModel)]="m.address" [disabled]="!canEdit() || saving()">
         </label>
         <label class="omp-field">
@@ -58,48 +89,132 @@
             <option *ngFor="let c of countries" [value]="c">{{ c }}</option>
           </select>
         </label>
+        <label class="omp-field omp-field--full">
+          <span>Parking information</span>
+          <input class="omp-input" [(ngModel)]="m.parkingInfo" placeholder="e.g. Free street parking on Church St" [disabled]="!canEdit() || saving()">
+        </label>
       </div>
     </section>
 
-    <section class="omp-section">
-      <h2>Description</h2>
-      <label class="omp-field omp-field--full">
-        <span>About your mosque</span>
-        <textarea class="omp-input omp-textarea" rows="6" [(ngModel)]="m.description" [disabled]="!canEdit() || saving()"></textarea>
-      </label>
+    <!-- SOCIAL TAB -->
+    <section *ngIf="activeTab() === 'social'" class="omp-section">
+      <h2>Social media links</h2>
+      <div class="omp-grid">
+        <label class="omp-field omp-field--full">
+          <span class="omp-social-label omp-social-label--fb">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+            Facebook URL
+          </span>
+          <input class="omp-input" [(ngModel)]="m.facebookUrl" placeholder="https://facebook.com/yourmosque" [disabled]="!canEdit() || saving()">
+        </label>
+        <label class="omp-field omp-field--full">
+          <span class="omp-social-label omp-social-label--ig">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+            Instagram URL
+          </span>
+          <input class="omp-input" [(ngModel)]="m.instagramUrl" placeholder="https://instagram.com/yourmosque" [disabled]="!canEdit() || saving()">
+        </label>
+        <label class="omp-field omp-field--full">
+          <span class="omp-social-label omp-social-label--yt">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white"/></svg>
+            YouTube URL
+          </span>
+          <input class="omp-input" [(ngModel)]="m.youtubeUrl" placeholder="https://youtube.com/@yourmosque" [disabled]="!canEdit() || saving()">
+        </label>
+        <label class="omp-field omp-field--full">
+          <span class="omp-social-label omp-social-label--tw">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            X / Twitter URL
+          </span>
+          <input class="omp-input" [(ngModel)]="m.twitterUrl" placeholder="https://x.com/yourmosque" [disabled]="!canEdit() || saving()">
+        </label>
+      </div>
+      <p class="omp-hint" style="margin-top:0.75rem">Social links appear on your public mosque profile page.</p>
     </section>
 
-    <section class="omp-section">
+    <!-- LOCATION TAB -->
+    <section *ngIf="activeTab() === 'location'" class="omp-section">
+      <h2>Map & coordinates</h2>
+      <p class="omp-hint" style="margin-bottom:0.75rem">Adding coordinates enables the "Get directions" link on your public profile.</p>
+      <div class="omp-grid">
+        <label class="omp-field">
+          <span>Latitude</span>
+          <input class="omp-input" type="number" step="0.000001" [(ngModel)]="m.latitude" placeholder="e.g. 51.5074" [disabled]="!canEdit() || saving()">
+        </label>
+        <label class="omp-field">
+          <span>Longitude</span>
+          <input class="omp-input" type="number" step="0.000001" [(ngModel)]="m.longitude" placeholder="e.g. -0.1278" [disabled]="!canEdit() || saving()">
+        </label>
+        <label class="omp-field omp-field--full">
+          <span>Map location label</span>
+          <input class="omp-input" [(ngModel)]="m.mapLocation" placeholder="Displayed label for map pin" [disabled]="!canEdit() || saving()">
+        </label>
+        <div *ngIf="m.latitude && m.longitude" class="omp-field omp-field--full">
+          <a [href]="'https://www.google.com/maps?q=' + m.latitude + ',' + m.longitude"
+             target="_blank" rel="noopener" class="omp-map-preview-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            Preview on Google Maps
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABOUT TAB -->
+    <section *ngIf="activeTab() === 'about'" class="omp-section">
+      <h2>About your mosque</h2>
+      <div class="omp-grid">
+        <label class="omp-field omp-field--full">
+          <span>Full description</span>
+          <textarea class="omp-input omp-textarea" rows="5" [(ngModel)]="m.description" [disabled]="!canEdit() || saving()"></textarea>
+        </label>
+        <label class="omp-field omp-field--full">
+          <span>Our vision</span>
+          <textarea class="omp-input omp-textarea" rows="4" [(ngModel)]="m.vision" placeholder="What does your mosque aim to achieve?" [disabled]="!canEdit() || saving()"></textarea>
+        </label>
+        <label class="omp-field omp-field--full">
+          <span>History</span>
+          <textarea class="omp-input omp-textarea" rows="5" [(ngModel)]="m.history" placeholder="Background and history of the mosque…" [disabled]="!canEdit() || saving()"></textarea>
+        </label>
+      </div>
+    </section>
+
+    <!-- MEDIA TAB -->
+    <section *ngIf="activeTab() === 'media'" class="omp-section">
       <h2>Branding</h2>
       <div class="omp-media">
         <div class="omp-media__card">
-          <p>Logo</p>
-          <img *ngIf="logoPreview()" [src]="logoPreview()!" alt="Logo preview" class="omp-media__preview">
+          <div class="omp-media__head">
+            <p>Logo</p>
+            <span>{{ logoPreview() ? 'Custom image' : 'Default image' }}</span>
+          </div>
+          <img [src]="logoPreview() || defaultLogo" alt="Logo preview" class="omp-media__preview">
           <label class="omp-upload" *ngIf="canEdit()">
-            Replace logo
+            {{ logoPreview() ? 'Replace logo' : 'Upload logo' }}
             <input type="file" accept="image/*" (change)="onLogoSelected($event)" [disabled]="saving()">
           </label>
+          <button *ngIf="canEdit() && logoPreview()" type="button" class="omp-media__remove" (click)="removeLogo()" [disabled]="saving()">
+            Delete image
+          </button>
+          <p class="omp-media__hint">JPG, PNG, WEBP, or GIF. Max 5 MB. Square images work best.</p>
         </div>
         <div class="omp-media__card">
-          <p>Banner</p>
-          <img *ngIf="bannerPreview()" [src]="bannerPreview()!" alt="Banner preview" class="omp-media__preview omp-media__preview--banner">
+          <div class="omp-media__head">
+            <p>Banner</p>
+            <span>{{ bannerPreview() ? 'Custom image' : 'Default image' }}</span>
+          </div>
+          <img [src]="bannerPreview() || defaultBanner" alt="Banner preview" class="omp-media__preview omp-media__preview--banner">
           <label class="omp-upload" *ngIf="canEdit()">
-            Replace banner
+            {{ bannerPreview() ? 'Replace banner' : 'Upload banner' }}
             <input type="file" accept="image/*" (change)="onBannerSelected($event)" [disabled]="saving()">
           </label>
+          <button *ngIf="canEdit() && bannerPreview()" type="button" class="omp-media__remove" (click)="removeBanner()" [disabled]="saving()">
+            Delete image
+          </button>
+          <p class="omp-media__hint">JPG, PNG, WEBP, or GIF. Max 5 MB. Wide images work best.</p>
         </div>
       </div>
     </section>
 
-    <section class="omp-section">
-      <h2>Settings</h2>
-      <label class="omp-field">
-        <span>Timezone</span>
-        <select class="omp-input" [(ngModel)]="m.timezone" [disabled]="!canEdit() || saving()">
-          <option *ngFor="let tz of timezones" [value]="tz">{{ tz }}</option>
-        </select>
-      </label>
-    </section>
   </div>
 
   <footer class="omp-footer">

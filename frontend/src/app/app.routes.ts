@@ -11,6 +11,8 @@ import { TodayComponent } from './modules/home/today/today.component';
 import { LandingComponent } from './modules/home/landing/landing.component';
 import { DemoMosqueComponent } from './modules/home/demo-mosque/demo-mosque.component';
 import { MosqueProfilePageComponent } from './modules/home/mosque-profile-page/mosque-profile-page.component';
+import { MosqueDirectoryComponent } from './modules/home/mosque-directory/mosque-directory.component';
+import { MosqueRequestComponent } from './modules/home/mosque-request/mosque-request.component';
 import { PrayerTimesComponent } from './modules/prayer-times/prayer-times.component';
 import { AnnouncementsComponent } from './modules/announcements/announcements.component';
 import { EventsComponent } from './modules/events/events.component';
@@ -40,6 +42,9 @@ const contentRolesGuard = [ROLES.ContentEditor, ROLES.SuperAdmin, ROLES.MosqueOw
 
 export const routes: Routes = [
   { path: '', component: LandingComponent },
+  { path: 'mosques', component: MosqueDirectoryComponent },
+  { path: 'mosques/request', component: MosqueRequestComponent },
+  { path: 'find-mosque', redirectTo: 'mosques', pathMatch: 'full' },
   { path: 'demo', component: DemoMosqueComponent },
   { path: 'claim-mosque/:slug', loadComponent: () => import('./modules/home/claim-mosque-page/claim-mosque-page.component').then(m => m.ClaimMosquePageComponent) },
   { path: 'mosque/:slug/claim', component: MosqueProfilePageComponent, data: { openClaim: true } },
@@ -56,6 +61,7 @@ export const routes: Routes = [
   { path: 'verify-otp', component: VerifyOtpComponent },
   { path: 'verify-email-pending', component: VerifyEmailPendingComponent },
   { path: 'verify-email', component: VerifyEmailComponent },
+  { path: 'invite/accept', loadComponent: () => import('./modules/auth/invite-accept/invite-accept.component').then(m => m.InviteAcceptComponent) },
   {
     path: 'dashboard',
     component: ShellComponent,

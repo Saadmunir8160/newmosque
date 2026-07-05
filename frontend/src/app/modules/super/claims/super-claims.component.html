@@ -77,6 +77,7 @@
           <td data-label="Status"><span [class]="statusBadge(c.status)">{{ c.status || 'Pending' }}</span></td>
           <td data-label="Actions" class="sc-actions">
             <button type="button" class="sc-link" (click)="openClaim(c.claimId)">View</button>
+            <a [routerLink]="['/dashboard/super/claims', c.claimId]" class="sc-link">Details</a>
             <button
               *ngIf="(c.status ?? 'Pending').toLowerCase() === 'pending'"
               type="button"

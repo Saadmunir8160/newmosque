@@ -1,3 +1,4 @@
+using MosqueOS.API.Models.Mosques;
 using MosqueOS.API.Services;
 using MosqueOS.Domain;
 using Xunit;
@@ -42,13 +43,45 @@ public class Module31Tests
             Email = "info@test.org",
             Description = "A test mosque",
             LogoUrl = "/logo.png",
-            BannerUrl = null
+            BannerUrl = null,
+            Vision = "Serve the local community",
+            History = "Established by the neighbourhood",
+            EstablishedYear = 1999,
+            GalleryJson = "[\"/gallery.jpg\"]",
+            ProfileJson = "{\"leadership\":[{\"name\":\"Imam Test\",\"role\":\"Imam\"}]}"
         };
 
         var (completeness, missing) = MosqueProfileCompleteness.Calculate(mosque);
 
-        Assert.Equal(89, completeness);
+        Assert.Equal(93, completeness);
         Assert.Single(missing);
         Assert.Equal("bannerUrl", missing[0]);
+    }
+
+    [Fact]
+    public void MosqueValidation_RejectsInvalidMilestone1Fields()
+    {
+        var dto = new MosqueUpdateDto
+        {
+            Name = "Test Mosque",
+            City = "London",
+            Slug = "Bad Slug!",
+            Timezone = "Not/A-Timezone",
+            Status = (MosqueStatus)99,
+            Latitude = 91,
+            Longitude = -181,
+            EstablishedYear = 500,
+            Capacity = -1
+        };
+
+        var errors = MosqueValidation.ValidateUpdate(dto);
+
+        Assert.Contains(errors, e => e.Contains("Slug", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(errors, e => e.Contains("Timezone", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(errors, e => e.Contains("Status", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(errors, e => e.Contains("Latitude", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(errors, e => e.Contains("Longitude", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(errors, e => e.Contains("Established year", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(errors, e => e.Contains("Capacity", StringComparison.OrdinalIgnoreCase));
     }
 }

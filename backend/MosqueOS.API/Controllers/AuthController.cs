@@ -10,6 +10,7 @@ using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
+using System.Security.Claims;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -25,6 +26,7 @@ public class AuthController : ControllerBase
     private readonly IUnitOfWork _unitOfWork;
     private readonly EmailOtpService _otp;
     private readonly EmailVerificationService _emailVerification;
+    private readonly MosqueInvitationService _invitations;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
@@ -32,7 +34,8 @@ public class AuthController : ControllerBase
         IPermissionService permissions,
         IUnitOfWork unitOfWork,
         EmailOtpService otp,
-        EmailVerificationService emailVerification)
+        EmailVerificationService emailVerification,
+        MosqueInvitationService invitations)
     {
         _userManager = userManager;
         _jwt = jwt;
@@ -40,6 +43,7 @@ public class AuthController : ControllerBase
         _unitOfWork = unitOfWork;
         _otp = otp;
         _emailVerification = emailVerification;
+        _invitations = invitations;
     }
 
     [HttpPost("register")]
@@ -261,6 +265,97 @@ public class AuthController : ControllerBase
 
         await _userManager.UpdateAsync(user);
         return Ok(new ApiMessageResponse { Message = "Preferences updated." });
+    }
+
+    [HttpGet("invite/{token}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetInvitePreview(string token)
+    {
+        var (preview, error, code) = await _invitations.GetInvitePreviewAsync(token);
+        if (error != null)
+            return StatusCode(code, new ApiMessageResponse { Message = error });
+        return Ok(preview);
+    }
+
+    [Authorize]
+    [HttpPost("accept-invite")]
+    public async Task<IActionResult> AcceptInvite([FromBody] AcceptInviteRequest model)
+    {
+        if (string.IsNullOrWhiteSpace(model.Token))
+            return BadRequest(new ApiMessageResponse { Message = "Invitation token is required." });
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
+        var (message, error, code) = await _invitations.AcceptInvitationAsync(model.Token.Trim(), userId);
+        if (error != null)
+            return StatusCode(code, new ApiMessageResponse { Message = error });
+
+        return Ok(new ApiMessageResponse { Message = message ?? "Invitation accepted." });
+    }
+
+    /// <summary>New mosque owner sets password from email invite and accepts in one step.</summary>
+    [HttpPost("register-from-invite")]
+    [AllowAnonymous]
+    public async Task<IActionResult> RegisterFromInvite([FromBody] RegisterFromInviteRequest model)
+    {
+        if (string.IsNullOrWhiteSpace(model.Token))
+            return BadRequest(new ApiMessageResponse { Message = "Invitation token is required." });
+
+        var (preview, previewError, previewCode) = await _invitations.GetInvitePreviewAsync(model.Token.Trim());
+        if (previewError != null)
+            return StatusCode(previewCode, new ApiMessageResponse { Message = previewError });
+
+        var email = preview!.InviteEmail.Trim().ToLowerInvariant();
+        var fullName = string.IsNullOrWhiteSpace(model.FullName)
+            ? (preview.InviteName?.Trim() ?? email.Split('@')[0])
+            : model.FullName.Trim();
+
+        var passwordErrors = AuthPasswordValidation.Validate(model.Password, model.ConfirmPassword);
+        if (passwordErrors.Count > 0)
+            return BadRequest(new ApiMessageResponse { Message = string.Join(" ", passwordErrors) });
+
+        var existing = await _userManager.FindByEmailAsync(email);
+        if (existing != null)
+            return Conflict(new ApiMessageResponse
+            {
+                Message = "An account already exists for this email. Log in with that email, then open the invitation link again to accept."
+            });
+
+        var username = await GenerateUniqueUsernameAsync(email);
+        var user = new ApplicationUser
+        {
+            UserName = username,
+            Email = email,
+            FullName = fullName,
+            EmailConfirmed = true,
+            HomeMosqueId = preview.MosqueId,
+            SecurityStamp = Guid.NewGuid().ToString()
+        };
+
+        var createResult = await _userManager.CreateAsync(user, model.Password);
+        if (!createResult.Succeeded)
+            return BadRequest(new ApiErrorResponse { Errors = createResult.Errors.Select(e => e.Description) });
+
+        var (message, acceptError, acceptCode) = await _invitations.AcceptInvitationAsync(model.Token.Trim(), user.Id);
+        if (acceptError != null)
+        {
+            await _userManager.DeleteAsync(user);
+            return StatusCode(acceptCode, new ApiMessageResponse { Message = acceptError });
+        }
+
+        var userRoles = await _userManager.GetRolesAsync(user);
+        var (token, expiration) = _jwt.CreateToken(user, userRoles);
+
+        return Ok(new LoginResponse
+        {
+            Token = token,
+            Expiration = expiration,
+            Username = user.UserName ?? string.Empty,
+            FullName = user.FullName,
+            Roles = userRoles
+        });
     }
 
     private async Task<string> GenerateUniqueUsernameAsync(string email)

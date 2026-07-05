@@ -40,6 +40,7 @@ public class AdminClaimListItemDto
     public string MosqueStatus { get; set; } = string.Empty;
     public DateTime SubmittedDate { get; set; }
     public DateTime? DecidedDate { get; set; }
+    public string? RejectionReason { get; set; }
 }
 
 public class AdminClaimDetailDto : AdminClaimListItemDto
@@ -47,7 +48,7 @@ public class AdminClaimDetailDto : AdminClaimListItemDto
     public string? MosqueAddress { get; set; }
     public string? MosquePostcode { get; set; }
     public string? MosqueCountry { get; set; }
-    public string? RejectionReason { get; set; }
+    public new string? RejectionReason { get; set; }
     public string? ReviewedById { get; set; }
 }
 

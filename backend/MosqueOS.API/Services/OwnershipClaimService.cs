@@ -301,6 +301,12 @@ public class OwnershipClaimService
         if (hasPendingGlobal)
             return (null, "You already have a pending claim.", 409);
 
+        var ownedActive = await _unitOfWork.Repository<Mosque>().QueryNoTracking()
+            .AnyAsync(m => m.OwnerId == userId && m.Status == MosqueStatus.Active && !m.IsDeleted);
+        var allowMulti = await PlatformConfigHelper.AllowMultiMosqueOwnershipAsync(_unitOfWork);
+        if (ownedActive && !allowMulti)
+            return (null, "You already own an active mosque listing.", 409);
+
         var slug = string.IsNullOrWhiteSpace(dto.Slug)
             ? await _slugService.GenerateUniqueAsync(dto.Name)
             : await _slugService.GenerateUniqueAsync(dto.Slug);
@@ -580,7 +586,8 @@ public class OwnershipClaimService
             Status = c.Status.ToString(),
             MosqueStatus = c.Mosque?.Status.ToString() ?? "",
             SubmittedDate = c.SubmittedAt,
-            DecidedDate = c.ReviewedAt
+            DecidedDate = c.ReviewedAt,
+            RejectionReason = c.RejectionReason
         }).ToList();
     }
 
@@ -709,5 +716,40 @@ public class OwnershipClaimService
             Description = description
         });
         await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task<(bool Success, string? Error)> UpdateClaimAsync(int claimId, UpdateClaimRequest dto)
+    {
+        var claim = await _unitOfWork.Repository<MosqueOwnershipClaim>().Query()
+            .FirstOrDefaultAsync(c => c.Id == claimId && !c.IsDeleted);
+        if (claim == null) return (false, "Claim not found.");
+
+        if (!string.IsNullOrWhiteSpace(dto.FullName)) claim.FullName = dto.FullName.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.Phone)) claim.Phone = dto.Phone.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.Position)) claim.Position = dto.Position.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.Organization)) claim.Organization = dto.Organization.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.RelationshipToMosque)) claim.RelationshipToMosque = dto.RelationshipToMosque.Trim();
+        if (dto.YearsAssociated.HasValue) claim.YearsAssociated = dto.YearsAssociated;
+        if (!string.IsNullOrWhiteSpace(dto.Reason)) claim.Reason = dto.Reason.Trim();
+
+        await _unitOfWork.SaveChangesAsync();
+        return (true, null);
+    }
+
+    public async Task<(bool Success, string? Error)> DeleteClaimAsync(int claimId)
+    {
+        var claim = await _unitOfWork.Repository<MosqueOwnershipClaim>().Query()
+            .Include(c => c.Mosque)
+            .FirstOrDefaultAsync(c => c.Id == claimId && !c.IsDeleted);
+        if (claim == null) return (false, "Claim not found.");
+
+        // Only allow deleting Rejected claims to prevent data loss
+        if (claim.Status == OwnershipClaimStatus.Pending)
+            return (false, "Cannot delete a pending claim. Reject it first.");
+
+        claim.IsDeleted = true;
+        claim.DeletedAt = DateTime.UtcNow;
+        await _unitOfWork.SaveChangesAsync();
+        return (true, null);
     }
 }

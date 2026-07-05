@@ -27,6 +27,11 @@ namespace MosqueOS.API.Controllers
             _mosqueAccess = mosqueAccess;
         }
 
+        /// <summary>
+        /// Public endpoint to get all events for a mosque.
+        /// ✅ FIX: Added [AllowAnonymous] so guest users can see events on landing page.
+        /// </summary>
+        [AllowAnonymous] // ✅ Guest users ke liye allow karo
         [HttpGet]
         public async Task<IActionResult> GetAll(int mosqueId, [FromQuery] bool upcomingOnly = true, [FromQuery] string? search = null, [FromQuery] EventType? type = null, [FromQuery] EventStatus? status = null)
         {
@@ -46,6 +51,11 @@ namespace MosqueOS.API.Controllers
             return Ok(await query.OrderBy(e => e.Date).ThenBy(e => e.StartTime).ToListAsync());
         }
 
+        /// <summary>
+        /// Public endpoint to get a single event by ID.
+        /// ✅ FIX: Added [AllowAnonymous] so guest users can view event details.
+        /// </summary>
+        [AllowAnonymous] // ✅ Guest users ke liye allow karo
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Get(int mosqueId, int id)
         {

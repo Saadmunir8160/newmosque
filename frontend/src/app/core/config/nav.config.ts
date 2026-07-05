@@ -82,13 +82,13 @@ export const NAV_ITEMS: NavItem[] = [
 
   { section: 'Mosque Owner', label: 'Owner Dashboard', route: '/dashboard/owner', roles: [ROLES.MosqueOwner] },
 
-  { section: 'Mosque Owner', label: 'Mosque profile', route: '/dashboard/owner/profile', roles: [ROLES.MosqueOwner] },
+  { section: 'Mosque Owner', label: 'My Mosque', route: '/dashboard/owner/my-mosque', roles: [ROLES.MosqueOwner] },
 
   { section: 'Mosque Owner', label: 'My claims', route: '/dashboard/owner/my-claims', roles: [ROLES.MosqueOwner] },
 
   { section: 'Mosque Owner', label: 'Mosque listings', route: '/dashboard/owner/mosque-listings', roles: [ROLES.MosqueOwner] },
 
-  { section: 'Mosque Owner', label: 'Module settings', route: '/dashboard/owner/settings', roles: [ROLES.MosqueOwner] },
+  { section: 'Mosque Owner', label: 'Modules', route: '/dashboard/owner/modules', roles: [ROLES.MosqueOwner] },
   { section: 'Mosque Owner', label: 'Admin management', route: '/dashboard/owner/staff', roles: [ROLES.MosqueOwner] },
 
 
@@ -195,8 +195,6 @@ export function homeRouteForRoles(userRoles: string[]): string {
   if (userRoles.includes(ROLES.SuperAdmin)) return '/dashboard/super';
 
   if (userRoles.includes(ROLES.MosqueOwner)) return '/dashboard/owner';
-
-  if (userRoles.includes(ROLES.MosqueAdmin) && !userRoles.includes(ROLES.MosqueOwner)) return '/dashboard/mosque';
 
   if (userRoles.includes(ROLES.MosqueAdmin)) return '/dashboard/admin';
 

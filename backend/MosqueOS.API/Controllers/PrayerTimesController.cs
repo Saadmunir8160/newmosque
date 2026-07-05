@@ -63,6 +63,7 @@ public class PrayerTimesController : ControllerBase
     }
 
     /// <summary>Public daily timetable. Defaults to today (Europe/London). Published rows only unless editor requests draft.</summary>
+    [AllowAnonymous] // ✅ FIX: Guest users ke liye allow karo
     [HttpGet("daily")]
     public async Task<IActionResult> GetDaily(int mosqueId, [FromQuery] DateOnly? date, [FromQuery] bool includeDraft = false)
     {
@@ -87,6 +88,7 @@ public class PrayerTimesController : ControllerBase
         return Ok(new { times = row, exceptions });
     }
 
+    [AllowAnonymous] // ✅ FIX: Guest users ke liye allow karo
     [HttpGet("monthly")]
     public async Task<IActionResult> GetMonthly(int mosqueId, [FromQuery] int year, [FromQuery] int month, [FromQuery] bool includeDraft = false)
     {
@@ -200,6 +202,7 @@ public class PrayerTimesController : ControllerBase
 
     // ---- Jumuah ----
 
+    [AllowAnonymous] // ✅ FIX: Guest users ke liye allow karo
     [HttpGet("jumuah")]
     public async Task<IActionResult> GetJumuah(int mosqueId) =>
         Ok(await _unitOfWork.Repository<JumuahTime>().QueryNoTracking()
@@ -262,6 +265,7 @@ public class PrayerTimesController : ControllerBase
 
     // ---- Exceptions ----
 
+    [AllowAnonymous] // ✅ FIX: Guest users ke liye allow karo
     [HttpGet("exceptions")]
     public async Task<IActionResult> GetExceptions(int mosqueId, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to)
     {
@@ -301,6 +305,7 @@ public class PrayerTimesController : ControllerBase
 
     // ---- Ramadan ----
 
+    [AllowAnonymous] // ✅ FIX: Guest users ke liye allow karo
     [HttpGet("ramadan")]
     public async Task<IActionResult> GetRamadan(int mosqueId, [FromQuery] int? year, [FromQuery] bool includeDraft = false)
     {
@@ -389,6 +394,7 @@ public class PrayerTimesController : ControllerBase
 
     // ---- Special timings ----
 
+    [AllowAnonymous] // ✅ FIX: Guest users ke liye allow karo
     [HttpGet("special-timings")]
     public async Task<IActionResult> GetSpecialTimings(int mosqueId, [FromQuery] int? year, [FromQuery] bool ramadanOnly = false)
     {

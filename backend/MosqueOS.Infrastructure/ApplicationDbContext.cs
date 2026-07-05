@@ -15,6 +15,7 @@ namespace MosqueOS.Infrastructure
         public DbSet<Mosque> Mosques => Set<Mosque>();
         public DbSet<MosqueSetting> MosqueSettings => Set<MosqueSetting>();
         public DbSet<MosqueOwnershipClaim> MosqueOwnershipClaims => Set<MosqueOwnershipClaim>();
+        public DbSet<MosqueInvitation> MosqueInvitations => Set<MosqueInvitation>();
         public DbSet<DonationFund> DonationFunds => Set<DonationFund>();
         public DbSet<PlatformAuditLog> PlatformAuditLogs => Set<PlatformAuditLog>();
         public DbSet<PlatformConfig> PlatformConfigs => Set<PlatformConfig>();
@@ -111,22 +112,75 @@ namespace MosqueOS.Infrastructure
         {
             base.OnModelCreating(builder);
 
+            builder.Entity<Mosque>(entity =>
+            {
+                entity.Property(m => m.Name).HasMaxLength(200).IsRequired();
+                entity.Property(m => m.Slug).HasMaxLength(120).IsRequired();
+                entity.Property(m => m.Address).HasMaxLength(300);
+                entity.Property(m => m.City).HasMaxLength(100).IsRequired();
+                entity.Property(m => m.Postcode).HasMaxLength(20);
+                entity.Property(m => m.Country).HasMaxLength(100).IsRequired().HasDefaultValue("United Kingdom");
+                entity.Property(m => m.Phone).HasMaxLength(30);
+                entity.Property(m => m.Email).HasMaxLength(200);
+                entity.Property(m => m.Website).HasMaxLength(300);
+                entity.Property(m => m.FacebookUrl).HasMaxLength(300);
+                entity.Property(m => m.InstagramUrl).HasMaxLength(300);
+                entity.Property(m => m.YoutubeUrl).HasMaxLength(300);
+                entity.Property(m => m.TwitterUrl).HasMaxLength(300);
+                entity.Property(m => m.ShortDescription).HasMaxLength(300);
+                entity.Property(m => m.MetaTitle).HasMaxLength(200);
+                entity.Property(m => m.MetaDescription).HasMaxLength(300);
+                entity.Property(m => m.LogoUrl).HasMaxLength(500);
+                entity.Property(m => m.BannerUrl).HasMaxLength(500);
+                entity.Property(m => m.Timezone).HasMaxLength(64).IsRequired().HasDefaultValue("Europe/London");
+                entity.Property(m => m.MapLocation).HasMaxLength(500);
+                entity.Property(m => m.Latitude).HasColumnType("float");
+                entity.Property(m => m.Longitude).HasColumnType("float");
+                entity.Property(m => m.OwnerId).HasMaxLength(450);
+
+                entity.HasIndex(m => m.Slug)
+                    .IsUnique()
+                    .HasFilter("[IsDeleted] = 0");
+                entity.HasIndex(m => m.City);
+                entity.HasIndex(m => new { m.Status, m.City });
+                entity.HasIndex(m => m.OwnerId)
+                    .HasFilter("[OwnerId] IS NOT NULL");
+
+                entity.HasOne(m => m.Owner)
+                    .WithMany()
+                    .HasForeignKey(m => m.OwnerId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.ToTable(t =>
+                {
+                    t.HasCheckConstraint("CK_Mosques_Status", "[Status] BETWEEN 0 AND 7");
+                    t.HasCheckConstraint("CK_Mosques_Latitude", "[Latitude] IS NULL OR ([Latitude] >= -90 AND [Latitude] <= 90)");
+                    t.HasCheckConstraint("CK_Mosques_Longitude", "[Longitude] IS NULL OR ([Longitude] >= -180 AND [Longitude] <= 180)");
+                    t.HasCheckConstraint("CK_Mosques_EstablishedYear", "[EstablishedYear] IS NULL OR ([EstablishedYear] >= 600 AND [EstablishedYear] <= 2100)");
+                    t.HasCheckConstraint("CK_Mosques_Capacity", "[Capacity] IS NULL OR [Capacity] >= 0");
+                    t.HasCheckConstraint("CK_Mosques_Timezone_NotBlank", "LEN(LTRIM(RTRIM([Timezone]))) > 0");
+                });
+            });
+
             // Mosque.Owner and ApplicationUser.HomeMosque are separate relationships
-            builder.Entity<Mosque>()
-                .HasOne(m => m.Owner)
-                .WithMany()
-                .HasForeignKey(m => m.OwnerId);
             builder.Entity<ApplicationUser>()
                 .HasOne(u => u.HomeMosque)
                 .WithMany()
-                .HasForeignKey(u => u.HomeMosqueId);
+                .HasForeignKey(u => u.HomeMosqueId)
+                .OnDelete(DeleteBehavior.Restrict);
 
-            builder.Entity<Mosque>().HasIndex(m => m.Slug).IsUnique();
-            builder.Entity<Mosque>().HasIndex(m => m.City);
             builder.Entity<PrayerTimesDaily>().HasIndex(p => new { p.MosqueId, p.Date }).IsUnique();
             builder.Entity<RamadanTimetable>().HasIndex(r => new { r.MosqueId, r.Year }).IsUnique();
             builder.Entity<RamadanDayEntry>().HasIndex(d => new { d.TimetableId, d.DayNumber }).IsUnique();
-            builder.Entity<MosqueSetting>().HasIndex(s => new { s.MosqueId, s.ModuleKey }).IsUnique();
+            builder.Entity<MosqueSetting>(entity =>
+            {
+                entity.Property(s => s.ModuleKey).HasMaxLength(50).IsRequired();
+                entity.HasIndex(s => new { s.MosqueId, s.ModuleKey }).IsUnique();
+                entity.HasOne(s => s.Mosque)
+                    .WithMany(m => m.Settings)
+                    .HasForeignKey(s => s.MosqueId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
             builder.Entity<JamaahTemplate>().HasIndex(t => new { t.MosqueId, t.IsActive });
 
             builder.Entity<MosqueOwnershipClaim>()
@@ -143,6 +197,32 @@ namespace MosqueOS.Infrastructure
                 .HasIndex(c => new { c.MosqueId, c.Status });
             builder.Entity<MosqueOwnershipClaim>()
                 .HasIndex(c => c.ClaimantId);
+
+            builder.Entity<MosqueInvitation>()
+                .HasOne(i => i.Mosque)
+                .WithMany()
+                .HasForeignKey(i => i.MosqueId)
+                .OnDelete(DeleteBehavior.Restrict);
+            builder.Entity<MosqueInvitation>()
+                .HasOne(i => i.InvitedBy)
+                .WithMany()
+                .HasForeignKey(i => i.InvitedById)
+                .OnDelete(DeleteBehavior.Restrict);
+            builder.Entity<MosqueInvitation>()
+                .HasOne(i => i.AcceptedBy)
+                .WithMany()
+                .HasForeignKey(i => i.AcceptedById)
+                .OnDelete(DeleteBehavior.Restrict);
+            builder.Entity<MosqueInvitation>()
+                .HasIndex(i => i.Token)
+                .IsUnique();
+            builder.Entity<MosqueInvitation>()
+                .HasIndex(i => new { i.MosqueId, i.Status });
+            builder.Entity<MosqueInvitation>().Property(i => i.InviteEmail).HasMaxLength(256);
+            builder.Entity<MosqueInvitation>().Property(i => i.InviteName).HasMaxLength(200);
+            builder.Entity<MosqueInvitation>().Property(i => i.Role).HasMaxLength(64);
+            builder.Entity<MosqueInvitation>().Property(i => i.Token).HasMaxLength(128);
+
             builder.Entity<DonationFund>().HasIndex(d => d.MosqueId);
 
             builder.Entity<PlatformConfig>().HasIndex(c => c.Key).IsUnique();

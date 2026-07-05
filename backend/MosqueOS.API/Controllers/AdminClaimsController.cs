@@ -68,4 +68,22 @@ public class AdminClaimsController : ControllerBase
             })
         });
     }
+
+    /// <summary>Update claim details — Super Admin can add notes or correct applicant info.</summary>
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> UpdateClaim(int id, [FromBody] UpdateClaimRequest dto)
+    {
+        var result = await _claims.UpdateClaimAsync(id, dto);
+        if (!result.Success) return NotFound(new { message = result.Error });
+        return Ok(new { message = "Claim updated.", claimId = id });
+    }
+
+    /// <summary>Delete a claim record — Super Admin only, non-reversible.</summary>
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteClaim(int id)
+    {
+        var result = await _claims.DeleteClaimAsync(id);
+        if (!result.Success) return NotFound(new { message = result.Error });
+        return Ok(new { message = "Claim deleted." });
+    }
 }

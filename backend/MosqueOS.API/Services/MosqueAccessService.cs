@@ -65,12 +65,6 @@ public class MosqueAccessService
             if (owned.HasValue) return owned;
         }
 
-        if (user.IsInRole(Roles.MosqueAdmin) || user.IsInRole(Roles.MosqueOwner))
-        {
-            var appUser = await _userManager.FindByIdAsync(userId);
-            return appUser?.HomeMosqueId;
-        }
-
         var fallbackUser = await _userManager.FindByIdAsync(userId);
         return fallbackUser?.HomeMosqueId;
     }
@@ -106,7 +100,7 @@ public class MosqueAccessService
 
         if (IsSuperAdmin(user)) return true;
 
-        if (mosque.Status != MosqueStatus.Active)
+        if (mosque.Status is not (MosqueStatus.Claimed or MosqueStatus.Active))
             return false;
 
         return await CanAccessMosqueAsync(user, mosque.Id);

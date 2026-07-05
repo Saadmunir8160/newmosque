@@ -30,6 +30,7 @@ builder.Services.AddScoped<MosqueAccessService>();
 builder.Services.AddScoped<SlugService>();
 builder.Services.AddScoped<MosqueModuleSeedService>();
 builder.Services.AddScoped<OwnershipClaimService>();
+builder.Services.AddScoped<MosqueInvitationService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<EmailOtpService>();
 builder.Services.AddScoped<EmailVerificationService>();

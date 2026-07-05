@@ -28,6 +28,7 @@ namespace MosqueOS.API.Controllers
         private readonly MosqueModuleSeedService _moduleSeed;
         private readonly SlugService _slugService;
         private readonly OwnershipClaimService _claimService;
+        private readonly MosqueInvitationService _invitationService;
 
         public PlatformController(
             IUnitOfWork unitOfWork,
@@ -36,7 +37,8 @@ namespace MosqueOS.API.Controllers
             RoleManager<IdentityRole> roleManager,
             MosqueModuleSeedService moduleSeed,
             SlugService slugService,
-            OwnershipClaimService claimService)
+            OwnershipClaimService claimService,
+            MosqueInvitationService invitationService)
         {
             _unitOfWork = unitOfWork;
             _db = db;
@@ -45,6 +47,7 @@ namespace MosqueOS.API.Controllers
             _moduleSeed = moduleSeed;
             _slugService = slugService;
             _claimService = claimService;
+            _invitationService = invitationService;
         }
 
         /// <summary>Batch-load Mosque Admin user IDs (avoids N+1 IsInRoleAsync per user).</summary>
@@ -584,6 +587,35 @@ namespace MosqueOS.API.Controllers
             return Ok(new ApiMessageResponse { Message = $"Role '{role}' removed." });
         }
 
+        /// <summary>Bulk status update for mosques (Super Admin).</summary>
+        [HttpPost("mosques/bulk")]
+        public async Task<IActionResult> BulkMosqueStatus([FromBody] BulkMosqueStatusRequest dto)
+        {
+            if (dto.Ids == null || dto.Ids.Length == 0)
+                return BadRequest(new ApiMessageResponse { Message = "No mosque IDs provided." });
+
+            if (!Enum.TryParse<MosqueStatus>(dto.Status, true, out var newStatus))
+                return BadRequest(new ApiMessageResponse { Message = $"Invalid status '{dto.Status}'." });
+
+            var mosques = await _unitOfWork.Repository<Mosque>().Query()
+                .Where(m => dto.Ids.Contains(m.Id) && !m.IsDeleted)
+                .ToListAsync();
+
+            foreach (var mosque in mosques)
+            {
+                mosque.Status = newStatus;
+                mosque.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+
+            var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
+            await LogAsync("BULK_MOSQUE_STATUS", actorId, "Mosque", null,
+                $"Bulk status update to '{dto.Status}' for {mosques.Count} mosque(s).");
+
+            return Ok(new { message = $"Updated {mosques.Count} mosque(s) to {dto.Status}.", count = mosques.Count });
+        }
+
         [HttpPost("mosques/{id:int}/activate")]
         public async Task<IActionResult> ActivateMosque(int id)
         {
@@ -621,6 +653,24 @@ namespace MosqueOS.API.Controllers
                 $"Deactivated mosque '{mosque.Name}'");
 
             return Ok(mosque);
+        }
+
+        [HttpDelete("mosques/{id:int}")]
+        public async Task<IActionResult> DeleteMosque(int id)
+        {
+            var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
+            if (mosque == null || mosque.IsDeleted)
+                return NotFound(new ApiMessageResponse { Message = "Mosque not found." });
+
+            mosque.IsDeleted = true;
+            mosque.DeletedAt = DateTime.UtcNow;
+            mosque.DeletedById = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            mosque.UpdatedAt = DateTime.UtcNow;
+
+            await _unitOfWork.SaveChangesAsync();
+            await LogAsync("MOSQUE_DELETED", null, "Mosque", id, $"Deleted mosque '{mosque.Name}'");
+
+            return Ok(new ApiMessageResponse { Message = "Mosque deleted." });
         }
 
         /// <summary>Check whether a mosque slug is available.</summary>
@@ -690,6 +740,41 @@ namespace MosqueOS.API.Controllers
                 $"Seeded unclaimed mosque '{mosque.Name}' ({mosque.Slug}).");
 
             return Ok(mosque);
+        }
+
+
+        /// <summary>Super admin update mosque (slug, status, owner, profile).</summary>
+        [HttpPut("mosques/{id:int}")]
+        public async Task<IActionResult> UpdateMosque(int id, [FromBody] MosqueUpdateDto dto)
+        {
+            var errors = MosqueValidation.ValidateUpdate(dto);
+            if (errors.Count > 0)
+                return BadRequest(new ApiMessageResponse { Message = string.Join(" ", errors) });
+
+            var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
+            if (mosque == null || mosque.IsDeleted)
+                return NotFound(new ApiMessageResponse { Message = "Mosque not found." });
+
+            string? newSlug = null;
+            if (!string.IsNullOrWhiteSpace(dto.Slug))
+            {
+                var normalized = SlugService.Normalize(dto.Slug);
+                if (normalized != mosque.Slug)
+                {
+                    if (await _slugService.IsSlugTakenAsync(normalized, excludeMosqueId: id))
+                        return Conflict(new ApiMessageResponse { Message = "This slug is already in use." });
+                    newSlug = normalized;
+                }
+            }
+
+            MosqueProfileFieldMapper.ApplyUpdate(mosque, dto, newSlug);
+
+            await _unitOfWork.SaveChangesAsync();
+
+            var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
+            await LogAsync("MOSQUE_UPDATED", actorId, "Mosque", id, $"Super admin updated mosque '{mosque.Name}'.");
+
+            return Ok(MosqueAdminProfileDto.FromEntity(mosque));
         }
 
         /// <summary>Super admin mosque listings with filters.</summary>
@@ -1123,6 +1208,158 @@ namespace MosqueOS.API.Controllers
             });
         }
 
+        /// <summary>Platform-wide mosque invitations queue.</summary>
+        [HttpGet("invitations")]
+        public async Task<IActionResult> GetInvitations([FromQuery] InvitationStatus? status = null)
+        {
+            var items = await _invitationService.ListInvitationsAsync(status);
+            return Ok(items);
+        }
+
+        [HttpPost("invitations/{id:int}/resend")]
+        public async Task<IActionResult> ResendInvitation(int id)
+        {
+            var (message, error, code) = await _invitationService.ResendInvitationAsync(id);
+            if (error != null)
+                return StatusCode(code, new ApiMessageResponse { Message = error });
+
+            await LogAsync("INVITE_RESENT", null, "MosqueInvitation", id, message ?? "Invitation resent.");
+            return Ok(new ApiMessageResponse { Message = message ?? "Invitation resent." });
+        }
+
+        [HttpPost("invitations/{id:int}/revoke")]
+        public async Task<IActionResult> RevokeInvitation(int id)
+        {
+            var (message, error, code) = await _invitationService.RevokeInvitationAsync(id);
+            if (error != null)
+                return StatusCode(code, new ApiMessageResponse { Message = error });
+
+            await LogAsync("INVITE_REVOKED", null, "MosqueInvitation", id, message ?? "Invitation revoked.");
+            return Ok(new ApiMessageResponse { Message = message ?? "Invitation revoked." });
+        }
+
+        /// <summary>Cross-mosque janaza notices for Super Admin oversight.</summary>
+        [HttpGet("oversight/janaza")]
+        public async Task<IActionResult> GetJanazaOversight([FromQuery] int? mosqueId, [FromQuery] int limit = 200)
+        {
+            limit = Math.Clamp(limit, 1, 500);
+            var query = _unitOfWork.Repository<JanazaAnnouncement>().QueryNoTracking()
+                .Where(j => !j.IsDeleted);
+            if (mosqueId.HasValue)
+                query = query.Where(j => j.MosqueId == mosqueId.Value);
+
+            var mosques = await _unitOfWork.Repository<Mosque>().QueryNoTracking()
+                .Where(m => !m.IsDeleted)
+                .ToDictionaryAsync(m => m.Id);
+
+            var rows = await query
+                .OrderByDescending(j => j.JanazaDate)
+                .ThenByDescending(j => j.Id)
+                .Take(limit)
+                .ToListAsync();
+
+            return Ok(rows.Select(j =>
+            {
+                mosques.TryGetValue(j.MosqueId, out var mosque);
+                return new
+                {
+                    id = j.Id,
+                    mosqueId = j.MosqueId,
+                    mosqueName = mosque?.Name ?? string.Empty,
+                    mosqueCity = mosque?.City ?? string.Empty,
+                    mosqueStatus = mosque?.Status.ToString() ?? string.Empty,
+                    name = j.Name,
+                    dateOfDeath = j.DateOfDeath,
+                    janazaDate = j.JanazaDate,
+                    janazaTime = j.JanazaTime,
+                    location = j.Location,
+                    burialLocation = j.BurialLocation,
+                    status = j.Status.ToString(),
+                    publishedAt = j.PublishedAt,
+                    createdAt = j.CreatedAt,
+                };
+            }));
+        }
+
+        /// <summary>Today's prayer times coverage across active mosques.</summary>
+        [HttpGet("oversight/prayer-times")]
+        public async Task<IActionResult> GetPrayerTimesOversight([FromQuery] DateOnly? date, [FromQuery] int? mosqueId)
+        {
+            var target = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            var mosqueQuery = _unitOfWork.Repository<Mosque>().QueryNoTracking()
+                .Where(m => !m.IsDeleted && m.Status == MosqueStatus.Active);
+            if (mosqueId.HasValue)
+                mosqueQuery = mosqueQuery.Where(m => m.Id == mosqueId.Value);
+
+            var mosques = await mosqueQuery.OrderBy(m => m.Name).ToListAsync();
+            var mosqueIds = mosques.Select(m => m.Id).ToList();
+            var prayerRows = await _unitOfWork.Repository<PrayerTimesDaily>().QueryNoTracking()
+                .Where(p => p.Date == target && mosqueIds.Contains(p.MosqueId))
+                .ToListAsync();
+            var byMosque = prayerRows.ToDictionary(p => p.MosqueId);
+
+            return Ok(mosques.Select(m =>
+            {
+                byMosque.TryGetValue(m.Id, out var row);
+                return new
+                {
+                    mosqueId = m.Id,
+                    mosqueName = m.Name,
+                    mosqueCity = m.City,
+                    mosqueStatus = m.Status.ToString(),
+                    date = target,
+                    hasTimes = row != null,
+                    status = row?.Status.ToString() ?? "Missing",
+                    fajrJamaat = row?.FajrJamaat,
+                    dhuhrJamaat = row?.DhuhrJamaat,
+                    asrJamaat = row?.AsrJamaat,
+                    maghribJamaat = row?.MaghribJamaat,
+                    ishaJamaat = row?.IshaJamaat,
+                    publishedAt = row?.PublishedAt,
+                    updatedAt = row?.UpdatedAt,
+                };
+            }));
+        }
+
+        /// <summary>Cross-mosque announcements for Super Admin oversight.</summary>
+        [HttpGet("oversight/announcements")]
+        public async Task<IActionResult> GetAnnouncementsOversight([FromQuery] int? mosqueId, [FromQuery] int limit = 200)
+        {
+            limit = Math.Clamp(limit, 1, 500);
+            var query = _unitOfWork.Repository<Announcement>().QueryNoTracking()
+                .Where(a => !a.IsDeleted);
+            if (mosqueId.HasValue)
+                query = query.Where(a => a.MosqueId == mosqueId.Value);
+
+            var mosques = await _unitOfWork.Repository<Mosque>().QueryNoTracking()
+                .Where(m => !m.IsDeleted)
+                .ToDictionaryAsync(m => m.Id);
+
+            var rows = await query
+                .OrderByDescending(a => a.PublishedAt ?? a.CreatedAt)
+                .Take(limit)
+                .ToListAsync();
+
+            return Ok(rows.Select(a =>
+            {
+                mosques.TryGetValue(a.MosqueId, out var mosque);
+                return new
+                {
+                    id = a.Id,
+                    mosqueId = a.MosqueId,
+                    mosqueName = mosque?.Name ?? string.Empty,
+                    mosqueCity = mosque?.City ?? string.Empty,
+                    mosqueStatus = mosque?.Status.ToString() ?? string.Empty,
+                    title = a.Title,
+                    summary = a.Summary,
+                    status = a.Status.ToString(),
+                    isFeatured = a.IsFeatured,
+                    publishedAt = a.PublishedAt,
+                    createdAt = a.CreatedAt,
+                };
+            }));
+        }
+
         [HttpGet("audit-logs")]
         public async Task<IActionResult> GetAuditLogs([FromQuery] int limit = 100)
         {
@@ -1231,7 +1468,7 @@ namespace MosqueOS.API.Controllers
             await _unitOfWork.SaveChangesAsync();
         }
 
-        private static Dictionary<int, string> ComputeDuplicateFlags(List<Mosque> mosques)
+        public static Dictionary<int, string> ComputeDuplicateFlags(List<Mosque> mosques)
         {
             var flags = new Dictionary<int, string>();
 
@@ -1258,5 +1495,29 @@ namespace MosqueOS.API.Controllers
 
             return flags;
         }
+
+
+        /// <summary>Super admin view of all mosque discovery requests (from audit log).</summary>
+        [HttpGet("discovery/requests")]
+        public async Task<IActionResult> GetDiscoveryRequests([FromQuery] int limit = 200)
+        {
+            var items = await _unitOfWork.Repository<PlatformAuditLog>().QueryNoTracking()
+                .Where(l => l.Action == "MOSQUE_DISCOVERY_REQUEST")
+                .OrderByDescending(l => l.CreatedAt)
+                .Take(limit)
+                .ToListAsync();
+
+            var result = items.Select(l => new
+            {
+                id = l.Id,
+                createdAt = l.CreatedAt,
+                actorName = l.ActorName,
+                description = l.Description
+            });
+
+            return Ok(new { total = items.Count, items = result });
+        }
+
     }
 }
+

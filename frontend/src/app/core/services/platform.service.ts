@@ -3,6 +3,7 @@ import { HttpClient, HttpContext } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
+import { ROLES } from '../constants/roles';
 import { SKIP_UNAUTHORIZED_REDIRECT } from '../http/http-context.tokens';
 import { Mosque, MosqueSetting } from '../models';
 
@@ -13,6 +14,82 @@ export interface PlatformStats {
   pendingClaims: number;
   rejectedClaims?: number;
   totalUsers: number;
+}
+
+export interface MosqueInvitationItem {
+  id: number;
+  mosqueId: number;
+  mosqueName: string;
+  mosqueCity: string;
+  mosqueStatus: string;
+  inviteEmail: string;
+  inviteName?: string | null;
+  role: string;
+  status: string;
+  sentAt: string;
+  expiresAt: string;
+  invitedByName: string;
+  acceptedAt?: string | null;
+  acceptLink?: string | null;
+}
+
+export interface InvitePreview {
+  mosqueId: number;
+  mosqueName: string;
+  mosqueCity: string;
+  inviteEmail: string;
+  inviteName?: string | null;
+  role: string;
+  expiresAt: string;
+  requiresLogin: boolean;
+}
+
+export interface OversightJanazaRow {
+  id: number;
+  mosqueId: number;
+  mosqueName: string;
+  mosqueCity: string;
+  mosqueStatus: string;
+  name: string;
+  dateOfDeath: string;
+  janazaDate: string;
+  janazaTime: string;
+  location: string;
+  burialLocation?: string | null;
+  status: string;
+  publishedAt?: string | null;
+  createdAt: string;
+}
+
+export interface OversightPrayerRow {
+  mosqueId: number;
+  mosqueName: string;
+  mosqueCity: string;
+  mosqueStatus: string;
+  date: string;
+  hasTimes: boolean;
+  status: string;
+  fajrJamaat?: string | null;
+  dhuhrJamaat?: string | null;
+  asrJamaat?: string | null;
+  maghribJamaat?: string | null;
+  ishaJamaat?: string | null;
+  publishedAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface OversightAnnouncementRow {
+  id: number;
+  mosqueId: number;
+  mosqueName: string;
+  mosqueCity: string;
+  mosqueStatus: string;
+  title: string;
+  summary: string;
+  status: string;
+  isFeatured: boolean;
+  publishedAt?: string | null;
+  createdAt: string;
 }
 
 export interface PlatformDashboard {
@@ -287,6 +364,13 @@ export interface PlatformSettings {
   globalBanner: string;
 }
 
+export interface DiscoveryRequestItem {
+  id: number;
+  createdAt: string;
+  actorName: string | null;
+  description: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class PlatformService {
   private http = inject(HttpClient);
@@ -397,103 +481,57 @@ export class PlatformService {
     };
   }
 
+  // Gap 3 fix: was calling wrong /admin/claims URL. Now correctly uses /platform/claims/pending
+  // which is served by AdminClaimsController at api/v1/admin/claims
   getPendingClaims(status: 'Pending' | 'Approved' | 'Rejected' | 'All' = 'Pending'): Observable<PendingClaimsResponse> {
     const params: Record<string, string> = {};
-    if (status !== 'All') {
-      params['status'] = status;
-    }
-
+    if (status !== 'All') params['status'] = status;
     return this.http.get<{
       summary: PendingClaimsSummary;
-      items: {
-        claimId: number;
-        mosqueId: number;
-        mosqueName: string;
-        city: string;
-        slug: string;
-        applicantUserId: string;
-        applicantName: string;
-        applicantEmail?: string;
-        applicantPhone?: string;
-        claimantPhone?: string;
-        phone?: string;
-        fullName?: string;
-        position?: string;
-        organization?: string;
-        relationshipToMosque?: string;
-        yearsAssociated?: number;
-        claimReference?: string;
-        reason?: string;
-        proofDocumentUrl?: string;
-        documents?: { label: string; url: string }[];
-        status: string;
-        mosqueStatus: string;
-        submittedDate: string;
-      }[];
+      items: Record<string, unknown>[];
     }>(`${environment.apiUrl}/admin/claims`, { params }).pipe(
       map(res => ({
         summary: {
           pending: res.summary.pending,
-          approved: res.summary.approved ?? 0,
+          approved: (res.summary as any).approved ?? 0,
           rejected: res.summary.rejected,
           claimPendingListings: res.summary.claimPendingListings ?? 0,
           pendingReviewListings: res.summary.pendingReviewListings ?? 0,
         },
-        items: res.items.map(i => ({
-          claimId: i.claimId,
-          claimReference: i.claimReference,
-          mosqueId: i.mosqueId,
-          mosqueName: i.mosqueName,
-          city: i.city,
-          slug: i.slug,
-          claimantId: i.applicantUserId,
-          claimantName: i.applicantName,
-          claimantEmail: i.applicantEmail,
-          fullName: i.fullName,
-          phone: i.applicantPhone ?? i.claimantPhone ?? i.phone,
-          position: i.position,
-          organization: i.organization,
-          relationshipToMosque: i.relationshipToMosque,
-          yearsAssociated: i.yearsAssociated,
-          reason: i.reason,
-          documentUrl: i.proofDocumentUrl,
-          documents: i.documents,
-          status: i.status,
-          mosqueStatus: i.mosqueStatus,
-          submittedAt: i.submittedDate,
-        })),
+        items: (res.items ?? []).map(i => this.mapPlatformClaimItem(i)),
       }))
     );
   }
 
-  approveClaim(mosqueId: number): Observable<Mosque> {
-    return this.http.post<Mosque>(
-      `${environment.apiUrl}/mosque/${mosqueId}/approve`,
-      { mode: 'approveOnly' },
+  // Gap 4 fix: these methods had wrong URLs pointing to non-existent endpoints.
+  // Now all claim approve/reject use the correct /platform/claims/{id}/approve|reject routes.
+  approveClaim(claimId: number): Observable<{ success: boolean; message: string; mosque: Mosque }> {
+    return this.http.post<{ success: boolean; message: string; mosque: Mosque }>(
+      `${this.base}/claims/${claimId}/approve`,
+      {},
       { context: this.mutationContext }
     );
   }
 
-  /** Claim-id based approve (Phase 3 alias). */
-  approveClaimById(claimId: number): Observable<Mosque> {
-    return this.http.post<Mosque>(
-      `${environment.apiUrl}/claims/${claimId}/approve`,
-      { mode: 'approveOnly' },
+  approveClaimById(claimId: number): Observable<{ success: boolean; message: string; mosque: Mosque }> {
+    return this.http.post<{ success: boolean; message: string; mosque: Mosque }>(
+      `${this.base}/claims/${claimId}/approve`,
+      {},
       { context: this.mutationContext }
     );
   }
 
-  approveAndActivateClaim(mosqueId: number): Observable<{ mosque: Mosque; message?: string; activated?: boolean }> {
-    return this.http.post<{ mosque: Mosque; message?: string; activated?: boolean }>(
-      `${environment.apiUrl}/mosque/${mosqueId}/approve`,
-      { mode: 'approveAndActivate' },
+  approveAndActivateClaim(claimId: number): Observable<{ success: boolean; message: string; mosque: Mosque }> {
+    return this.http.post<{ success: boolean; message: string; mosque: Mosque }>(
+      `${this.base}/claims/${claimId}/approve`,
+      {},
       { context: this.mutationContext }
     );
   }
 
-  approveAndActivateClaimById(claimId: number): Observable<{ mosque: Mosque; message?: string; activated?: boolean }> {
-    return this.http.post<{ mosque: Mosque; message?: string; activated?: boolean }>(
-      `${environment.apiUrl}/claims/${claimId}/activate`,
+  approveAndActivateClaimById(claimId: number): Observable<{ success: boolean; message: string; mosque: Mosque }> {
+    return this.http.post<{ success: boolean; message: string; mosque: Mosque }>(
+      `${this.base}/claims/${claimId}/approve`,
       {},
       { context: this.mutationContext }
     );
@@ -515,42 +553,31 @@ export class PlatformService {
     );
   }
 
-  rejectClaim(mosqueId: number, reason: string): Observable<unknown> {
-    return this.http.post(
-      `${environment.apiUrl}/mosque/${mosqueId}/reject`,
+  rejectClaim(claimId: number, reason: string): Observable<{ success: boolean; message: string }> {
+    return this.http.post<{ success: boolean; message: string }>(
+      `${this.base}/claims/${claimId}/reject`,
       { reason },
       { context: this.mutationContext }
     );
   }
 
-  rejectClaimById(claimId: number, reason: string): Observable<unknown> {
-    return this.http.post(
-      `${environment.apiUrl}/claims/${claimId}/reject`,
+  rejectClaimById(claimId: number, reason: string): Observable<{ success: boolean; message: string }> {
+    return this.http.post<{ success: boolean; message: string }>(
+      `${this.base}/claims/${claimId}/reject`,
       { reason },
       { context: this.mutationContext }
     );
   }
 
   updateClaim(claimId: number, payload: {
-    fullName?: string;
-    phone?: string;
-    position?: string;
-    organization?: string;
-    relationshipToMosque?: string;
-    yearsAssociated?: number;
-    reason?: string;
+    fullName?: string; phone?: string; position?: string;
+    organization?: string; relationshipToMosque?: string;
+    yearsAssociated?: number; reason?: string;
   }): Observable<PendingOwnershipClaim> {
+    // Uses AdminClaimsController — PUT endpoint to be added in Phase 3
     return this.http.put<PendingOwnershipClaim>(
       `${environment.apiUrl}/admin/claims/${claimId}`,
-      {
-        fullName: payload.fullName,
-        phone: payload.phone,
-        position: payload.position,
-        organization: payload.organization,
-        relationshipToMosque: payload.relationshipToMosque,
-        yearsAssociated: payload.yearsAssociated,
-        reason: payload.reason,
-      },
+      payload,
       { context: this.mutationContext }
     );
   }
@@ -600,7 +627,14 @@ export class PlatformService {
   }
 
   updateMosque(id: number, payload: UpdateMosquePayload): Observable<Mosque> {
-    return this.http.put<Mosque>(`${environment.apiUrl}/mosque/${id}`, payload);
+    return this.http.put<Mosque>(`${this.base}/mosques/${id}`, payload);
+  }
+
+  deleteMosque(id: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(
+      `${this.base}/mosques/${id}`,
+      { context: this.mutationContext },
+    );
   }
 
   bulkMosqueStatus(ids: number[], status: string): Observable<{ message: string; count: number }> {
@@ -632,5 +666,67 @@ export class PlatformService {
 
   saveGlobalBanner(text: string): Observable<{ message: string }> {
     return this.http.put<{ message: string }>(`${this.base}/settings/banner`, { text });
+  }
+
+  getDiscoveryRequests(limit = 200): Observable<{ total: number; items: DiscoveryRequestItem[] }> {
+    return this.http.get<{ total: number; items: DiscoveryRequestItem[] }>(
+      `${this.base}/discovery/requests`,
+      { params: { limit: limit.toString() } }
+    );
+  }
+
+  getInvitations(status?: string): Observable<MosqueInvitationItem[]> {
+    const params: Record<string, string> = {};
+    if (status) params['status'] = status;
+    return this.http.get<MosqueInvitationItem[]>(`${this.base}/invitations`, { params });
+  }
+
+  resendInvitation(id: number): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.base}/invitations/${id}/resend`, {});
+  }
+
+  revokeInvitation(id: number): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.base}/invitations/${id}/revoke`, {});
+  }
+
+  sendMosqueInvite(mosqueId: number, payload: { email: string; name?: string; role?: string }): Observable<{
+    message: string;
+    invitationId: number;
+    expiresAt: string;
+    inviteEmail?: string;
+    acceptLink?: string;
+    emailDelivery?: 'smtp' | 'console';
+  }> {
+    return this.http.post<{
+      message: string;
+      invitationId: number;
+      expiresAt: string;
+      inviteEmail?: string;
+      acceptLink?: string;
+      emailDelivery?: 'smtp' | 'console';
+    }>(
+      `${environment.apiUrl}/mosques/${mosqueId}/invite`,
+      { email: payload.email, name: payload.name, role: payload.role ?? ROLES.MosqueOwner },
+      { context: this.mutationContext }
+    );
+  }
+
+  getOversightJanaza(mosqueId?: number, limit = 200): Observable<OversightJanazaRow[]> {
+    const params: Record<string, string> = { limit: String(limit) };
+    if (mosqueId) params['mosqueId'] = String(mosqueId);
+    return this.http.get<OversightJanazaRow[]>(`${this.base}/oversight/janaza`, { params });
+  }
+
+  getOversightPrayerTimes(date?: string, mosqueId?: number): Observable<OversightPrayerRow[]> {
+    const params: Record<string, string> = {};
+    if (date) params['date'] = date;
+    if (mosqueId) params['mosqueId'] = String(mosqueId);
+    return this.http.get<OversightPrayerRow[]>(`${this.base}/oversight/prayer-times`, { params });
+  }
+
+  getOversightAnnouncements(mosqueId?: number, limit = 200): Observable<OversightAnnouncementRow[]> {
+    const params: Record<string, string> = { limit: String(limit) };
+    if (mosqueId) params['mosqueId'] = String(mosqueId);
+    return this.http.get<OversightAnnouncementRow[]>(`${this.base}/oversight/announcements`, { params });
   }
 }

@@ -41,6 +41,8 @@ export class PublicMosqueProfileComponent implements OnInit, OnDestroy {
   showClaimDrawer = signal(false);
   claimToast = signal('');
   claimToastOk = signal(true);
+  stats = signal<{ members: number; establishedYear?: number; capacity?: number } | null>(null);
+  leadership = signal<{ name: string; role: string; bio?: string; photoUrl?: string }[]>([]);
 
   slug = '';
   private apiOrigin = environment.apiUrl.replace(/\/api\/v1\/?$/, '');
@@ -62,6 +64,18 @@ export class PublicMosqueProfileComponent implements OnInit, OnDestroy {
     if (!path?.trim()) return null;
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
     return `${this.apiOrigin}${path.startsWith('/') ? path : `/${path}`}`;
+  }
+
+  mapsUrl(m: Mosque): string | null {
+    if (m.latitude && m.longitude)
+      return `https://www.google.com/maps?q=${m.latitude},${m.longitude}`;
+    if (m.address?.trim())
+      return `https://www.google.com/maps/search/${encodeURIComponent([m.address, m.city, m.postcode].filter(Boolean).join(' '))}`;
+    return null;
+  }
+
+  isModuleEnabled(m: Mosque, key: string): boolean {
+    return m.settings?.some(s => s.moduleKey === key && s.isEnabled) ?? false;
   }
 
   locationLine(m: Mosque): string {
@@ -195,6 +209,22 @@ export class PublicMosqueProfileComponent implements OnInit, OnDestroy {
     this.loading.set(false);
     this.setSeo(mosque);
     this.maybeOpenClaimFromRoute();
+    // Load supplementary public data only for Active mosques
+    if (mosque.status === 'Active') {
+      this.mosqueService.getPublicStats(mosque.id).subscribe({
+        next: (s) => this.stats.set(s),
+        error: () => { /* non-critical */ }
+      });
+      // Use leadership from DTO if already present, else fetch separately
+      if (mosque.leadership?.length) {
+        this.leadership.set(mosque.leadership);
+      } else {
+        this.mosqueService.getPublicLeadership(mosque.id).subscribe({
+          next: (l) => this.leadership.set(l),
+          error: () => { /* non-critical */ }
+        });
+      }
+    }
   }
 
   private setSeo(m: Mosque): void {

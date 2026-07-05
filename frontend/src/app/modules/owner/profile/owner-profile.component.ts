@@ -9,8 +9,8 @@ import { OwnerMosqueProfileComponent } from './owner-mosque-profile.component';
   template: `
     <app-page-header
       badge="Mosque Owner"
-      title="Mosque profile"
-      subtitle="Edit your mosque name, contact details, logo, banner, and public listing information." />
+      title="My Mosque"
+      subtitle="Edit allowed profile fields, upload logo and banner, and prepare your mosque for verification." />
     <app-owner-mosque-profile />
   `
 })

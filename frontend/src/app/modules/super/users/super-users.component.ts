@@ -120,7 +120,7 @@ export class SuperUsersComponent implements OnInit {
   );
 
   activeUsersCount = computed(() => this.users().filter(u => u.isActive !== false && u.roles.length > 0).length);
-  pendingInvitesCount = computed(() => this.users().filter(u => !u.roles.length).length);
+  pendingInvitesCount = signal(0);
   rolesCount = computed(() => ROLE_DEFINITIONS.length);
   deactivatedCount = computed(() => this.users().filter(u => u.isActive === false).length);
 
@@ -173,6 +173,10 @@ export class SuperUsersComponent implements OnInit {
     });
     this.admin.getAllMosques().subscribe(m => this.mosques.set(m));
     this.load();
+    this.platform.getInvitations('Pending').subscribe({
+      next: items => this.pendingInvitesCount.set(items.length),
+      error: () => this.pendingInvitesCount.set(0),
+    });
   }
 
   @HostListener('document:keydown.escape')
@@ -295,6 +299,9 @@ export class SuperUsersComponent implements OnInit {
       this.showToast('Select a role for bulk assignment.', false);
       return;
     }
+    if (action === 'assignRole' && this.bulkRole === ROLES.SuperAdmin && !confirm(
+      `Grant Super Admin to ${ids.length} user(s)? This gives full platform access. Continue?`
+    )) return;
     if (action === 'delete' && !confirm(`Delete ${ids.length} user(s)? This cannot be undone.`)) return;
     if (action === 'deactivate' && !confirm(`Deactivate ${ids.length} user(s)?`)) return;
 
@@ -390,6 +397,9 @@ export class SuperUsersComponent implements OnInit {
   assign(userId: string): void {
     const role = this.rolePick[userId];
     if (!role) return;
+    if (role === ROLES.SuperAdmin && !confirm(
+      'Grant Super Admin role? This user will have full platform access across all mosques. Continue?'
+    )) return;
     this.assigningId.set(userId);
     this.platform.assignRole(userId, role).subscribe({
       next: () => {

@@ -9,8 +9,8 @@ import { OwnerModuleSettingsComponent } from './owner-module-settings.component'
   template: `
     <app-page-header
       badge="Mosque Owner"
-      title="Module settings"
-      subtitle="Enable or disable mosque modules such as prayer times, events, donations, and volunteers." />
+      title="Modules"
+      subtitle="Enable or disable Prayer, Events, Donations, Education, Volunteers, and Announcements." />
     <app-owner-module-settings />
   `
 })

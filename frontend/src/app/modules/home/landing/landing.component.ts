@@ -705,6 +705,7 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly footerLinks: { label: string; action?: string; route?: string }[] = [
     { label: 'About', action: 'home' },
     { label: 'Features', action: 'features' },
+    { label: 'Find a Mosque', route: '/mosques' },
     { label: 'Demo Mosque', route: '/demo' },
     { label: 'Pricing', action: 'pricing' },
     { label: 'Privacy Policy', action: 'privacy' },
@@ -722,6 +723,33 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private authService = inject(AuthService);
   private router = inject(Router);
+
+//  // Detect scroll for header styling
+//   @HostListener('window:scroll')
+//   onWindowScroll() {
+//     this.navScrolled.set(window.scrollY > 20);
+//   }
+//
+//   scrollTo(section: string): void {
+//     const el = document.getElementById(section);
+//     if (el) {
+//       el.scrollIntoView({ behavior: 'smooth' });
+//     }
+//   }
+//
+//   isActive(section: string): boolean {
+//     const el = document.getElementById(section);
+//     if (!el) return false;
+//     const top = el.offsetTop;
+//     const height = el.offsetHeight;
+//     const scroll = window.scrollY;
+//     return scroll >= top && scroll < top + height;
+//   }
+//
+//   browseAsGuest(): void {
+//     this.authService.enterGuestMode();
+//     this.router.navigate(['/dashboard/guest']);
+//   }
 
   ngOnInit(): void {
     this.refreshDateLabel();

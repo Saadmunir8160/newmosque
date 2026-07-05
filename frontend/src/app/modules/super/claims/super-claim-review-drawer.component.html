@@ -56,8 +56,13 @@
     <footer *ngIf="!loading() && detail()" class="scr-footer">
       <button type="button" class="scr-btn scr-btn--ghost" (click)="close()" [disabled]="acting()">Close</button>
       <div class="scr-footer__actions">
-        <button type="button" class="scr-btn scr-btn--danger" (click)="openRejectDialog()" [disabled]="acting()">Reject</button>
-        <button type="button" class="scr-btn scr-btn--primary" (click)="openApproveConfirm()" [disabled]="acting()">Approve</button>
+        <ng-container *ngIf="detail()!.status.toLowerCase() === 'pending'">
+          <button type="button" class="scr-btn scr-btn--danger" (click)="openRejectDialog()" [disabled]="acting()">Reject</button>
+          <button type="button" class="scr-btn scr-btn--primary" (click)="openApproveConfirm()" [disabled]="acting()">Approve</button>
+        </ng-container>
+        <span *ngIf="detail()!.status.toLowerCase() !== 'pending'" class="scr-reviewed-badge scr-badge scr-badge--{{ detail()!.status.toLowerCase() === 'approved' ? 'ok' : 'rejected' }}">
+          {{ detail()!.status }}
+        </span>
       </div>
     </footer>
   </aside>

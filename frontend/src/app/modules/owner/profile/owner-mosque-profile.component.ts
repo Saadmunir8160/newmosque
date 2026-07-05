@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { ActivatedRoute, RouterModule } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { AdminService } from '../../../core/services/admin.service';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -20,6 +20,7 @@ export class OwnerMosqueProfileComponent implements OnInit {
   private admin = inject(AdminService);
   private auth = inject(AuthService);
   private mosqueCtx = inject(MosqueContextService);
+  private route = inject(ActivatedRoute);
 
   mosque = signal<Mosque | null>(null);
   loading = signal(true);
@@ -30,18 +31,26 @@ export class OwnerMosqueProfileComponent implements OnInit {
 
   logoFile: File | null = null;
   bannerFile: File | null = null;
+  logoRemoved = false;
+  bannerRemoved = false;
   logoPreview = signal<string | null>(null);
   bannerPreview = signal<string | null>(null);
+  activeTab = signal<'basic' | 'address' | 'social' | 'location' | 'about' | 'media'>('basic');
 
   private apiOrigin = environment.apiUrl.replace(/\/api\/v1\/?$/, '');
 
   readonly countries = ['United Kingdom', 'Ireland', 'United States', 'Canada', 'Pakistan', 'United Arab Emirates'];
   readonly timezones = ['Europe/London', 'Europe/Dublin', 'America/New_York', 'Asia/Dubai', 'Asia/Karachi'];
+  readonly currentYear = new Date().getFullYear();
+  readonly maxImageBytes = 5 * 1024 * 1024;
+  readonly defaultLogo = 'assets/mosque-default-logo.svg';
+  readonly defaultBanner = 'assets/mosque-default-banner.svg';
 
   canEdit = computed(() => {
     const m = this.mosque();
     if (!m) return false;
-    if (m.status !== 'Active') return false;
+    // Gap 15 fix: PRD says Claimed + Active both allow editing. Was incorrectly blocking Claimed status.
+    if (m.status !== 'Active' && m.status !== 'Claimed') return false;
     const uid = this.auth.user()?.id;
     return !!uid && (m.ownerId === uid || this.auth.isSuperAdmin());
   });
@@ -50,12 +59,14 @@ export class OwnerMosqueProfileComponent implements OnInit {
     const m = this.mosque();
     if (!m) return 'No mosque linked to your account.';
     if (m.status === 'ClaimPending') return 'Your claim is under review. Editing unlocks after approval.';
-    if (m.status === 'Claimed') return 'Awaiting activation. Profile editing unlocks when status is Active.';
-    if (m.status !== 'Active') return 'Profile editing is available only for active mosques.';
+    if (m.status !== 'Active' && m.status !== 'Claimed')
+      return 'Profile editing is available only for claimed or active mosques.';
     return 'You do not have permission to edit this mosque.';
   });
 
   ngOnInit(): void {
+    const tab = this.route.snapshot.data['profileTab'];
+    if (tab === 'media' || tab === 'basic') this.activeTab.set(tab);
     this.admin.getOwnerMosque().subscribe({
       next: (res) => {
         if (res.mosque) {
@@ -78,20 +89,50 @@ export class OwnerMosqueProfileComponent implements OnInit {
   onLogoSelected(event: Event): void {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
+    if (!this.validateImage(file, 'logo')) {
+      (event.target as HTMLInputElement).value = '';
+      return;
+    }
     this.logoFile = file;
+    this.logoRemoved = false;
     this.logoPreview.set(URL.createObjectURL(file));
   }
 
   onBannerSelected(event: Event): void {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
+    if (!this.validateImage(file, 'banner')) {
+      (event.target as HTMLInputElement).value = '';
+      return;
+    }
     this.bannerFile = file;
+    this.bannerRemoved = false;
     this.bannerPreview.set(URL.createObjectURL(file));
+  }
+
+  removeLogo(): void {
+    const m = this.mosque();
+    if (!m || !this.canEdit()) return;
+    this.logoFile = null;
+    this.logoRemoved = true;
+    m.logoUrl = undefined;
+    this.logoPreview.set(null);
+  }
+
+  removeBanner(): void {
+    const m = this.mosque();
+    if (!m || !this.canEdit()) return;
+    this.bannerFile = null;
+    this.bannerRemoved = true;
+    m.bannerUrl = undefined;
+    this.bannerPreview.set(null);
   }
 
   cancel(): void {
     this.logoFile = null;
     this.bannerFile = null;
+    this.logoRemoved = false;
+    this.bannerRemoved = false;
     this.fieldErrors.set({});
     this.toast.set('');
     this.loading.set(true);
@@ -125,10 +166,16 @@ export class OwnerMosqueProfileComponent implements OnInit {
       if (this.logoFile) {
         const res = await firstValueFrom(this.admin.uploadMosqueImage(m.id, this.logoFile, 'logo'));
         if (res?.url) m.logoUrl = res.url;
+      } else if (this.logoRemoved) {
+        await firstValueFrom(this.admin.deleteMosqueImage(m.id, 'logo'));
+        m.logoUrl = undefined;
       }
       if (this.bannerFile) {
         const res = await firstValueFrom(this.admin.uploadMosqueImage(m.id, this.bannerFile, 'banner'));
         if (res?.url) m.bannerUrl = res.url;
+      } else if (this.bannerRemoved) {
+        await firstValueFrom(this.admin.deleteMosqueImage(m.id, 'banner'));
+        m.bannerUrl = undefined;
       }
 
       const updated = await firstValueFrom(this.admin.updateMosque(m.id, {
@@ -144,6 +191,20 @@ export class OwnerMosqueProfileComponent implements OnInit {
         logoUrl: m.logoUrl,
         bannerUrl: m.bannerUrl,
         timezone: m.timezone || 'Europe/London',
+        // G-14: previously missing fields
+        facebookUrl: m.facebookUrl,
+        instagramUrl: m.instagramUrl,
+        youtubeUrl: m.youtubeUrl,
+        twitterUrl: m.twitterUrl,
+        latitude: m.latitude,
+        longitude: m.longitude,
+        mapLocation: m.mapLocation,
+        vision: m.vision,
+        history: m.history,
+        parkingInfo: m.parkingInfo,
+        establishedYear: m.establishedYear,
+        capacity: m.capacity,
+        shortDescription: m.shortDescription,
       }));
 
       if (updated) {
@@ -153,6 +214,10 @@ export class OwnerMosqueProfileComponent implements OnInit {
 
       this.logoFile = null;
       this.bannerFile = null;
+      this.logoRemoved = false;
+      this.bannerRemoved = false;
+      this.logoPreview.set(this.mediaUrl(updated?.logoUrl ?? m.logoUrl));
+      this.bannerPreview.set(this.mediaUrl(updated?.bannerUrl ?? m.bannerUrl));
       this.showToast('Mosque profile updated successfully.', true);
     } catch {
       this.showToast('Unable to save profile. Check phone, email, and website format.', false);
@@ -165,5 +230,18 @@ export class OwnerMosqueProfileComponent implements OnInit {
     this.toast.set(msg);
     this.toastOk.set(ok);
     setTimeout(() => this.toast.set(''), 4000);
+  }
+
+  private validateImage(file: File, label: 'logo' | 'banner'): boolean {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowed.includes(file.type)) {
+      this.showToast(`${label === 'logo' ? 'Logo' : 'Banner'} must be JPG, PNG, WEBP, or GIF.`, false);
+      return false;
+    }
+    if (file.size > this.maxImageBytes) {
+      this.showToast(`${label === 'logo' ? 'Logo' : 'Banner'} image must be 5 MB or smaller.`, false);
+      return false;
+    }
+    return true;
   }
 }

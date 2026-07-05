@@ -17,6 +17,14 @@ interface EventRegistrationRow {
   registeredAt: string;
 }
 
+export interface MosqueDirectoryResponse {
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  items: Mosque[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class MosqueService {
   private http = inject(HttpClient);
@@ -27,8 +35,57 @@ export class MosqueService {
     return this.http.get<Mosque[]>(`${this.base}/mosques`, { params });
   }
 
+  getMosqueDirectory(params: {
+    name?: string;
+    city?: string;
+    postcode?: string;
+    country?: string;
+    status?: string;
+    page?: number;
+    pageSize?: number;
+  }): Observable<MosqueDirectoryResponse> {
+    const p: Record<string, string> = {
+      page: String(params.page ?? 1),
+      pageSize: String(params.pageSize ?? 12),
+    };
+    if (params.name?.trim()) p['name'] = params.name.trim();
+    if (params.city?.trim()) p['city'] = params.city.trim();
+    if (params.postcode?.trim()) p['postcode'] = params.postcode.trim();
+    if (params.country?.trim()) p['country'] = params.country.trim();
+    if (params.status?.trim()) p['status'] = params.status.trim();
+    return this.http.get<MosqueDirectoryResponse | Mosque[]>(`${this.base}/mosques`, { params: p }).pipe(
+      map(res => Array.isArray(res)
+        ? {
+            total: res.length,
+            page: 1,
+            pageSize: params.pageSize ?? 12,
+            totalPages: 1,
+            items: res,
+          }
+        : {
+            total: res.total ?? (res.items?.length ?? 0),
+            page: res.page ?? 1,
+            pageSize: res.pageSize ?? (res.items?.length || 12),
+            totalPages: res.totalPages ?? 1,
+            items: res.items ?? [],
+          })
+    );
+  }
+
   getPublicBySlug(slug: string): Observable<Mosque> {
     return this.http.get<Mosque>(`${this.base}/mosques/${slug}`);
+  }
+
+  getPublicStats(mosqueId: number): Observable<{ members: number; establishedYear?: number; capacity?: number }> {
+    return this.http.get<{ members: number; establishedYear?: number; capacity?: number }>(
+      `${this.base}/mosques/${mosqueId}/public/stats`
+    );
+  }
+
+  getPublicLeadership(mosqueId: number): Observable<{ name: string; role: string; bio?: string; photoUrl?: string }[]> {
+    return this.http.get<{ name: string; role: string; bio?: string; photoUrl?: string }[]>(
+      `${this.base}/mosques/${mosqueId}/public/leadership`
+    );
   }
 
   getBySlug(slug: string): Observable<Mosque> {
@@ -106,5 +163,17 @@ export class MosqueService {
 
   getReadingCampaigns(mosqueId: number): Observable<ReadingCampaign[]> {
     return this.http.get<ReadingCampaign[]>(`${this.base}/mosques/${mosqueId}/reading-campaigns`);
+  }
+
+  submitDiscoveryRequest(dto: {
+    mosqueName: string;
+    city: string;
+    postcode?: string;
+    address?: string;
+    submitterName?: string;
+    email?: string;
+    notes?: string;
+  }): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.base}/discovery/request`, dto);
   }
 }
