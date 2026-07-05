@@ -1,0 +1,135 @@
+.mp-toast {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1200;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  max-width: min(22rem, calc(100vw - 2rem));
+}
+
+.mp-toast--ok {
+  background: #ECFDF5;
+  color: #047857;
+  border: 1px solid #A7F3D0;
+}
+
+.mp-toast--err {
+  background: #FEF2F2;
+  color: #B91C1C;
+  border: 1px solid #FECACA;
+}
+
+.mp-btn--danger {
+  background: #FEF2F2;
+  color: #B91C1C;
+  border-color: #FECACA;
+}
+
+.mp-btn--danger:hover:not(:disabled) {
+  background: #FEE2E2;
+  border-color: #FCA5A5;
+}
+
+.mp-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--mos-border);
+  border-radius: var(--mos-radius-card);
+  background: var(--mos-surface);
+}
+
+.mp-pagination__summary,
+.mp-pagination__page {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--mos-text-secondary);
+}
+
+.mp-pagination__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mp-page-btn {
+  min-height: 2.25rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--mos-border);
+  background: var(--mos-surface);
+  color: var(--mos-text-primary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mp-page-btn:hover:not(:disabled) {
+  border-color: rgba(15, 76, 58, 0.35);
+  background: rgba(15, 76, 58, 0.05);
+}
+
+.mp-page-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mp-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.48);
+}
+
+.mp-dialog {
+  width: min(100%, 28rem);
+  padding: 1.25rem;
+  border-radius: var(--mos-radius-card);
+  border: 1px solid var(--mos-border);
+  background: var(--mos-surface);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+}
+
+.mp-dialog__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--mos-text-primary);
+}
+
+.mp-dialog__body {
+  margin: 0.7rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--mos-text-secondary);
+}
+
+.mp-dialog__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+  font-size: 0.75rem;
+  color: var(--mos-text-secondary);
+}
+
+.mp-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}

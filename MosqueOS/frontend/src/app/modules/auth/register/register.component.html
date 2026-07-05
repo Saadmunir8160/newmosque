@@ -1,0 +1,78 @@
+<div class="auth-page">
+  <div class="auth-shell">
+    <header class="auth-head">
+      <p class="auth-eyebrow">MosqueOS</p>
+      <h1>Create account</h1>
+      <p class="auth-lead">Register as a mosque owner to claim and manage your mosque profile.</p>
+    </header>
+
+    <div *ngIf="toast()" class="auth-toast" [class.auth-toast--ok]="toastOk()" [class.auth-toast--err]="!toastOk()">{{ toast() }}</div>
+    <div *ngIf="error()" class="auth-alert" role="alert">{{ error() }}</div>
+
+    <form class="auth-form" (ngSubmit)="onRegister()" novalidate>
+      <section class="auth-section">
+        <h2>Personal information</h2>
+        <label class="auth-field">
+          <span>Full name <em>*</em></span>
+          <input class="auth-input" [class.auth-input--invalid]="fieldErrors()['fullName']"
+            [(ngModel)]="fullName" name="fullName" (ngModelChange)="clearField('fullName')" autocomplete="name">
+          <small *ngIf="fieldErrors()['fullName']" class="auth-error">{{ fieldErrors()['fullName'] }}</small>
+        </label>
+        <label class="auth-field">
+          <span>Email address <em>*</em></span>
+          <input class="auth-input" type="email" [class.auth-input--invalid]="fieldErrors()['email']"
+            [(ngModel)]="email" name="email" (ngModelChange)="clearField('email')" autocomplete="email">
+          <small *ngIf="fieldErrors()['email']" class="auth-error">{{ fieldErrors()['email'] }}</small>
+        </label>
+      </section>
+
+      <section class="auth-section">
+        <h2>Security</h2>
+        <label class="auth-field">
+          <span>Password <em>*</em></span>
+          <div class="auth-pass">
+            <input class="auth-input" [type]="showPassword() ? 'text' : 'password'"
+              [class.auth-input--invalid]="fieldErrors()['password']"
+              [(ngModel)]="password" name="password" (ngModelChange)="clearField('password')" autocomplete="new-password">
+            <button type="button" class="auth-pass__toggle" (click)="showPassword.set(!showPassword())" aria-label="Toggle password visibility">
+              {{ showPassword() ? 'Hide' : 'Show' }}
+            </button>
+          </div>
+          <div class="auth-strength" *ngIf="password">
+            <div class="auth-strength__bar"><span [style.width.%]="strength().percent"></span></div>
+            <small>{{ strength().label }}</small>
+          </div>
+          <small *ngIf="fieldErrors()['password']" class="auth-error">{{ fieldErrors()['password'] }}</small>
+        </label>
+        <label class="auth-field">
+          <span>Confirm password <em>*</em></span>
+          <div class="auth-pass">
+            <input class="auth-input" [type]="showConfirmPassword() ? 'text' : 'password'"
+              [class.auth-input--invalid]="fieldErrors()['confirmPassword']"
+              [(ngModel)]="confirmPassword" name="confirmPassword" (ngModelChange)="clearField('confirmPassword')" autocomplete="new-password">
+            <button type="button" class="auth-pass__toggle" (click)="showConfirmPassword.set(!showConfirmPassword())" aria-label="Toggle confirm password visibility">
+              {{ showConfirmPassword() ? 'Hide' : 'Show' }}
+            </button>
+          </div>
+          <small *ngIf="fieldErrors()['confirmPassword']" class="auth-error">{{ fieldErrors()['confirmPassword'] }}</small>
+        </label>
+      </section>
+
+      <section class="auth-section">
+        <h2>Terms</h2>
+        <label class="auth-check" [class.auth-check--invalid]="fieldErrors()['terms']">
+          <input type="checkbox" [(ngModel)]="acceptedTerms" name="acceptedTerms" (ngModelChange)="clearField('terms')">
+          <span>I agree to the Terms &amp; Privacy Policy</span>
+        </label>
+        <small *ngIf="fieldErrors()['terms']" class="auth-error">{{ fieldErrors()['terms'] }}</small>
+      </section>
+
+      <button type="submit" class="auth-btn" [disabled]="submitting()">
+        <span *ngIf="submitting()" class="auth-spinner" aria-hidden="true"></span>
+        {{ submitting() ? 'Creating account…' : 'Create Account' }}
+      </button>
+    </form>
+
+    <p class="auth-footer">Already have an account? <a routerLink="/login">Login</a></p>
+  </div>
+</div>

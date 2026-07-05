@@ -1,0 +1,170 @@
+<div class="jz-page">
+  <div *ngIf="toast()" class="toast" [class.toast--ok]="toastOk()" [class.toast--err]="!toastOk()">{{ toast() }}</div>
+
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a routerLink="/dashboard/super">Dashboard</a>
+    <span class="breadcrumb__sep">›</span>
+    <span class="breadcrumb__current">Janaza Announcements</span>
+  </nav>
+
+  <header class="jz-header">
+    <h1 class="jz-title">Janaza Announcements</h1>
+    <p class="jz-sub">Respectful death and funeral notices for the community.</p>
+  </header>
+
+  <section class="toolbar">
+    <button type="button" class="btn-post" (click)="openCreate()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Post Janaza
+    </button>
+    <div class="search-field">
+      <svg class="search-field__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input class="search-field__input" type="search" placeholder="Search by name or location…" [(ngModel)]="search" (ngModelChange)="onSearchChange()">
+    </div>
+  </section>
+
+  <section class="table-card">
+    <div class="table-head">
+      <h2 class="table-head__title">{{ filtered().length }} Announcements</h2>
+      <button type="button" class="table-head__sort" (click)="toggleSort()" aria-label="Toggle sort direction">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+    </div>
+
+    <div *ngIf="loading()" class="state-loading"><span class="pulse-dot"></span> Loading announcements…</div>
+
+    <div *ngIf="!loading() && !paged().length" class="empty-state">
+      <span class="empty-state__icon">🕊️</span>
+      <h3>No announcements found</h3>
+      <p>Post a janaza notice when ready.</p>
+    </div>
+
+    <div *ngIf="!loading() && paged().length" class="table-wrap">
+      <table class="jz-table">
+        <thead>
+          <tr>
+            <th><button type="button" class="th-btn" (click)="setSort('name')">Deceased <span class="sort-icon">↕</span></button></th>
+            <th><button type="button" class="th-btn" (click)="setSort('janazaDate')">Janaza Date <span class="sort-icon">↕</span></button></th>
+            <th><button type="button" class="th-btn" (click)="setSort('burialLocation')">Burial Location <span class="sort-icon">↕</span></button></th>
+            <th><button type="button" class="th-btn" (click)="setSort('posted')">Posted By <span class="sort-icon">↕</span></button></th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let j of paged()">
+            <td class="cell-deceased">
+              <span class="status-badge" [class.status-badge--draft]="j.status === 'Draft'" [class.status-badge--published]="j.status === 'Published'">{{ j.status || 'Published' }}</span>
+              <p class="deceased-name">{{ j.name }}</p>
+              <p class="deceased-sub">Passed {{ formatDate(j.dateOfDeath) }}</p>
+            </td>
+            <td class="cell-date">
+              <p class="date-main">{{ formatJanazaDateTime(j) }}</p>
+              <p class="date-sub">{{ j.location }}</p>
+            </td>
+            <td class="cell-burial">{{ j.burialLocation || '—' }}</td>
+            <td class="cell-poster">
+              <div class="poster">
+                <span class="poster__avatar">{{ j.postedByInitials || 'AD' }}</span>
+                <div>
+                  <p class="poster__name">{{ j.postedByName || 'Admin' }}</p>
+                  <p class="poster__when">{{ postedAgo(j) }}</p>
+                </div>
+              </div>
+            </td>
+            <td class="cell-actions">
+              <button type="button" class="btn-link" (click)="copyLink(j)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                Copy Link
+              </button>
+              <div class="menu-wrap">
+                <button type="button" class="btn-menu" (click)="toggleMenu(j.id, $event)" aria-label="More actions">⋯</button>
+                <div *ngIf="openMenuId() === j.id" class="dropdown" (click)="$event.stopPropagation()">
+                  <button type="button" class="dropdown__item" (click)="openEdit(j)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    Edit
+                  </button>
+                  <button type="button" class="dropdown__item" *ngIf="j.status === 'Draft'" (click)="publish(j)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Publish
+                  </button>
+                  <button type="button" class="dropdown__item dropdown__item--danger" (click)="del(j)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <nav *ngIf="!loading() && totalPages() > 1" class="pagination" aria-label="Pagination">
+      <button type="button" class="page-btn" [disabled]="page() <= 1" (click)="setPage(page() - 1)">‹</button>
+      <button type="button" class="page-btn page-btn--on">{{ page() }}</button>
+      <button type="button" class="page-btn" [disabled]="page() >= totalPages()" (click)="setPage(page() + 1)">›</button>
+    </nav>
+  </section>
+
+  <!-- Side drawer -->
+  <div *ngIf="drawerOpen()" class="drawer-backdrop" (click)="closeDrawer()" role="presentation">
+    <aside class="drawer" (click)="$event.stopPropagation()" role="dialog" [attr.aria-labelledby]="editingId() ? 'drawer-edit-title' : 'drawer-create-title'">
+      <header class="drawer__head">
+        <div>
+          <h2 [id]="editingId() ? 'drawer-edit-title' : 'drawer-create-title'" class="drawer__title">
+            {{ editingId() ? 'Edit Janaza' : 'Post Janaza' }}
+          </h2>
+          <p class="drawer__sub">Respectful funeral notice for the community</p>
+        </div>
+        <button type="button" class="drawer__close" (click)="closeDrawer()" aria-label="Close">×</button>
+      </header>
+      <div class="drawer__body">
+        <div class="field">
+          <label for="f-name">Name of deceased <span class="req">*</span></label>
+          <input id="f-name" class="field__input" placeholder="Full name" [(ngModel)]="form.name">
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="f-dod">Date of death</label>
+            <input id="f-dod" class="field__input" type="date" [(ngModel)]="form.dateOfDeath">
+          </div>
+          <div class="field">
+            <label for="f-date">Janaza date</label>
+            <input id="f-date" class="field__input" type="date" [(ngModel)]="form.janazaDate">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="f-time">Janaza time</label>
+            <input id="f-time" class="field__input" type="time" [(ngModel)]="form.janazaTime">
+          </div>
+          <div class="field">
+            <label for="f-status">Status</label>
+            <select id="f-status" class="field__input" [(ngModel)]="form.status">
+              <option value="Draft">Draft</option>
+              <option value="Published">Published</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-loc">Location</label>
+          <input id="f-loc" class="field__input" placeholder="Masjid or venue" [(ngModel)]="form.location">
+        </div>
+        <div class="field">
+          <label for="f-burial">Burial location</label>
+          <input id="f-burial" class="field__input" placeholder="Cemetery name" [(ngModel)]="form.burialLocation">
+        </div>
+        <div class="field">
+          <label for="f-notes">Notes</label>
+          <textarea id="f-notes" class="field__input field__textarea" rows="3" placeholder="Optional message for the community" [(ngModel)]="form.notes"></textarea>
+        </div>
+      </div>
+      <footer class="drawer__foot">
+        <button type="button" class="btn-secondary" (click)="closeDrawer()">Cancel</button>
+        <button type="button" class="btn-primary" [disabled]="saving() || !form.name.trim()" (click)="save()">
+          {{ saving() ? 'Saving…' : (editingId() ? 'Save changes' : 'Post Janaza') }}
+        </button>
+      </footer>
+    </aside>
+  </div>
+</div>

@@ -1,0 +1,90 @@
+<div class="sc-page">
+  <nav class="sc-breadcrumb" aria-label="Breadcrumb">
+    <a routerLink="/dashboard/super">Dashboard</a>
+    <span aria-hidden="true">›</span>
+    <span>Oversight</span>
+    <span aria-hidden="true">›</span>
+    <span class="sc-breadcrumb__current">Prayer times</span>
+  </nav>
+
+  <header class="sc-header">
+    <div>
+      <h1>Prayer times oversight</h1>
+      <p>Daily jamaah coverage across all active mosques — spot missing or unpublished timetables.</p>
+    </div>
+    <button type="button" class="sc-btn sc-btn--ghost" (click)="load()" [disabled]="loading()">Refresh</button>
+  </header>
+
+  <section class="sc-kpis">
+    <article class="sc-kpi">
+      <p class="sc-kpi__label">Active mosques</p>
+      <p class="sc-kpi__value">{{ items().length }}</p>
+    </article>
+    <article class="sc-kpi">
+      <p class="sc-kpi__label">Published today</p>
+      <p class="sc-kpi__value">{{ publishedCount() }}</p>
+    </article>
+    <article class="sc-kpi sc-kpi--warn">
+      <p class="sc-kpi__label">Missing / draft</p>
+      <p class="sc-kpi__value">{{ missingCount() }}</p>
+    </article>
+  </section>
+
+  <p *ngIf="error()" class="sc-alert sc-alert--error" role="alert">{{ error() }}</p>
+
+  <div class="sc-toolbar">
+    <input class="sc-search" type="date" [ngModel]="selectedDate()" (ngModelChange)="onDateChange($event)" aria-label="Date">
+    <input class="sc-search" type="search" placeholder="Search mosque or city…"
+      [ngModel]="search()" (ngModelChange)="search.set($event)" aria-label="Search mosques">
+    <select class="sc-select" [ngModel]="coverageFilter()" (ngModelChange)="coverageFilter.set($event)" aria-label="Coverage filter">
+      <option value="All">All</option>
+      <option value="Missing">Missing times</option>
+      <option value="Published">Published</option>
+      <option value="Draft">Draft</option>
+    </select>
+  </div>
+
+  <div *ngIf="loading()" class="sc-loading" role="status">
+    <span class="sc-spinner" aria-hidden="true"></span> Loading prayer coverage…
+  </div>
+
+  <div *ngIf="!loading() && !filtered().length" class="sc-empty">
+    <span class="sc-empty__icon" aria-hidden="true">🕐</span>
+    <h2>No active mosques</h2>
+    <p>Activate mosques to appear in prayer times oversight.</p>
+  </div>
+
+  <div *ngIf="!loading() && filtered().length" class="sc-table-wrap">
+    <table class="sc-table">
+      <thead>
+        <tr>
+          <th>Mosque</th>
+          <th>Fajr</th>
+          <th>Dhuhr</th>
+          <th>Asr</th>
+          <th>Maghrib</th>
+          <th>Isha</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let row of filtered()">
+          <td data-label="Mosque">
+            <a [routerLink]="['/dashboard/super/mosques', row.mosqueId]" class="sc-link">{{ row.mosqueName }}</a>
+            <div class="ov-muted">{{ row.mosqueCity }}</div>
+          </td>
+          <td data-label="Fajr">{{ formatTime(row.fajrJamaat) }}</td>
+          <td data-label="Dhuhr">{{ formatTime(row.dhuhrJamaat) }}</td>
+          <td data-label="Asr">{{ formatTime(row.asrJamaat) }}</td>
+          <td data-label="Maghrib">{{ formatTime(row.maghribJamaat) }}</td>
+          <td data-label="Isha">{{ formatTime(row.ishaJamaat) }}</td>
+          <td data-label="Status"><span [class]="statusBadge(row)">{{ statusLabel(row) }}</span></td>
+          <td data-label="Actions" class="sc-actions">
+            <a [routerLink]="['/dashboard/admin/prayer-times']" [queryParams]="{ mosqueId: row.mosqueId }" class="sc-link">Open editor</a>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

@@ -1,0 +1,136 @@
+<div class="rm-page">
+  <div *ngIf="toast()" class="toast" [class.toast--ok]="toastOk()" [class.toast--err]="!toastOk()">{{ toast() }}</div>
+
+  <header class="rm-header">
+    <div>
+      <h1 class="rm-title">Role Management Monitor</h1>
+      <p class="rm-sub">Super Admin Dashboard — assign and track roles across the platform.</p>
+    </div>
+    <div class="date-range">
+      <input type="date" class="date-input" [(ngModel)]="dateFrom" (change)="reload()">
+      <span class="date-sep">–</span>
+      <input type="date" class="date-input" [(ngModel)]="dateTo" (change)="reload()">
+    </div>
+  </header>
+
+  <div *ngIf="loading()" class="state-loading"><span class="pulse-dot"></span> Loading role monitor…</div>
+
+  <ng-container *ngIf="!loading() && data() as d">
+    <section class="kpi-row">
+      <article class="kpi-card">
+        <p class="kpi-label">Total Users</p>
+        <p class="kpi-value">{{ d.totalUsers | number }}<span class="kpi-badge kpi-badge--green">+2% M/M</span></p>
+      </article>
+      <article class="kpi-card">
+        <p class="kpi-label">Standard Role Assignments</p>
+        <p class="kpi-value">{{ d.standardRoleAssignments | number }}<span class="kpi-badge">Standardized</span></p>
+      </article>
+      <article class="kpi-card">
+        <p class="kpi-label">Admin Role Assignments</p>
+        <p class="kpi-value">{{ d.adminRoleAssignments | number }}<span class="kpi-badge kpi-badge--red">Critical</span></p>
+      </article>
+      <article class="kpi-card">
+        <p class="kpi-label">Unassigned Users</p>
+        <p class="kpi-value">{{ d.unassignedUsers | number }}<span class="kpi-badge kpi-badge--amber">Open</span></p>
+      </article>
+      <article class="kpi-card">
+        <p class="kpi-label">Role Assignment Completion</p>
+        <p class="kpi-value">{{ d.assignmentCompletionPercent }}%</p>
+      </article>
+    </section>
+
+    <div class="grid-main">
+      <!-- Workflow -->
+      <section class="panel panel--wide">
+        <div class="panel__head"><h2>Role Assignment Overview</h2></div>
+        <div class="workflow">
+          <div *ngFor="let step of d.workflow; let last = last" class="workflow-step">
+            <div class="workflow-step__node">{{ step.value | number }}</div>
+            <p class="workflow-step__label">{{ step.label }}</p>
+            <span *ngIf="!last" class="workflow-arrow">→</span>
+          </div>
+        </div>
+        <div class="progress-bar"><div class="progress-bar__fill" [style.width.%]="d.assignmentCompletionPercent"></div></div>
+      </section>
+
+      <!-- Top assignments -->
+      <section class="panel">
+        <div class="panel__head"><h2>Top User-Role Assignments</h2></div>
+        <ul class="leaderboard">
+          <li *ngFor="let u of d.topAssignments" class="leader-row">
+            <span class="leader-row__avatar">{{ u.initials }}</span>
+            <div class="leader-row__info">
+              <p class="leader-row__name">{{ u.name }}</p>
+              <p class="leader-row__role">{{ u.primaryRole }}</p>
+            </div>
+            <span class="leader-row__count">{{ u.roleCount }}</span>
+            <span class="rank-badge" [attr.data-rank]="u.rank">{{ u.rank }}</span>
+          </li>
+        </ul>
+        <p *ngIf="!d.topAssignments.length" class="panel-empty">No role assignments yet.</p>
+      </section>
+
+      <!-- Audit trail -->
+      <section class="panel panel--audit">
+        <div class="panel__head">
+          <div class="panel__head-left">
+            <h2>Expanded Audit Trail</h2>
+            <span class="entry-count">{{ filteredAudit().length }} entries</span>
+          </div>
+          <button type="button" class="filter-btn" [class.filter-btn--on]="roleFilterOnly()" (click)="toggleRoleFilter()">
+            {{ roleFilterOnly() ? 'All logs' : 'Role events only' }}
+          </button>
+        </div>
+
+        <p *ngIf="!filteredAudit().length" class="panel-empty">No audit entries in this date range.</p>
+
+        <div *ngIf="filteredAudit().length" class="audit-scroll" #auditScroll (scroll)="onAuditScroll($event)">
+          <table class="audit-table">
+            <thead class="audit-table__head">
+              <tr>
+                <th class="col-entry">Entry</th>
+                <th class="col-action">Action</th>
+                <th class="col-time">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let log of filteredAudit(); trackBy: trackLog" class="audit-row">
+                <td class="cell-entry">
+                  <div class="cell-entry-inner">
+                    <span class="entry-icon" [attr.data-type]="actionType(log.action)">{{ actionIcon(log.action) }}</span>
+                    <span class="entry-text">{{ log.description }}</span>
+                  </div>
+                </td>
+                <td class="cell-action">
+                  <span class="action-tag" [attr.data-type]="actionType(log.action)">{{ actionLabel(log.action) }}</span>
+                </td>
+                <td class="cell-time">{{ log.createdAt | date:'MMM d, y · h:mm a' }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="audit-scroll__fade" aria-hidden="true"></div>
+        </div>
+
+        <div *ngIf="filteredAudit().length" class="audit-footer">
+          <span class="audit-footer__hint">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+            Scroll table for more entries
+          </span>
+          <button type="button" class="btn-load-more" [disabled]="loadingMore()" (click)="loadMoreAudit()">
+            {{ loadingMore() ? 'Loading…' : 'Load more' }}
+          </button>
+        </div>
+      </section>
+
+      <!-- Admin actions -->
+      <section class="panel panel--actions">
+        <div class="panel__head"><h2>Admin Role Actions</h2></div>
+        <div class="action-btns">
+          <a routerLink="/dashboard/super/users" [queryParams]="{ tab: 'roles' }" class="btn-solid">New Role</a>
+          <button type="button" class="btn-outline" (click)="focusRoleAudit()">Role Audit</button>
+          <button type="button" class="btn-outline" (click)="exportAccessReport()">User Access Report</button>
+        </div>
+      </section>
+    </div>
+  </ng-container>
+</div>

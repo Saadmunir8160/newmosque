@@ -1,0 +1,119 @@
+/**
+ * MosqueOS Design System
+ * Modern Islamic SaaS — light enterprise dashboard
+ */
+
+:root {
+  /* Brand — deep emerald + Islamic gold */
+  --mos-primary: #0F4C3A;
+  --mos-primary-hover: #0D3D2F;
+  --mos-primary-deep: #08362A;
+  --mos-secondary: #1D6B57;
+  --mos-teal: #0D9488;
+  --mos-gold: #D4AF37;
+  --mos-gold-bright: #E8C547;
+  --mos-gold-deep: #B8941F;
+  --mos-gold-dark: #92680A;
+  --mos-gold-light: #F5E6A8;
+  --mos-gold-soft: rgba(212, 175, 55, 0.15);
+  --mos-accent: #D4AF37;
+  --mos-accent-light: #F5E6A8;
+
+  /* Marketing surfaces — landing + demo share these */
+  --mos-hero-from: #F8FAF9;
+  --mos-hero-tint: #D4EDE4;
+  --mos-hero-mid: #0F4C3A;
+  --mos-hero-to: #08362A;
+  --mos-mint-soft: #F0FDFA;
+  --mos-mint-bg: #ECFDF5;
+  --mos-cream: #FFFBEB;
+  --mos-cream-soft: #FEF9E8;
+  --mos-cream-warm: #FFF7ED;
+  --mos-blue-soft: #EFF6FF;
+  --mos-prayer-card-from: #1D6B57;
+  --mos-prayer-card-to: #0F4C3A;
+  --mos-glass: rgba(15, 76, 58, 0.12);
+  --mos-glass-border: rgba(212, 175, 55, 0.35);
+  --mos-gold-gradient: linear-gradient(135deg, var(--mos-gold-bright) 0%, var(--mos-gold) 55%, var(--mos-gold-deep) 100%);
+  --mos-gold-shadow: 0 4px 14px rgba(212, 175, 55, 0.28);
+  --mos-gold-shadow-hover: 0 6px 18px rgba(212, 175, 55, 0.38);
+  --mos-phone-shadow: 0 16px 40px rgba(8, 54, 42, 0.45);
+
+  /* Primary / gold alpha helpers (landing + demo) */
+  --mos-primary-06: rgba(15, 76, 58, 0.06);
+  --mos-primary-08: rgba(15, 76, 58, 0.08);
+  --mos-primary-10: rgba(15, 76, 58, 0.10);
+  --mos-primary-18: rgba(15, 76, 58, 0.18);
+  --mos-primary-25: rgba(15, 76, 58, 0.25);
+  --mos-primary-35: rgba(15, 76, 58, 0.35);
+  --mos-gold-30: rgba(212, 175, 55, 0.30);
+  --mos-gold-35: rgba(212, 175, 55, 0.35);
+  --mos-gold-45: rgba(212, 175, 55, 0.45);
+  --mos-gold-55: rgba(212, 175, 55, 0.55);
+  --mos-on-hero: rgba(255, 255, 255, 0.88);
+  --mos-on-hero-muted: rgba(255, 255, 255, 0.72);
+  --mos-on-hero-subtle: rgba(255, 255, 255, 0.65);
+
+  /* Semantic */
+  --mos-success: #16A34A;
+  --mos-warning: #F59E0B;
+  --mos-danger: #DC2626;
+  --mos-info: #0284C7;
+
+  /* Surfaces */
+  --mos-bg: #F8FAF9;
+  --mos-surface: #FFFFFF;
+  --mos-border: #E2E8F0;
+  --mos-border-input: #CBD5E1;
+
+  /* Text */
+  --mos-text-primary: #0F172A;
+  --mos-text-secondary: #64748B;
+  --mos-text-muted: #94A3B8;
+  --mos-text-inverse: #FFFFFF;
+
+  /* Sidebar */
+  --mos-sidebar-bg: #0F4C3A;
+  --mos-sidebar-active: #08362A;
+  --mos-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --mos-sidebar-text: #FFFFFF;
+  --mos-sidebar-section: #D4AF37;
+  --mos-sidebar-border: rgba(255, 255, 255, 0.12);
+
+  /* Header */
+  --mos-header-bg: #FFFFFF;
+  --mos-header-border: #E2E8F0;
+
+  /* Cards */
+  --mos-radius-card: 16px;
+  --mos-radius-btn: 10px;
+  --mos-radius-input: 10px;
+  --mos-shadow-card: 0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 16px rgba(15, 23, 42, 0.04);
+  --mos-shadow-card-hover: 0 4px 12px rgba(15, 23, 42, 0.08), 0 8px 24px rgba(15, 23, 42, 0.06);
+
+  /* Forms */
+  --mos-focus-ring: 0 0 0 4px rgba(15, 76, 58, 0.15);
+
+  /* Tables */
+  --mos-table-header-bg: #F8FAFC;
+  --mos-table-header-text: #334155;
+  --mos-table-row-hover: #F1F5F9;
+
+  /* Status badges */
+  --mos-badge-active-bg: #DCFCE7;
+  --mos-badge-active-text: #166534;
+  --mos-badge-pending-bg: #FEF3C7;
+  --mos-badge-pending-text: #92400E;
+  --mos-badge-rejected-bg: #FEE2E2;
+  --mos-badge-rejected-text: #991B1B;
+
+  /* Charts */
+  --mos-chart-primary: #0F4C3A;
+  --mos-chart-secondary: #1D6B57;
+  --mos-chart-accent: #D4AF37;
+
+  /* Angular Material bridge */
+  --mat-primary: var(--mos-primary);
+  --mat-accent: var(--mos-accent);
+  --mat-warn: var(--mos-danger);
+}

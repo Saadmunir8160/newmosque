@@ -1,0 +1,518 @@
+<div class="demo-page">
+
+  <div *ngIf="notFound()" class="demo-not-found app-section">
+    <h1>Mosque not found</h1>
+    <p>This profile is not published or the URL may be incorrect.</p>
+    <a routerLink="/" class="demo-nav__back">Back to Home</a>
+  </div>
+
+  <ng-container *ngIf="!notFound()">
+  <nav id="demo-nav" class="demo-nav app-section">
+    <a routerLink="/" class="demo-nav__back">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Back to Home
+    </a>
+    <span class="demo-nav__title">{{ mosque()?.name || 'Sample Mosque' }}</span>
+    <div class="demo-nav__actions" *ngIf="isPublicProfile">
+      <button *ngIf="showClaimBox()" type="button" class="demo-nav__action demo-nav__action--primary" (click)="openClaimFlow()">Claim This Mosque</button>
+      <button type="button" class="demo-nav__action" (click)="shareMosque()">Share</button>
+      <button type="button" class="demo-nav__action" (click)="reportListing()">Report</button>
+      <button type="button" class="demo-nav__action" (click)="scrollToSection('contact')">Contact</button>
+      <button type="button" class="demo-nav__action" [class.demo-nav__action--saved]="isSaved()" (click)="toggleSaveMosque()">
+        {{ isSaved() ? 'Saved' : 'Save' }}
+      </button>
+      <span class="demo-badge demo-badge--public">PUBLIC PROFILE</span>
+      <a *ngIf="isSuperAdminViewer()" routerLink="/dashboard/super/claims" class="demo-nav__admin-link">Review claims</a>
+    </div>
+    <ng-container *ngIf="!isPublicProfile">
+      <span class="demo-badge demo-badge--live" [class.demo-badge--pulse]="tourActive()">
+        {{ tourActive() ? 'LIVE TOUR' : 'LIVE DEMO' }}
+      </span>
+      <button *ngIf="!tourActive() && tourCompleted()" type="button" (click)="replayTour()" class="demo-nav__replay hidden sm:inline-flex">Replay tour</button>
+    </ng-container>
+  </nav>
+
+  <div *ngIf="actionToast()" class="demo-action-toast app-section">{{ actionToast() }}</div>
+
+  <div *ngIf="usingOfflineDemo() && !isPublicProfile" class="demo-offline-banner app-section">
+    <span>Demo preview data — start the API for live mosque content</span>
+  </div>
+
+  <div *ngIf="tourActive()" class="app-section demo-tour-banner-wrap">
+    <div class="demo-tour-banner">
+      <p>Auto tour — sit back and watch the mosque page</p>
+      <button type="button" (click)="skipTour()" class="demo-tour-banner__skip">Skip tour</button>
+    </div>
+  </div>
+
+  <!-- Hero -->
+  <section id="demo-hero" class="demo-hero scroll-mt-16">
+    <div *ngIf="mosque()?.bannerUrl" class="demo-banner-wrap">
+      <img [src]="mediaUrl(mosque()?.bannerUrl)" alt="" class="demo-banner">
+    </div>
+    <div class="demo-hero__inner app-section">
+      <div class="demo-hero__copy">
+        <img *ngIf="mosque()?.logoUrl as logo" [src]="mediaUrl(logo)" alt="" class="demo-logo">
+        <p class="demo-eyebrow">MosqueOS · Live Preview</p>
+        <h1 class="demo-hero__title">
+          Welcome to <span class="demo-hero__accent">{{ mosque()?.name || 'Masjid Al-Noor Bradford' }}</span>
+        </h1>
+        <p class="demo-hero__desc">{{ displayDescription() }}</p>
+        <div class="demo-hero__meta" *ngIf="mosque() as m">
+          <span class="demo-meta-chip">{{ m.city }}, {{ m.country }}</span>
+          <span class="demo-meta-chip">Daily jamaat times</span>
+          <span class="demo-meta-chip">Wird &amp; adhkar</span>
+        </div>
+
+        <div *ngIf="showClaimBox()" class="demo-claim-box">
+          <div class="demo-claim-box__head">
+            <app-mosque-status-indicator status="Unclaimed" />
+            <span class="demo-verification-badge">⏳ Awaiting verification</span>
+          </div>
+
+          <div class="demo-status-workflow">
+            <span *ngFor="let s of claimWorkflowSteps(); let last = last" class="demo-workflow-step"
+              [class.demo-workflow-step--current]="s.current" [class.demo-workflow-step--done]="s.done">
+              {{ s.label }}<span *ngIf="!last" class="demo-workflow-arrow">→</span>
+            </span>
+          </div>
+
+          <p>This mosque listing hasn't been claimed yet. Submit a claim request for super admin review.</p>
+
+          <ul class="demo-claim-meta">
+            <li><span>Claims submitted</span><strong>{{ claimCountLabel() }}</strong></li>
+            <li><span>Last updated</span><strong>{{ mosqueLastUpdated() }}</strong></li>
+            <li><span>Listing status</span><strong>Unclaimed</strong></li>
+          </ul>
+
+          <p *ngIf="auth.loading()" class="demo-claim-loading">Checking login…</p>
+
+          <button *ngIf="!auth.loading()" type="button" class="demo-claim-btn" (click)="openClaimFlow()">
+            Claim This Mosque
+          </button>
+
+          <p *ngIf="!auth.loading() && auth.isAuthenticated() && !canSubmitClaim() && !isSuperAdminViewer()" class="demo-claim-role-note">
+            Only mosque owner or mosque admin accounts can submit a claim.
+          </p>
+          <p *ngIf="isSuperAdminViewer()" class="demo-claim-role-note">
+            Review claims in the dashboard, or log in as a mosque owner to test the claim flow.
+          </p>
+          <p *ngIf="claimMsg()" class="demo-claim-msg" [class.demo-claim-msg--ok]="claimMsgOk()" [class.demo-claim-msg--err]="!claimMsgOk()">{{ claimMsg() }}</p>
+        </div>
+
+        <div *ngIf="isPublicProfile && isClaimPending() && canSeePendingBadge()" class="demo-claim-box demo-claim-box--pending">
+          <app-mosque-status-indicator status="ClaimPending" />
+          <p class="demo-claim-msg demo-claim-msg--ok">🟡 Claim Submitted</p>
+          <p *ngIf="pendingClaim() as pc" class="demo-claim-review-id">Claim ID: {{ pc.claimReference }}</p>
+          <ul *ngIf="pendingClaim() as pc" class="demo-claim-review-meta">
+            <li><span>Submitted</span><strong>{{ formatClaimDate(pc.submittedAt) }}</strong></li>
+            <li><span>Review status</span><strong>{{ pc.reviewStatus }}</strong></li>
+            <li><span>Expected review</span><strong>{{ pc.expectedReviewTime }}</strong></li>
+          </ul>
+
+          <div class="demo-progress-tracker">
+            <div *ngFor="let s of claimProgressSteps()" class="demo-progress-step"
+              [class.demo-progress-step--active]="s.active" [class.demo-progress-step--complete]="s.complete">
+              <span class="demo-progress-step__dot"></span>
+              <span class="demo-progress-step__label">{{ s.label }}</span>
+            </div>
+          </div>
+
+          <p *ngIf="!pendingClaim()">{{ claimMsg() || 'Your claim is awaiting super admin approval.' }}</p>
+          <button *appHasRole="[ROLES.SuperAdmin]" type="button" class="demo-claim-btn" routerLink="/dashboard/super/claims">Approve claim</button>
+        </div>
+
+        <div *ngIf="isPublicProfile && isActive()" class="demo-profile-actions">
+          <button *appHasRole="[ROLES.SuperAdmin, ROLES.MosqueAdmin, ROLES.MosqueOwner]" type="button" class="demo-claim-btn"
+            [routerLink]="editProfileRoute()" [queryParams]="editProfileQueryParams()">Edit profile</button>
+        </div>
+      </div>
+
+      <div class="demo-hero__cards">
+        <div class="demo-prayer-card">
+          <p class="demo-prayer-card__label">Next Prayer</p>
+          <h2 class="demo-prayer-card__name">{{ nextPrayerName() }}</h2>
+          <p class="demo-prayer-card__countdown">{{ countdown() }}</p>
+          <div class="demo-prayer-card__jamaat">
+            <p class="demo-prayer-card__jamaat-label">Jamaat</p>
+            <p class="demo-prayer-card__jamaat-time">{{ nextJamaat() }}</p>
+          </div>
+        </div>
+
+        <div *ngIf="nextJumuah() as j" class="demo-jumuah-card demo-jumuah-card--active">
+          <p class="demo-eyebrow demo-eyebrow--sm">Jumuah · Slot {{ j.slotNumber }}</p>
+          <p class="demo-jumuah-card__time">{{ formatTime(j.jamaatTime) }}</p>
+          <p class="demo-jumuah-card__countdown">{{ j.countdown }}</p>
+        </div>
+        <div *ngIf="!nextJumuah() && jumuah().length && !isFriday()" class="demo-jumuah-card">
+          <p class="demo-jumuah-card__hint">Jumuah every Friday</p>
+          <p class="demo-jumuah-card__time">
+            {{ formatTime(jumuah()[0].jamaatTime) }}
+            <span *ngIf="jumuah().length > 1"> · Slot 2 {{ formatTime(jumuah()[1].jamaatTime) }}</span>
+          </p>
+        </div>
+
+        <div class="demo-today-widgets" *ngIf="todayWird() || todayQuran()">
+          <div class="demo-widget" *ngIf="todayWird() as wird">
+            <p class="demo-widget__label">Today's Wird</p>
+            <p class="demo-widget__value">{{ wird }}</p>
+          </div>
+          <div class="demo-widget" *ngIf="todayQuran() as quran">
+            <p class="demo-widget__label">Quran Khatm</p>
+            <p class="demo-widget__value">{{ quran }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Public profile sections (after hero) -->
+  <ng-container *ngIf="isPublicProfile && mosque() as m">
+    <section id="overview" class="demo-section demo-section--alt scroll-mt-16">
+      <div class="demo-section-split app-section">
+        <div>
+          <h2 class="demo-section__title demo-section__title--left">Mosque overview</h2>
+          <dl class="demo-overview-grid">
+            <div><dt>Established</dt><dd>{{ establishedYear() }}</dd></div>
+            <div><dt>Languages spoken</dt><dd>{{ languagesSpoken() }}</dd></div>
+            <div class="demo-overview-grid__full"><dt>About this mosque</dt><dd>{{ aboutDescription() || displayDescription() }}</dd></div>
+            <div class="demo-overview-grid__full"><dt>Mission statement</dt><dd>{{ missionStatement() }}</dd></div>
+          </dl>
+        </div>
+        <div>
+          <h2 class="demo-section__title demo-section__title--left">Statistics</h2>
+          <div class="demo-public-stats">
+            <article class="demo-public-stat"><p class="demo-public-stat__value">{{ publicStatMembers() }}</p><p class="demo-public-stat__label">Members</p></article>
+            <article class="demo-public-stat"><p class="demo-public-stat__value">{{ volunteerCount() }}</p><p class="demo-public-stat__label">Volunteers</p></article>
+            <article class="demo-public-stat"><p class="demo-public-stat__value">{{ events().length }}</p><p class="demo-public-stat__label">Events</p></article>
+            <article class="demo-public-stat"><p class="demo-public-stat__value">{{ classCount() }}</p><p class="demo-public-stat__label">Classes</p></article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="prayer-times" class="demo-section scroll-mt-16" *ngIf="moduleEnabled('PrayerTimes')">
+      <div class="app-section">
+        <h2 class="demo-section__title">Prayer times</h2>
+        <p class="demo-prayer-method">Calculation method: <strong>{{ calculationMethod() }}</strong></p>
+        <div class="demo-prayer-highlight">
+          <div class="demo-prayer-highlight__item">
+            <span>Next prayer</span>
+            <strong>{{ nextPrayerName() }}</strong>
+            <em>{{ countdown() }}</em>
+          </div>
+          <div class="demo-prayer-highlight__item">
+            <span>Next jamaat</span>
+            <strong>{{ nextJamaat() }}</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="facilities" class="demo-section demo-section--alt scroll-mt-16" *ngIf="facilityBadges().length">
+      <div class="app-section">
+        <h2 class="demo-section__title">Facilities</h2>
+        <div class="demo-facility-badges">
+          <span *ngFor="let f of facilityBadges()" class="demo-facility-badge">{{ f }}</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="services" class="demo-section scroll-mt-16">
+      <div class="app-section">
+        <h2 class="demo-section__title">Services</h2>
+        <div class="demo-services-grid">
+          <article *ngFor="let s of publicServices()" class="demo-service-card">{{ s }}</article>
+        </div>
+      </div>
+    </section>
+
+    <section id="events-grid" class="demo-section demo-section--alt scroll-mt-16" *ngIf="moduleEnabled('Events')">
+      <div class="app-section">
+        <h2 class="demo-section__title">Upcoming events</h2>
+        <div class="demo-events-grid-cards" *ngIf="events().length; else eventsGridEmpty">
+          <article *ngFor="let e of events()" class="demo-event-grid-card">
+            <p class="demo-event-grid-card__date">{{ e.date | date:'MMM d' }}</p>
+            <h3>{{ e.title }}</h3>
+            <p>{{ formatTime(e.startTime) }} · {{ e.location }}</p>
+            <span class="demo-tag">{{ e.eventType }}</span>
+          </article>
+        </div>
+        <ng-template #eventsGridEmpty>
+          <p class="demo-empty">Community events will appear here when scheduled.</p>
+        </ng-template>
+      </div>
+    </section>
+
+    <section id="gallery" class="demo-section scroll-mt-16" *ngIf="galleryImages().length">
+      <div class="app-section">
+        <h2 class="demo-section__title">Gallery</h2>
+        <div class="demo-gallery">
+          <img *ngFor="let img of galleryImages()" [src]="mediaUrl(img)" alt="" loading="lazy">
+        </div>
+      </div>
+    </section>
+
+    <section id="contact" class="demo-section demo-section--alt scroll-mt-16">
+      <div class="app-section demo-contact-grid">
+        <div>
+          <h2 class="demo-section__title demo-section__title--left">Contact</h2>
+          <ul class="demo-contact-list">
+            <li *ngIf="m.phone"><span>Phone</span><a [href]="'tel:' + m.phone">{{ m.phone }}</a></li>
+            <li *ngIf="m.email"><span>Email</span><a [href]="'mailto:' + m.email">{{ m.email }}</a></li>
+            <li *ngIf="m.website"><span>Website</span><a [href]="m.website" target="_blank" rel="noopener">{{ m.website }}</a></li>
+          </ul>
+          <div class="demo-social-links" *ngIf="m.facebookUrl || m.instagramUrl || m.youtubeUrl || m.twitterUrl">
+            <a *ngIf="m.facebookUrl" [href]="m.facebookUrl" target="_blank" rel="noopener">Facebook</a>
+            <a *ngIf="m.instagramUrl" [href]="m.instagramUrl" target="_blank" rel="noopener">Instagram</a>
+            <a *ngIf="m.youtubeUrl" [href]="m.youtubeUrl" target="_blank" rel="noopener">YouTube</a>
+            <a *ngIf="m.twitterUrl" [href]="m.twitterUrl" target="_blank" rel="noopener">X / Twitter</a>
+          </div>
+        </div>
+        <div *ngIf="mapEmbedUrl() as mapUrl">
+          <iframe class="demo-map" [src]="mapUrl" title="Mosque location map" loading="lazy"></iframe>
+          <a *ngIf="directionsUrl() as dir" [href]="dir" target="_blank" rel="noopener" class="demo-directions-link">Get directions →</a>
+        </div>
+      </div>
+    </section>
+  </ng-container>
+
+  <section id="jamaat" class="demo-section scroll-mt-16" *ngIf="moduleEnabled('PrayerTimes')">
+    <div class="app-section">
+      <h2 class="demo-section__title">Today's Jamaat Times</h2>
+      <div class="demo-prayer-grid" *ngIf="prayerSlots().length">
+        <div *ngFor="let p of prayerSlots()" class="demo-prayer-slot"
+          [class.demo-prayer-slot--active]="p.active">
+          <h3>{{ p.name }}</h3>
+          <p class="demo-prayer-slot__time">{{ p.jamaat }}</p>
+          <p *ngIf="p.active" class="demo-prayer-slot__countdown">{{ p.countdown }}</p>
+        </div>
+      </div>
+
+      <div class="demo-jumuah-panel" *ngIf="jumuahCountdowns().length">
+        <h4 class="demo-jumuah-panel__title">Friday Jumuah</h4>
+        <div class="demo-jumuah-panel__slots">
+          <div *ngFor="let j of jumuahCountdowns()" class="demo-jumuah-slot"
+            [class.demo-jumuah-slot--active]="j.active">
+            <p class="demo-jumuah-slot__label">Jamaat {{ j.slotNumber }}</p>
+            <p class="demo-jumuah-slot__time">{{ formatTime(j.jamaatTime) }}</p>
+            <p *ngIf="isFriday() && j.countdown" class="demo-jumuah-slot__cd"
+              [class.demo-jumuah-slot__cd--lg]="j.active">{{ j.countdown }}</p>
+            <p *ngIf="j.active" class="demo-jumuah-slot__next">Next Jumuah</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="announcements" class="demo-section demo-section--alt scroll-mt-16" *ngIf="moduleEnabled('Announcements')">
+    <div class="app-section" *ngIf="announcements().length; else announcementsEmpty">
+      <h2 class="demo-section__title">Announcements</h2>
+      <div class="demo-announce-grid">
+        <div *ngIf="featuredAnnouncement() as fa" class="demo-announce-featured">
+          <span *ngIf="fa.isFeatured" class="demo-tag demo-tag--gold">Featured</span>
+          <h3>{{ fa.title }}</h3>
+          <p>{{ fa.summary }}</p>
+        </div>
+        <div class="demo-announce-list">
+          <div *ngFor="let a of otherAnnouncements()" class="demo-announce-item">
+            <h4>{{ a.title }}</h4>
+            <p>{{ a.summary }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ng-template #announcementsEmpty>
+      <div class="app-section demo-empty">
+        <h2 class="demo-section__title">Announcements</h2>
+        <p>Community updates appear here for your congregation.</p>
+      </div>
+    </ng-template>
+  </section>
+
+  <section id="events" class="demo-section scroll-mt-16" *ngIf="moduleEnabled('Events') || moduleEnabled('Janaza')">
+    <div class="app-section demo-events-grid">
+      <div *ngIf="events().length && moduleEnabled('Events'); else eventsEmpty">
+        <h2 class="demo-section__title">Upcoming Events</h2>
+        <div class="demo-events-list">
+          <div *ngFor="let e of events()" class="demo-event-card">
+            <div class="demo-event-card__date">
+              <p>{{ e.date | date:'MMM' }}</p>
+              <p>{{ e.date | date:'d' }}</p>
+            </div>
+            <div>
+              <span class="demo-tag">{{ e.eventType }}</span>
+              <h4>{{ e.title }}</h4>
+              <p>{{ formatTime(e.startTime) }} · {{ e.location }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <ng-template #eventsEmpty>
+        <div *ngIf="moduleEnabled('Events')">
+          <h2 class="demo-section__title">Upcoming Events</h2>
+          <p class="demo-empty">Weekly classes, mawlid nights, and community gatherings appear here.</p>
+        </div>
+      </ng-template>
+      <div *ngIf="janaza().length && moduleEnabled('Janaza')">
+        <h2 class="demo-section__title">Janaza Notices</h2>
+        <div *ngFor="let j of janaza()" class="demo-janaza-card">
+          <p class="demo-janaza-card__verse">Inna lillahi wa inna ilayhi raji'un</p>
+          <h4>{{ j.name }}</h4>
+          <p><strong>Janaza:</strong> {{ j.janazaDate | date:'mediumDate' }} at {{ formatTime(j.janazaTime) }}</p>
+          <p class="demo-janaza-card__loc">{{ j.location }}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="dua" class="demo-section demo-section--alt scroll-mt-16">
+    <div class="app-section demo-dua" *ngIf="featuredDua() as dua; else duaEmpty">
+      <h2 class="demo-eyebrow">Dua for Now</h2>
+      <p class="demo-dua__arabic" dir="rtl">{{ dua.arabicText }}</p>
+      <p class="demo-dua__trans">{{ dua.translation }}</p>
+    </div>
+    <ng-template #duaEmpty>
+      <div class="app-section demo-empty">
+        <h2 class="demo-eyebrow">Dua for Now</h2>
+        <p>A daily dua recommendation for worshippers.</p>
+      </div>
+    </ng-template>
+  </section>
+
+  <section id="donations" class="demo-section scroll-mt-16" *ngIf="moduleEnabled('Donations')">
+    <div class="app-section demo-empty">
+      <h2 class="demo-section__title">Support This Mosque</h2>
+      <p>Online donations will appear here when configured by the mosque admin.</p>
+    </div>
+  </section>
+
+  <footer id="demo-footer" class="demo-footer scroll-mt-16">
+    <div class="app-section demo-footer__grid" *ngIf="mosque() as m; else footerEmpty">
+      <div>
+        <h3>Visit Us</h3>
+        <p>{{ m.address }}, {{ m.city }}<span *ngIf="m.postcode">, {{ m.postcode }}</span></p>
+        <p *ngIf="m.country">{{ m.country }}</p>
+        <p *ngIf="m.phone">{{ m.phone }}</p>
+        <p *ngIf="m.email"><a [href]="'mailto:' + m.email" class="demo-footer__link">{{ m.email }}</a></p>
+        <p *ngIf="m.website"><a [href]="m.website" target="_blank" rel="noopener" class="demo-footer__link">{{ m.website }}</a></p>
+      </div>
+      <div *ngIf="m.facebookUrl || m.instagramUrl || m.youtubeUrl || m.twitterUrl" class="demo-footer__social">
+        <h3>Connect</h3>
+        <a *ngIf="m.facebookUrl" [href]="m.facebookUrl" target="_blank" rel="noopener" class="demo-footer__link">Facebook</a>
+        <a *ngIf="m.instagramUrl" [href]="m.instagramUrl" target="_blank" rel="noopener" class="demo-footer__link">Instagram</a>
+        <a *ngIf="m.youtubeUrl" [href]="m.youtubeUrl" target="_blank" rel="noopener" class="demo-footer__link">YouTube</a>
+        <a *ngIf="m.twitterUrl" [href]="m.twitterUrl" target="_blank" rel="noopener" class="demo-footer__link">X / Twitter</a>
+      </div>
+      <div class="demo-footer__meta">
+        <p>&copy; 2026 {{ m.name }}. Powered by MOS.</p>
+      </div>
+    </div>
+    <ng-template #footerEmpty>
+      <div class="app-section demo-empty">
+        <p>Powered by MOS.</p>
+      </div>
+    </ng-template>
+  </footer>
+
+  <div *ngIf="loading()" class="demo-loading">Loading demo...</div>
+
+  <app-auth-login-modal
+    *ngIf="showLoginModal()"
+    [mosqueName]="mosque()?.name || ''"
+    (close)="onLoginModalClosed()"
+    (loggedIn)="onLoggedInFromModal()" />
+
+  <!-- Claim Modal -->
+  <div *ngIf="showClaimModal()" class="claim-modal-backdrop" (click)="onClaimModalClosed()">
+    <div class="claim-modal" (click)="$event.stopPropagation()" role="dialog" aria-labelledby="claim-modal-title">
+      <header class="claim-modal__head">
+        <div>
+          <p class="claim-modal__eyebrow">Ownership Claim</p>
+          <h2 id="claim-modal-title">Claim {{ mosque()?.name }}</h2>
+        </div>
+        <button type="button" class="claim-modal__close" (click)="onClaimModalClosed()" aria-label="Close">✕</button>
+      </header>
+      <div class="claim-modal__body">
+        <p class="claim-modal__hint">Fill in your details. A super admin will review and approve your claim within 3–5 business days.</p>
+        <label class="demo-claim-field">Full Name *
+          <input class="demo-claim-input" [(ngModel)]="claimDto.fullName" placeholder="Your full name">
+        </label>
+        <label class="demo-claim-field">Phone *
+          <input class="demo-claim-input" [(ngModel)]="claimDto.phone" placeholder="+44 7700 900000">
+        </label>
+        <label class="demo-claim-field">Position *
+          <input class="demo-claim-input" [(ngModel)]="claimDto.position" placeholder="Imam / Trustee / Secretary">
+        </label>
+        <label class="demo-claim-field">Organisation
+          <input class="demo-claim-input" [(ngModel)]="claimDto.organization" placeholder="e.g. Bradford Muslim Society">
+        </label>
+        <label class="demo-claim-field">Relationship to mosque *
+          <select class="demo-claim-input" [(ngModel)]="claimDto.relationshipToMosque">
+            <option value="">Select…</option>
+            <option>Imam</option>
+            <option>Trustee</option>
+            <option>Committee Member</option>
+            <option>Administrator</option>
+            <option>Volunteer</option>
+            <option>Community Member</option>
+          </select>
+        </label>
+        <label class="demo-claim-field">Years associated
+          <input class="demo-claim-input" type="number" min="0" max="100" [(ngModel)]="claimDto.yearsAssociated" placeholder="0">
+        </label>
+        <label class="demo-claim-field">Reason for claim *
+          <textarea class="demo-claim-input demo-claim-textarea" rows="3" [(ngModel)]="claimDto.reason"
+            placeholder="Explain your role and connection to this mosque (min 10 characters)…"></textarea>
+        </label>
+        <div class="demo-claim-docs">
+          <p class="demo-claim-docs__title">Supporting document (optional)</p>
+          <div class="demo-claim-file">
+            <span>Upload a letter, ID or authority document</span>
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png" (change)="onClaimFileChange($event)">
+          </div>
+        </div>
+        <label class="demo-claim-check">
+          <input type="checkbox" [(ngModel)]="claimDto.authorizedDeclaration">
+          <span>I confirm I am authorised to claim ownership of this mosque listing.</span>
+        </label>
+        <label class="demo-claim-check">
+          <input type="checkbox" [(ngModel)]="claimDto.accurateInfoDeclaration">
+          <span>I confirm all information provided is accurate to the best of my knowledge.</span>
+        </label>
+        <p *ngIf="claimMsg()" class="demo-claim-msg" [class.demo-claim-msg--ok]="claimMsgOk()" [class.demo-claim-msg--err]="!claimMsgOk()">{{ claimMsg() }}</p>
+      </div>
+      <footer class="claim-modal__foot">
+        <button type="button" class="demo-claim-btn" style="background:#334155;color:#fff;border-color:#334155;" (click)="onClaimModalClosed()">Cancel</button>
+        <button type="button" class="demo-claim-btn" [disabled]="claiming()" (click)="submitClaimForm()">
+          {{ claiming() ? 'Submitting…' : 'Submit Claim' }}
+        </button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Step 4 — Claim submitted success -->
+  <div *ngIf="showClaimSuccess()" class="claim-modal-backdrop">
+    <div class="claim-modal claim-modal--success" role="dialog" aria-labelledby="claim-success-title">
+      <header class="claim-modal__head">
+        <div>
+          <p class="claim-modal__eyebrow">Ownership Claim</p>
+          <h2 id="claim-success-title">Claim Submitted</h2>
+        </div>
+      </header>
+      <div class="claim-modal__body">
+        <p class="claim-modal__hint" style="color:#6ee7b7;font-weight:600;">Your request has been sent to the Super Admin.</p>
+        <p class="claim-modal__hint">You'll receive an email after approval. You can track status from your dashboard.</p>
+        <p *ngIf="pendingClaim()?.claimReference" class="claim-modal__hint">
+          Reference: <strong>{{ pendingClaim()!.claimReference }}</strong>
+        </p>
+      </div>
+      <footer class="claim-modal__foot" style="grid-template-columns:1fr;">
+        <a [routerLink]="claimDashboardRoute()" class="demo-claim-btn" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;">
+          Go to Dashboard
+        </a>
+      </footer>
+    </div>
+  </div>
+  </ng-container>
+</div>

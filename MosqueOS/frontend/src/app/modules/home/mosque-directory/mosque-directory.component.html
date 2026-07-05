@@ -1,0 +1,163 @@
+<div class="dir-page">
+
+  <header class="dir-hero">
+    <div class="dir-hero__inner">
+      <p class="dir-hero__eyebrow">Mosque Directory</p>
+      <h1 class="dir-hero__title">Find Your Mosque</h1>
+      <p class="dir-hero__sub">Search active mosques near you by name, city, or postcode.</p>
+
+      <form class="dir-search" (ngSubmit)="search()" role="search" aria-label="Search mosques">
+        <div class="dir-search__fields">
+          <div class="dir-search__field">
+            <label class="dir-search__label" for="dir-name">Mosque name</label>
+            <input
+              id="dir-name"
+              class="dir-input"
+              type="search"
+              [(ngModel)]="name"
+              name="name"
+              placeholder="e.g. Al-Noor"
+              autocomplete="off"
+              aria-label="Search by mosque name">
+          </div>
+          <div class="dir-search__field">
+            <label class="dir-search__label" for="dir-city">City</label>
+            <input
+              id="dir-city"
+              class="dir-input"
+              type="search"
+              [(ngModel)]="city"
+              name="city"
+              placeholder="e.g. Bradford"
+              autocomplete="off"
+              aria-label="Search by city">
+          </div>
+          <div class="dir-search__field">
+            <label class="dir-search__label" for="dir-postcode">Postcode</label>
+            <input
+              id="dir-postcode"
+              class="dir-input"
+              type="search"
+              [(ngModel)]="postcode"
+              name="postcode"
+              placeholder="e.g. BD1"
+              autocomplete="off"
+              aria-label="Search by postcode">
+          </div>
+          <div class="dir-search__field">
+            <label class="dir-search__label" for="dir-country">Country</label>
+            <input
+              id="dir-country"
+              class="dir-input"
+              type="search"
+              [(ngModel)]="country"
+              name="country"
+              placeholder="e.g. United Kingdom"
+              autocomplete="off"
+              aria-label="Search by country">
+          </div>
+        </div>
+
+        <!-- Status filter chips -->
+        <div class="dir-filters" role="group" aria-label="Filter by status">
+          <span class="dir-filters__label">Status:</span>
+          <button
+            *ngFor="let opt of statusOptions"
+            type="button"
+            class="dir-chip"
+            [class.dir-chip--active]="statusFilter === opt.value"
+            (click)="setStatus(opt.value)"
+            [attr.aria-pressed]="statusFilter === opt.value">
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <div class="dir-search__actions">
+          <button type="submit" class="dir-btn" [disabled]="loading()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            Search
+          </button>
+          <button *ngIf="hasFilters()" type="button" class="dir-btn dir-btn--ghost" (click)="clear()">
+            Clear
+          </button>
+        </div>
+      </form>
+    </div>
+  </header>
+
+  <main class="dir-main" aria-live="polite" aria-label="Search results">
+
+    <div *ngIf="loading()" class="dir-state">
+      <span class="dir-pulse" aria-hidden="true"></span>
+      <p>Searching mosques…</p>
+    </div>
+
+    <p *ngIf="error() && !loading()" class="dir-alert" role="alert">{{ error() }}</p>
+
+    <div *ngIf="!loading() && searched() && !error()">
+      <p class="dir-count" *ngIf="mosques().length">
+        Showing {{ pageStart() }}-{{ pageEnd() }} of {{ total() }} mosque{{ total() === 1 ? '' : 's' }}
+      </p>
+
+      <div *ngIf="!mosques().length" class="dir-state">
+        <span class="dir-state__icon" aria-hidden="true">🕌</span>
+        <p>No mosques found matching your search.</p>
+        <div style="display:flex;gap:0.65rem;flex-wrap:wrap;justify-content:center;margin-top:0.5rem">
+          <button type="button" class="dir-btn dir-btn--outline" (click)="clear()">Show all mosques</button>
+          <a routerLink="/mosques/request" class="dir-btn dir-btn--outline">Request a mosque</a>
+        </div>
+      </div>
+
+      <ul class="dir-grid" *ngIf="mosques().length">
+        <li *ngFor="let m of mosques()" class="dir-card">
+          <div class="dir-card__top">
+            <div class="dir-card__avatar" aria-hidden="true">
+              <img *ngIf="m.logoUrl" [src]="m.logoUrl" [alt]="m.name + ' logo'" class="dir-card__logo">
+              <span *ngIf="!m.logoUrl">{{ initial(m.name) }}</span>
+            </div>
+            <div class="dir-card__info">
+              <h2 class="dir-card__name">{{ m.name }}</h2>
+              <p class="dir-card__location">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                {{ m.city }}<span *ngIf="m.postcode"> · {{ m.postcode }}</span>
+              </p>
+              <span class="dir-card__status" [class.dir-card__status--active]="m.status === 'Active'" [class.dir-card__status--unclaimed]="m.status === 'Unclaimed'">
+                {{ m.status === 'Active' ? 'Active' : 'Unclaimed' }}
+              </span>
+            </div>
+          </div>
+
+          <p *ngIf="m.shortDescription || m.description" class="dir-card__desc">
+            {{ (m.shortDescription || m.description) | slice:0:120 }}{{ ((m.shortDescription || m.description)!.length > 120) ? '…' : '' }}
+          </p>
+
+          <footer class="dir-card__foot">
+            <a *ngIf="m.publicProfileEnabled !== false" [routerLink]="['/mosque', m.slug]" class="dir-btn dir-btn--sm">
+              View Profile
+            </a>
+            <a *ngIf="m.status === 'Unclaimed' && m.allowClaimRequests !== false" [routerLink]="['/claim-mosque', m.slug]" class="dir-btn dir-btn--ghost dir-btn--sm">
+              Claim
+            </a>
+          </footer>
+        </li>
+      </ul>
+
+      <nav *ngIf="mosques().length && totalPages() > 1" class="dir-pagination" aria-label="Mosque directory pagination">
+        <button type="button" class="dir-page-btn" (click)="previousPage()" [disabled]="page() <= 1">
+          Previous
+        </button>
+        <span class="dir-pagination__page">Page {{ page() }} of {{ totalPages() }}</span>
+        <button type="button" class="dir-page-btn" (click)="nextPage()" [disabled]="page() >= totalPages()">
+          Next
+        </button>
+      </nav>
+    </div>
+
+    <div class="dir-cant-find">
+      <p>Can't find your mosque?</p>
+      <a routerLink="/mosques/request" class="dir-btn dir-btn--outline dir-btn--sm">Request it to be added</a>
+    </div>
+  </main>
+</div>

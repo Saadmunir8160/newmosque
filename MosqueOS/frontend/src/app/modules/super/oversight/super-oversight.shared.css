@@ -1,0 +1,22 @@
+.ov-muted { font-size: 0.75rem; color: #64748b; margin-top: 0.15rem; }
+.ov-summary {
+  max-width: 280px;
+  font-size: 0.8125rem;
+  color: #475569;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ov-featured {
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #b45309;
+  background: #fef3c7;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+}
+.sc-kpi--warn .sc-kpi__value { color: #b45309; }
+.sc-badge--warn { background: #fef3c7; color: #92400e; }

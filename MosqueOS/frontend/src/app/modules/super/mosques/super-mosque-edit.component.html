@@ -1,0 +1,40 @@
+<div class="mp-page">
+  <div *ngIf="toast()" class="mp-toast mp-toast--ok" role="status">{{ toast() }}</div>
+
+  <nav class="mp-breadcrumb" aria-label="Breadcrumb">
+    <a routerLink="/dashboard/super">Dashboard</a>
+    <span class="mp-breadcrumb__sep">›</span>
+    <a routerLink="/dashboard/super/mosques">Mosque listings</a>
+    <span class="mp-breadcrumb__sep">›</span>
+    <a *ngIf="mosque() as m" [routerLink]="['/dashboard/super/mosques', m.id]">{{ m.name }}</a>
+    <span *ngIf="mosque()" class="mp-breadcrumb__sep">›</span>
+    <span class="mp-breadcrumb__current">Edit</span>
+  </nav>
+
+  <div *ngIf="loading()" class="mp-state-loading">
+    <span class="mp-pulse"></span> Loading mosque…
+  </div>
+
+  <p *ngIf="error()" class="mp-alert mp-alert--error" role="alert">{{ error() }}</p>
+
+  <ng-container *ngIf="mosque() as m">
+    <section class="mp-hero mp-hero--compact">
+      <div class="mp-hero__top">
+        <div>
+          <p class="mp-hero__eyebrow">Super Admin · Edit Mosque</p>
+          <h1 class="mp-hero__title">{{ m.name }}</h1>
+          <p class="mp-hero__sub">{{ m.city }} · <code>/{{ m.slug }}</code></p>
+        </div>
+        <span class="mp-status" [ngClass]="statusClass(m.status)">{{ formatStatus(m.status) }}</span>
+      </div>
+    </section>
+
+    <section class="mp-panel mp-edit-panel">
+      <app-mosque-seed-form
+        [editMosque]="m"
+        [users]="users()"
+        (cancelled)="onCancel()"
+        (saved)="onSaved($event)" />
+    </section>
+  </ng-container>
+</div>

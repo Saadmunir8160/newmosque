@@ -1,0 +1,149 @@
+<div class="req-page">
+
+  <header class="req-hero">
+    <div class="req-hero__inner">
+      <a routerLink="/mosques" class="req-back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        Back to directory
+      </a>
+      <p class="req-hero__eyebrow">Mosque Discovery</p>
+      <h1 class="req-hero__title">Can't Find Your Mosque?</h1>
+      <p class="req-hero__sub">
+        If your mosque isn't listed in our directory, submit a request and our team will add it for you.
+      </p>
+    </div>
+  </header>
+
+  <main class="req-main">
+
+    <!-- Success state -->
+    <div *ngIf="success()" class="req-success" role="alert">
+      <span class="req-success__icon" aria-hidden="true">✅</span>
+      <h2 class="req-success__title">Request Submitted!</h2>
+      <p class="req-success__msg">{{ successMessage() }}</p>
+      <div class="req-success__actions">
+        <a routerLink="/mosques" class="req-btn">Back to Directory</a>
+      </div>
+    </div>
+
+    <!-- Form -->
+    <form *ngIf="!success()" class="req-card" (ngSubmit)="submit()" novalidate aria-label="Request new mosque form">
+
+      <p class="req-card__intro">
+        Fill in as much detail as you know. Fields marked <abbr title="required">*</abbr> are required.
+      </p>
+
+      <p *ngIf="error()" class="req-alert" role="alert">{{ error() }}</p>
+
+      <div class="req-section">
+        <h2 class="req-section__title">Mosque Details</h2>
+
+        <div class="req-field req-field--required">
+          <label class="req-label" for="req-name">Mosque name *</label>
+          <input
+            id="req-name"
+            class="req-input"
+            type="text"
+            [(ngModel)]="mosqueName"
+            name="mosqueName"
+            placeholder="e.g. Masjid Al-Noor"
+            autocomplete="organization"
+            required>
+        </div>
+
+        <div class="req-row">
+          <div class="req-field req-field--required">
+            <label class="req-label" for="req-city">City *</label>
+            <input
+              id="req-city"
+              class="req-input"
+              type="text"
+              [(ngModel)]="city"
+              name="city"
+              placeholder="e.g. Bradford"
+              autocomplete="address-level2"
+              required>
+          </div>
+          <div class="req-field">
+            <label class="req-label" for="req-postcode">Postcode</label>
+            <input
+              id="req-postcode"
+              class="req-input"
+              type="text"
+              [(ngModel)]="postcode"
+              name="postcode"
+              placeholder="e.g. BD1 1AA"
+              autocomplete="postal-code">
+          </div>
+        </div>
+
+        <div class="req-field">
+          <label class="req-label" for="req-address">Address</label>
+          <input
+            id="req-address"
+            class="req-input"
+            type="text"
+            [(ngModel)]="address"
+            name="address"
+            placeholder="Street address (optional)"
+            autocomplete="street-address">
+        </div>
+      </div>
+
+      <div class="req-section">
+        <h2 class="req-section__title">Your Contact Details <span class="req-section__opt">(optional)</span></h2>
+        <p class="req-section__note">We'll use this to follow up if we need more information.</p>
+
+        <div class="req-row">
+          <div class="req-field">
+            <label class="req-label" for="req-submitter">Your name</label>
+            <input
+              id="req-submitter"
+              class="req-input"
+              type="text"
+              [(ngModel)]="submitterName"
+              name="submitterName"
+              placeholder="Your full name"
+              autocomplete="name">
+          </div>
+          <div class="req-field">
+            <label class="req-label" for="req-email">Email address</label>
+            <input
+              id="req-email"
+              class="req-input"
+              type="email"
+              [(ngModel)]="email"
+              name="email"
+              placeholder="you@example.com"
+              autocomplete="email">
+          </div>
+        </div>
+      </div>
+
+      <div class="req-section">
+        <h2 class="req-section__title">Additional Notes <span class="req-section__opt">(optional)</span></h2>
+        <div class="req-field">
+          <label class="req-label" for="req-notes">Notes</label>
+          <textarea
+            id="req-notes"
+            class="req-input req-input--textarea"
+            [(ngModel)]="notes"
+            name="notes"
+            rows="3"
+            placeholder="Any extra details that might help us find or verify this mosque…"></textarea>
+        </div>
+      </div>
+
+      <footer class="req-footer">
+        <button type="submit" class="req-btn" [disabled]="submitting()">
+          <svg *ngIf="!submitting()" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg>
+          <span *ngIf="submitting()" class="req-spinner" aria-hidden="true"></span>
+          {{ submitting() ? 'Submitting…' : 'Submit Request' }}
+        </button>
+        <a routerLink="/mosques" class="req-btn req-btn--ghost">Cancel</a>
+      </footer>
+
+    </form>
+
+  </main>
+</div>

@@ -1,0 +1,366 @@
+<app-page-header
+  *ngIf="!hideHeader"
+  [useAuthRole]="true"
+  title="Mosque Profile"
+  subtitle="Manage public identity, contact channels, brand assets, and profile readiness." />
+
+<div *ngIf="isOwner() && ownerChecked() && !mosque()" class="admin-empty mp-empty">
+  <p class="admin-empty-title">No mosque linked yet</p>
+  <p class="admin-empty-desc">Contact your super admin to link your account to a mosque.</p>
+</div>
+
+<ng-container *ngIf="mosque() as m">
+  <section class="mp-hero">
+    <div class="mp-hero__media" [style.background-image]="m.bannerUrl ? 'url(' + mediaUrl(m.bannerUrl) + ')' : null">
+      <div class="mp-logo">
+        <img *ngIf="m.logoUrl" [src]="mediaUrl(m.logoUrl)" alt="Mosque logo">
+        <lucide-icon *ngIf="!m.logoUrl" name="building-2" size="24"></lucide-icon>
+      </div>
+    </div>
+
+    <div class="mp-hero__content">
+      <div>
+        <div class="mp-kicker">
+          <span class="mp-status" [class.mp-status--locked]="!canEdit()">
+            <lucide-icon [name]="canEdit() ? 'shield-check' : 'lock'" size="14"></lucide-icon>
+            {{ canEdit() ? 'Editable profile' : 'Editing locked' }}
+          </span>
+          <span class="mp-id">ID {{ m.id }}</span>
+        </div>
+        <h1>{{ m.name || 'Untitled mosque' }}</h1>
+        <p>{{ m.shortDescription || m.description || 'Build a complete, trusted public profile for your community.' }}</p>
+      </div>
+
+      <div class="mp-actions">
+        <a *ngIf="m.slug" class="mp-btn mp-btn--secondary" [routerLink]="['/mosque', m.slug]" target="_blank" rel="noopener">
+          <lucide-icon name="external-link" size="15"></lucide-icon>
+          Public page
+        </a>
+        <button class="mp-btn mp-btn--primary" type="button" [disabled]="!canEdit() || saving()" (click)="save(m)">
+          <lucide-icon name="save" size="15"></lucide-icon>
+          {{ saving() ? 'Saving...' : 'Save changes' }}
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <div *ngIf="!canEdit()" class="mp-alert" role="alert">
+    <lucide-icon name="alert-triangle" size="16"></lucide-icon>
+    <span>{{ editLockMessage() }}</span>
+  </div>
+
+  <div *ngIf="msg()" class="mp-toast" [class.mp-toast--error]="msgError()" role="status">
+    <lucide-icon [name]="msgError() ? 'alert-triangle' : 'check-circle-2'" size="16"></lucide-icon>
+    <span>{{ msg() }}</span>
+  </div>
+
+  <div class="mp-shell">
+    <aside class="mp-nav" aria-label="Profile sections">
+      <div class="mp-nav__header">
+        <span>Profile setup</span>
+        <strong>{{ profileCompletion() }}%</strong>
+      </div>
+      <div class="mp-progress"><span [style.width.%]="profileCompletion()"></span></div>
+
+      <button
+        *ngFor="let section of visibleSections()"
+        type="button"
+        class="mp-nav-item"
+        [class.mp-nav-item--active]="activeSection() === section.id"
+        (click)="setActiveSection(section.id)">
+        <span class="mp-nav-item__icon">
+          <lucide-icon [name]="section.icon" size="15"></lucide-icon>
+        </span>
+        <span class="mp-nav-item__copy">
+          <strong>{{ section.label }}</strong>
+          <small>{{ section.eyebrow }}</small>
+        </span>
+        <span class="mp-dot" [class.mp-dot--complete]="sectionStatus(section.id, m) === 'complete'"></span>
+      </button>
+    </aside>
+
+    <main class="mp-main" [class.mp-main--locked]="!canEdit()">
+      <section *ngIf="showSection('basic')" class="mp-panel" [class.mp-panel--active]="activeSection() === 'basic'">
+        <div class="mp-panel__head">
+          <div>
+            <span class="mp-panel__eyebrow">Core profile</span>
+            <h2>Identity</h2>
+          </div>
+          <span class="mp-chip">{{ sectionProgress('basic', m) }}% complete</span>
+        </div>
+        <div class="mp-grid">
+          <label class="mp-field">
+            <span>Name <em>*</em></span>
+            <input class="mp-input" [(ngModel)]="m.name" placeholder="Masjid Al-Noor" [disabled]="!canEdit()">
+          </label>
+          <label class="mp-field">
+            <span>City <em>*</em></span>
+            <input class="mp-input" [(ngModel)]="m.city" placeholder="Bradford" [disabled]="!canEdit()">
+          </label>
+          <label class="mp-field mp-field--full">
+            <span>Short description</span>
+            <input class="mp-input" [(ngModel)]="m.shortDescription" placeholder="One-line summary shown in listings" [disabled]="!canEdit()">
+          </label>
+          <label class="mp-field mp-field--full">
+            <span>Description</span>
+            <textarea class="mp-input mp-textarea" rows="4" [(ngModel)]="m.description" placeholder="Tell visitors what makes this mosque active and welcoming." [disabled]="!canEdit()"></textarea>
+          </label>
+        </div>
+      </section>
+
+      <section *ngIf="showSection('address')" class="mp-panel" [class.mp-panel--active]="activeSection() === 'address'">
+        <div class="mp-panel__head">
+          <div>
+            <span class="mp-panel__eyebrow">Directory data</span>
+            <h2>Address</h2>
+          </div>
+          <span class="mp-chip">{{ sectionProgress('address', m) }}% complete</span>
+        </div>
+        <div class="mp-grid">
+          <label class="mp-field mp-field--full">
+            <span>Street address</span>
+            <input class="mp-input" [(ngModel)]="m.address" placeholder="12 Manningham Lane" [disabled]="!canEdit()">
+          </label>
+          <label class="mp-field">
+            <span>Postcode</span>
+            <input class="mp-input" [(ngModel)]="m.postcode" placeholder="BD1 3EA" [disabled]="!canEdit()">
+          </label>
+          <label class="mp-field">
+            <span>Country</span>
+            <input class="mp-input" [(ngModel)]="m.country" placeholder="United Kingdom" [disabled]="!canEdit()">
+          </label>
+          <label class="mp-field mp-field--full">
+            <span>Parking info</span>
+            <textarea class="mp-input mp-textarea" rows="3" [(ngModel)]="m.parkingInfo" placeholder="Parking, entrances, accessibility, and arrival notes." [disabled]="!canEdit()"></textarea>
+          </label>
+        </div>
+      </section>
+
+      <section *ngIf="showSection('contact')" class="mp-panel" [class.mp-panel--active]="activeSection() === 'contact'">
+        <div class="mp-panel__head">
+          <div>
+            <span class="mp-panel__eyebrow">Channels</span>
+            <h2>Contact</h2>
+          </div>
+          <span class="mp-chip">{{ sectionProgress('contact', m) }}% complete</span>
+        </div>
+        <div class="mp-grid">
+          <label class="mp-field">
+            <span><lucide-icon name="phone" size="13"></lucide-icon> Phone</span>
+            <input class="mp-input" [(ngModel)]="m.phone" placeholder="+44 1274 555000" [disabled]="!canEdit()">
+          </label>
+          <label class="mp-field">
+            <span><lucide-icon name="mail" size="13"></lucide-icon> Email</span>
+            <input class="mp-input" type="email" [(ngModel)]="m.email" placeholder="info@mosque.org" [disabled]="!canEdit()">
+          </label>
+          <label class="mp-field mp-field--full">
+            <span><lucide-icon name="link" size="13"></lucide-icon> Website</span>
+            <input class="mp-input" [(ngModel)]="m.website" placeholder="https://..." [disabled]="!canEdit()">
+          </label>
+        </div>
+      </section>
+
+      <section *ngIf="showSection('social')" class="mp-panel" [class.mp-panel--active]="activeSection() === 'social'">
+        <div class="mp-panel__head">
+          <div>
+            <span class="mp-panel__eyebrow">Distribution</span>
+            <h2>Social links</h2>
+          </div>
+          <span class="mp-chip">{{ sectionProgress('social', m) }}% complete</span>
+        </div>
+        <div class="mp-grid">
+          <label class="mp-field">
+            <span>Facebook</span>
+            <input class="mp-input" [(ngModel)]="m.facebookUrl" placeholder="https://facebook.com/..." [disabled]="!canEdit()">
+          </label>
+          <label class="mp-field">
+            <span>Instagram</span>
+            <input class="mp-input" [(ngModel)]="m.instagramUrl" placeholder="https://instagram.com/..." [disabled]="!canEdit()">
+          </label>
+          <label class="mp-field">
+            <span>YouTube</span>
+            <input class="mp-input" [(ngModel)]="m.youtubeUrl" placeholder="https://youtube.com/..." [disabled]="!canEdit()">
+          </label>
+          <label class="mp-field">
+            <span>X / Twitter</span>
+            <input class="mp-input" [(ngModel)]="m.twitterUrl" placeholder="https://x.com/..." [disabled]="!canEdit()">
+          </label>
+        </div>
+      </section>
+
+      <section *ngIf="showSection('location')" class="mp-panel" [class.mp-panel--active]="activeSection() === 'location'">
+        <div class="mp-panel__head">
+          <div>
+            <span class="mp-panel__eyebrow">Maps</span>
+            <h2>Location intelligence</h2>
+          </div>
+          <span class="mp-chip">{{ sectionProgress('location', m) }}% complete</span>
+        </div>
+        <div class="mp-grid">
+          <label class="mp-field mp-field--full">
+            <span>Map link or embed URL</span>
+            <input class="mp-input" [(ngModel)]="m.mapLocation" placeholder="Google Maps URL or location label" [disabled]="!canEdit()">
+          </label>
+          <label class="mp-field">
+            <span>Latitude</span>
+            <input class="mp-input" type="number" step="any" [(ngModel)]="m.latitude" placeholder="53.7960" [disabled]="!canEdit()">
+          </label>
+          <label class="mp-field">
+            <span>Longitude</span>
+            <input class="mp-input" type="number" step="any" [(ngModel)]="m.longitude" placeholder="-1.7594" [disabled]="!canEdit()">
+          </label>
+          <label class="mp-field mp-field--full">
+            <span><lucide-icon name="clock-3" size="13"></lucide-icon> Timezone</span>
+            <input class="mp-input" [(ngModel)]="m.timezone" placeholder="Europe/London" [disabled]="!canEdit()">
+          </label>
+        </div>
+      </section>
+
+      <section *ngIf="showSection('media')" class="mp-panel" [class.mp-panel--active]="activeSection() === 'media'">
+        <div class="mp-panel__head">
+          <div>
+            <span class="mp-panel__eyebrow">Logo and banner</span>
+            <h2>Brand assets</h2>
+          </div>
+          <span class="mp-chip">{{ sectionProgress('media', m) }}% complete</span>
+        </div>
+        <div class="mp-media-grid">
+          <div class="mp-upload-card">
+            <div class="mp-upload-card__preview mp-upload-card__preview--logo">
+              <img *ngIf="m.logoUrl" [src]="mediaUrl(m.logoUrl)" alt="Mosque logo">
+              <lucide-icon *ngIf="!m.logoUrl" name="image" size="22"></lucide-icon>
+            </div>
+            <div>
+              <h3>Logo</h3>
+              <p>Used in admin context, listing cards, and the public profile header.</p>
+              <label class="mp-upload" [class.mp-upload--disabled]="!canEdit()">
+                <lucide-icon name="upload" size="14"></lucide-icon>
+                Replace logo
+                <input type="file" accept="image/*" (change)="onFile($event, m, 'logo')" [disabled]="!canEdit()">
+              </label>
+            </div>
+          </div>
+          <div class="mp-upload-card">
+            <div class="mp-upload-card__preview">
+              <img *ngIf="m.bannerUrl" [src]="mediaUrl(m.bannerUrl)" alt="Mosque banner">
+              <lucide-icon *ngIf="!m.bannerUrl" name="image" size="22"></lucide-icon>
+            </div>
+            <div>
+              <h3>Banner</h3>
+              <p>Wide visual shown across public mosque pages and management surfaces.</p>
+              <label class="mp-upload" [class.mp-upload--disabled]="!canEdit()">
+                <lucide-icon name="upload" size="14"></lucide-icon>
+                Replace banner
+                <input type="file" accept="image/*" (change)="onFile($event, m, 'banner')" [disabled]="!canEdit()">
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section *ngIf="showSection('profile')" class="mp-panel" [class.mp-panel--active]="activeSection() === 'profile'">
+        <div class="mp-panel__head">
+          <div>
+            <span class="mp-panel__eyebrow">About page</span>
+            <h2>Public story</h2>
+          </div>
+          <span class="mp-chip">{{ sectionProgress('profile', m) }}% complete</span>
+        </div>
+        <div class="mp-grid">
+          <label class="mp-field">
+            <span>Established year</span>
+            <input class="mp-input" type="number" [(ngModel)]="m.establishedYear" [disabled]="!canEdit()">
+          </label>
+          <label class="mp-field">
+            <span>Capacity</span>
+            <input class="mp-input" type="number" [(ngModel)]="m.capacity" [disabled]="!canEdit()">
+          </label>
+          <label class="mp-field mp-field--full">
+            <span>Vision</span>
+            <textarea class="mp-input mp-textarea" rows="3" [(ngModel)]="m.vision" [disabled]="!canEdit()"></textarea>
+          </label>
+          <label class="mp-field mp-field--full">
+            <span>History</span>
+            <textarea class="mp-input mp-textarea" rows="4" [(ngModel)]="m.history" [disabled]="!canEdit()"></textarea>
+          </label>
+          <label class="mp-field mp-field--full">
+            <span>Services</span>
+            <input class="mp-input" [ngModel]="(m.services || []).join(', ')" (ngModelChange)="setServices(m, $event)" [disabled]="!canEdit()" placeholder="DailyPrayers, Jumuah, QuranClasses">
+          </label>
+        </div>
+      </section>
+
+      <section *ngIf="showSection('gallery')" class="mp-panel" [class.mp-panel--active]="activeSection() === 'gallery'">
+        <div class="mp-panel__head">
+          <div>
+            <span class="mp-panel__eyebrow">Visual proof</span>
+            <h2>Gallery</h2>
+          </div>
+          <span class="mp-chip">{{ sectionProgress('gallery', m) }}% complete</span>
+        </div>
+        <label class="mp-field">
+          <span>Image URLs</span>
+          <textarea class="mp-input mp-textarea" rows="5" [ngModel]="(m.gallery || []).join('\n')" (ngModelChange)="setGallery(m, $event)" [disabled]="!canEdit()" placeholder="One image URL per line"></textarea>
+        </label>
+        <label class="mp-upload mp-upload--inline" [class.mp-upload--disabled]="!canEdit()">
+          <lucide-icon name="upload" size="14"></lucide-icon>
+          Upload gallery images
+          <input type="file" accept="image/*" multiple (change)="onGalleryFiles($event, m)" [disabled]="!canEdit()">
+        </label>
+      </section>
+
+      <section *ngIf="showSection('leadership')" class="mp-panel" [class.mp-panel--active]="activeSection() === 'leadership'">
+        <div class="mp-panel__head">
+          <div>
+            <span class="mp-panel__eyebrow">Team</span>
+            <h2>Leadership</h2>
+          </div>
+          <button type="button" class="mp-btn mp-btn--secondary mp-btn--sm" (click)="addLeader()" [disabled]="!canEdit()">
+            <lucide-icon name="plus" size="14"></lucide-icon>
+            Add leader
+          </button>
+        </div>
+
+        <div *ngIf="!leadership().length" class="mp-subtle-empty">No leaders added yet.</div>
+        <div *ngFor="let leader of leadership(); let i = index" class="mp-leader-row">
+          <input class="mp-input" [(ngModel)]="leader.name" placeholder="Name" [disabled]="!canEdit()">
+          <input class="mp-input" [(ngModel)]="leader.role" placeholder="Role" [disabled]="!canEdit()">
+          <input class="mp-input" [(ngModel)]="leader.photoUrl" placeholder="Photo URL" [disabled]="!canEdit()">
+          <textarea class="mp-input mp-textarea" rows="2" [(ngModel)]="leader.bio" placeholder="Bio" [disabled]="!canEdit()"></textarea>
+          <button type="button" class="mp-icon-btn" (click)="removeLeader(i)" [disabled]="!canEdit()" aria-label="Remove leader">
+            <lucide-icon name="trash-2" size="15"></lucide-icon>
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <aside class="mp-inspector">
+      <div class="mp-inspector__card">
+        <span class="mp-panel__eyebrow">Readiness</span>
+        <strong>{{ profileCompletion() }}%</strong>
+        <div class="mp-progress mp-progress--large"><span [style.width.%]="profileCompletion()"></span></div>
+        <p>Complete identity, contact, media, and leadership fields to improve visitor trust.</p>
+      </div>
+      <div class="mp-inspector__card">
+        <span class="mp-panel__eyebrow">Status</span>
+        <dl>
+          <div><dt>Lifecycle</dt><dd>{{ m.status || 'Unknown' }}</dd></div>
+          <div><dt>Timezone</dt><dd>{{ m.timezone || 'Not set' }}</dd></div>
+          <div><dt>Gallery</dt><dd>{{ m.gallery?.length || 0 }} images</dd></div>
+          <div><dt>Leaders</dt><dd>{{ leadership().length }}</dd></div>
+        </dl>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="mp-savebar">
+    <div>
+      <strong>{{ canEdit() ? 'Unsaved profile edits are local until saved.' : 'This profile is currently read-only.' }}</strong>
+      <span *ngIf="m.slug">Public URL: /mosque/{{ m.slug }}</span>
+    </div>
+    <button class="mp-btn mp-btn--primary" type="button" [disabled]="!canEdit() || saving()" (click)="save(m)">
+      <lucide-icon name="save" size="15"></lucide-icon>
+      {{ saving() ? 'Saving...' : 'Save changes' }}
+    </button>
+  </footer>
+</ng-container>

@@ -1,0 +1,11 @@
+.sc-muted { font-size: 0.75rem; color: #64748b; margin-top: 0.15rem; }
+.sc-link--danger { color: #b91c1c; }
+.sc-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  font-size: 0.8125rem;
+}
+.ov-link-cell { white-space: nowrap; }

@@ -1,0 +1,16 @@
+.mp-hero--compact {
+  margin-bottom: 1rem;
+}
+
+.mp-hero__eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--mp-primary, #1D6B57);
+}
+
+.mp-edit-panel {
+  padding: 1.25rem 1.5rem 1.5rem;
+}

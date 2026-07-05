@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="Default mosque logo">
+  <rect width="240" height="240" rx="32" fill="#f8fafc"/>
+  <rect x="24" y="24" width="192" height="192" rx="28" fill="#ecfdf5" stroke="#bbf7d0" stroke-width="4"/>
+  <path d="M72 190V96l48-38 48 38v94" fill="#0f4c3a"/>
+  <path d="M92 190v-54a28 28 0 0 1 56 0v54" fill="#f8fafc"/>
+  <path d="M120 42c12 7 22 18 25 31-15-9-35-9-50 0 3-13 13-24 25-31Z" fill="#d4af37"/>
+  <circle cx="120" cy="102" r="10" fill="#d4af37"/>
+</svg>
