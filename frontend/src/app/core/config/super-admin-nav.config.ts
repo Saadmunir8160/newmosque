@@ -18,6 +18,7 @@ export const SUPER_ADMIN_NAV_SECTIONS: SuperNavSection[] = [
       { section: 'Mosques', label: 'Mosque List', route: '/dashboard/super/mosques', icon: 'mosque' },
       { section: 'Mosques', label: 'Add Mosque', route: '/dashboard/super/mosques/add', icon: 'add' },
       { section: 'Mosques', label: 'Claim management', route: '/dashboard/super/claims', icon: 'stamp' },
+      { section: 'Mosques', label: 'Registrations', route: '/dashboard/super/registrations', icon: 'add' },
       { section: 'Mosques', label: 'Invitations', route: '/dashboard/super/invitations', icon: 'mail' },
       { section: 'Mosques', label: 'Mosque data', route: '/dashboard/super/mosque-data', icon: 'database' },
       { section: 'Mosques', label: 'Module flags', route: '/dashboard/super/features', icon: 'toggle' },

@@ -67,6 +67,9 @@ import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
         <p *ngIf="isPending(claim)" class="oc-note">
           Your request is pending admin verification. You will be notified when it is approved or rejected.
         </p>
+        <p *ngIf="isApproved(claim) && !isActive(claim)" class="oc-note">
+          Your request has been approved and ownership assigned! The mosque is currently pending activation by a super admin. You will be notified when it is live.
+        </p>
         <p *ngIf="claim.rejectionReason" class="oc-rejected">
           Rejection reason: {{ claim.rejectionReason }}
         </p>
@@ -215,6 +218,10 @@ export class OwnerClaimsComponent implements OnInit {
 
   isApproved(claim: MyClaimItem): boolean {
     return this.normalize(claim.status) === 'approved';
+  }
+
+  isActive(claim: MyClaimItem): boolean {
+    return this.normalize(claim.mosqueStatus) === 'active';
   }
 
   private normalize(status?: string): string {

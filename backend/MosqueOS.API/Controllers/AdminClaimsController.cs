@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MosqueOS.API.Models.Common;
 using MosqueOS.API.Models.Mosques;
 using MosqueOS.API.Models.Platform;
 using MosqueOS.API.Services;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
+using System.Security.Claims;
 
 namespace MosqueOS.API.Controllers;
 
@@ -67,6 +69,58 @@ public class AdminClaimsController : ControllerBase
                 decidedDate = i.DecidedDate
             })
         });
+    }
+
+    /// <summary>Get single claim detail.</summary>
+    [HttpGet("{id:int}")]
+    public async Task<IActionResult> GetDetail(int id)
+    {
+        var detail = await _claims.GetClaimDetailAsync(id);
+        if (detail == null) return NotFound(new ApiMessageResponse { Message = "Claim not found." });
+        return Ok(detail);
+    }
+
+    /// <summary>Approve claim — assign owner, set mosque to CLAIMED (activation is a separate step).</summary>
+    [HttpPost("{id:int}/approve")]
+    public async Task<IActionResult> Approve(int id)
+    {
+        var reviewerId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        var (mosque, error, code) = await _claims.ApproveAsync(id, reviewerId);
+        if (error != null) return StatusCode(code, new ApiMessageResponse { Message = error });
+        return Ok(new
+        {
+            message = "Claim approved. Ownership assigned. Mosque is CLAIMED — activate separately to go public.",
+            mosqueId = mosque!.Id,
+            mosqueStatus = mosque.Status.ToString()
+        });
+    }
+
+    /// <summary>Activate mosque after approval — CLAIMED → ACTIVE.</summary>
+    [HttpPost("{id:int}/activate")]
+    public async Task<IActionResult> Activate(int id)
+    {
+        var reviewerId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        var (mosque, error, code) = await _claims.ActivateAsync(id, reviewerId);
+        if (error != null) return StatusCode(code, new ApiMessageResponse { Message = error });
+        return Ok(new
+        {
+            message = "Mosque activated. Public profile is now live.",
+            mosqueId = mosque!.Id,
+            mosqueStatus = mosque.Status.ToString()
+        });
+    }
+
+    /// <summary>Reject claim with a reason (Module 3.1 verification flow).</summary>
+    [HttpPost("{id:int}/reject")]
+    public async Task<IActionResult> Reject(int id, [FromBody] MosqueOS.API.Models.Platform.RejectClaimRequest dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Reason))
+            return BadRequest(new ApiMessageResponse { Message = "Rejection reason is required." });
+
+        var reviewerId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        var (mosque, error, code) = await _claims.RejectAsync(id, reviewerId, dto.Reason);
+        if (error != null) return StatusCode(code, new ApiMessageResponse { Message = error });
+        return Ok(new { message = "Claim rejected.", mosqueId = mosque!.Id });
     }
 
     /// <summary>Update claim details — Super Admin can add notes or correct applicant info.</summary>

@@ -53,6 +53,7 @@ import { navForGuest, navForRoles, navIcon, navSections, navIsSuperAdmin, navIsM
 import { MosqueContextService } from '../../core/services/mosque-context.service';
 import { MosqueSwitcherComponent } from '../../shared/components/mosque-switcher/mosque-switcher.component';
 import { BreadcrumbsComponent } from '../../shared/ui/breadcrumbs.component';
+import { NotificationBellComponent } from '../../shared/ui/notification-bell.component';
 
 const SIDEBAR_KEY = 'mos_sidebar_collapsed';
 const SECTIONS_KEY = 'mos_nav_sections';
@@ -60,7 +61,7 @@ const SECTIONS_KEY = 'mos_nav_sections';
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterModule, MosqueSwitcherComponent, BreadcrumbsComponent],
+  imports: [CommonModule, RouterOutlet, RouterModule, MosqueSwitcherComponent, BreadcrumbsComponent, NotificationBellComponent],
   styles: [`
     .shell-layout {
       background: var(--mos-bg);
@@ -257,6 +258,7 @@ const SECTIONS_KEY = 'mos_nav_sections';
             [attr.aria-label]="sidebarCollapsed() ? 'Expand sidebar' : 'Collapse sidebar'">
             {{ sidebarCollapsed() ? '»' : '«' }}
           </button>
+          <app-notification-bell *ngIf="!sidebarCollapsed()" />
         </div>
 
         <nav class="flex-1 overflow-y-auto no-scrollbar py-3 min-h-0">
@@ -402,6 +404,7 @@ const SECTIONS_KEY = 'mos_nav_sections';
             </span>
           </div>
           <div class="flex items-center gap-2">
+            <app-notification-bell />
             <button (click)="menuOpen.set(!menuOpen())"
               class="shell-mobile-menu-btn text-base font-bold px-3 py-2 rounded-[10px] min-h-[44px]">Menu</button>
           </div>

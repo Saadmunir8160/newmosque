@@ -1169,6 +1169,9 @@ namespace MosqueOS.Infrastructure.Migrations
                     b.Property<string>("LogoUrl")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("SocialLinksJson")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<double?>("Latitude")
                         .HasColumnType("float");
 

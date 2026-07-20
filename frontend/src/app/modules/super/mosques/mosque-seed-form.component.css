@@ -49,6 +49,13 @@
   border-top: 1px solid #E2E8F0;
 }
 
+.seed-form__footer-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .seed-section + .seed-section { margin-top: 1.5rem; }
 
 .seed-section__title {
@@ -255,6 +262,12 @@
   background: #fff;
   color: #334155;
   border: 1px solid #CBD5E1;
+}
+
+.seed-btn--test {
+  background: #FFFBEB;
+  color: #92400E;
+  border: 1px dashed #F59E0B;
 }
 
 .seed-btn--primary {

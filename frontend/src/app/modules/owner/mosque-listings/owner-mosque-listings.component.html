@@ -2,7 +2,7 @@
   <header class="oml-header">
     <div>
       <h1 class="oml-title">Mosque Listings</h1>
-      <p class="oml-sub">Browse unclaimed mosques to claim, or register a new listing for super-admin review.</p>
+      <p class="oml-sub">Browse unclaimed mosques to claim, or submit a new mosque registration for Super Admin review.</p>
     </div>
     <div class="oml-header__actions">
       <button
@@ -22,14 +22,13 @@
 
   <section *ngIf="showRegister() && canRegisterNew()" class="oml-panel oml-register">
     <h2 class="oml-register__title">Register a new mosque</h2>
-    <p class="oml-register__sub">Your listing will be reviewed by the platform team before it goes live.</p>
+    <p class="oml-register__sub">Creates a registration request (not an ownership claim). Super Admin approves, then activates when the profile is ready.</p>
     <div class="oml-register__grid">
       <label class="oml-field">Mosque name *<input class="oml-input" [(ngModel)]="registerForm.name" /></label>
       <label class="oml-field">City *<input class="oml-input" [(ngModel)]="registerForm.city" /></label>
-      <label class="oml-field">Postcode<input class="oml-input" [(ngModel)]="registerForm.postcode" /></label>
       <label class="oml-field">Phone<input class="oml-input" [(ngModel)]="registerForm.phone" /></label>
-      <label class="oml-field oml-field--full">Address<input class="oml-input" [(ngModel)]="registerForm.address" /></label>
       <label class="oml-field">Email<input class="oml-input" type="email" [(ngModel)]="registerForm.email" /></label>
+      <label class="oml-field oml-field--full">Address *<input class="oml-input" [(ngModel)]="registerForm.address" /></label>
       <label class="oml-field oml-field--full">Description<textarea class="oml-input oml-textarea" rows="3" [(ngModel)]="registerForm.description"></textarea></label>
     </div>
     <p *ngIf="registerMsg()" class="oml-register__msg" [class.oml-register__msg--err]="!registerOk()">{{ registerMsg() }}</p>

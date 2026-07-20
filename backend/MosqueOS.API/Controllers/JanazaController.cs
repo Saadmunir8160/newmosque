@@ -227,7 +227,7 @@ namespace MosqueOS.API.Controllers
                 .Where(a => a.CampaignId == campaign.Id)
                 .ToListAsync();
 
-            var userIds = allocations.Select(a => a.UserId).Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList()!;
+            var userIds = allocations.Select(a => a.UserId).Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id!).Distinct().ToList();
             var users = await LoadUsersAsync(userIds);
 
             var completedInRange = allocations
@@ -352,7 +352,7 @@ namespace MosqueOS.API.Controllers
                 .FirstOrDefaultAsync(c => c.Id == id && c.MosqueId == mosqueId);
             if (campaign == null) return NotFound();
 
-            var userIds = campaign.Allocations.Select(a => a.UserId).Where(x => x != null).Distinct().ToList()!;
+            var userIds = campaign.Allocations.Select(a => a.UserId).Where(x => x != null).Select(x => x!).Distinct().ToList();
             var users = await LoadUsersAsync(userIds);
 
             var sb = new System.Text.StringBuilder();

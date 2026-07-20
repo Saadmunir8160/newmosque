@@ -303,6 +303,8 @@ export interface PlatformClaimDetail {
   mosqueCity?: string;
   mosquePostcode?: string;
   mosqueCountry?: string;
+  mosquePhone?: string;
+  mosqueEmail?: string;
   slug: string;
   applicant: {
     userId: string;
@@ -451,6 +453,14 @@ export class PlatformService {
     );
   }
 
+  activatePlatformClaim(claimId: number): Observable<{ success: boolean; message: string }> {
+    return this.http.post<{ success: boolean; message: string }>(
+      `${this.base}/claims/${claimId}/activate`,
+      {},
+      { context: this.mutationContext },
+    );
+  }
+
   rejectPlatformClaim(claimId: number, reason: string): Observable<{ success: boolean; message: string }> {
     return this.http.post<{ success: boolean; message: string }>(
       `${this.base}/claims/${claimId}/reject`,
@@ -503,38 +513,25 @@ export class PlatformService {
     );
   }
 
-  // Gap 4 fix: these methods had wrong URLs pointing to non-existent endpoints.
-  // Now all claim approve/reject use the correct /platform/claims/{id}/approve|reject routes.
-  approveClaim(claimId: number): Observable<{ success: boolean; message: string; mosque: Mosque }> {
-    return this.http.post<{ success: boolean; message: string; mosque: Mosque }>(
+  // Gap 4 fix: claim approve / activate / reject use /platform/claims/{id}/...
+  approveClaim(claimId: number): Observable<{ success: boolean; message: string; mosque: Mosque; mosqueStatus?: string }> {
+    return this.http.post<{ success: boolean; message: string; mosque: Mosque; mosqueStatus?: string }>(
       `${this.base}/claims/${claimId}/approve`,
       {},
       { context: this.mutationContext }
     );
   }
 
-  approveClaimById(claimId: number): Observable<{ success: boolean; message: string; mosque: Mosque }> {
-    return this.http.post<{ success: boolean; message: string; mosque: Mosque }>(
-      `${this.base}/claims/${claimId}/approve`,
+  activateClaim(claimId: number): Observable<{ success: boolean; message: string; mosque: Mosque; mosqueStatus?: string }> {
+    return this.http.post<{ success: boolean; message: string; mosque: Mosque; mosqueStatus?: string }>(
+      `${this.base}/claims/${claimId}/activate`,
       {},
       { context: this.mutationContext }
     );
   }
 
-  approveAndActivateClaim(claimId: number): Observable<{ success: boolean; message: string; mosque: Mosque }> {
-    return this.http.post<{ success: boolean; message: string; mosque: Mosque }>(
-      `${this.base}/claims/${claimId}/approve`,
-      {},
-      { context: this.mutationContext }
-    );
-  }
-
-  approveAndActivateClaimById(claimId: number): Observable<{ success: boolean; message: string; mosque: Mosque }> {
-    return this.http.post<{ success: boolean; message: string; mosque: Mosque }>(
-      `${this.base}/claims/${claimId}/approve`,
-      {},
-      { context: this.mutationContext }
-    );
+  approveClaimById(claimId: number): Observable<{ success: boolean; message: string; mosque: Mosque; mosqueStatus?: string }> {
+    return this.approveClaim(claimId);
   }
 
   activateMosque(mosqueId: number): Observable<Mosque> {

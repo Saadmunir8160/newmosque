@@ -25,6 +25,7 @@ import {
   normalizeSeedSlug,
   validateMosqueSeedForm,
 } from '../../../core/utils/mosque-seed-form.util';
+import { environment } from '../../../../environments/environment';
 
 export interface MosqueSeedSavedEvent {
   mosque: Mosque;
@@ -63,6 +64,8 @@ export class MosqueSeedFormComponent implements OnChanges {
   bannerPreview = signal<string | null>(null);
 
   readonly editStatuses = EDIT_MOSQUE_STATUSES;
+  /** Dev/test only — hidden when production or editing an existing mosque. */
+  readonly showFillTestData = !environment.production;
 
   readonly countries = [
     'United Kingdom',
@@ -151,6 +154,44 @@ export class MosqueSeedFormComponent implements OnChanges {
     this.cancelled.emit();
   }
 
+  /** Development helper: fill sample Unclaimed mosque fields with a unique slug. */
+  fillTestData(): void {
+    if (!this.showFillTestData || this.editMosque || this.saving()) return;
+
+    const stamp = Date.now().toString(36);
+    const slug = `test-mosque-${stamp}`;
+    this.slugTouched = true;
+    this.fieldErrors.set({});
+    this.formError.set('');
+
+    this.form = {
+      ...defaultMosqueSeedForm(),
+      name: `Test Mosque ${stamp.toUpperCase()}`,
+      slug,
+      description: 'Auto-filled test listing for Module 3.1 seed → claim → activate flow.',
+      address: '12 High Street',
+      city: 'Bradford',
+      postcode: 'BD1 1AA',
+      country: 'United Kingdom',
+      phone: '01274123456',
+      email: `test-${stamp}@mosqueos.test`,
+      website: 'https://example.org',
+      timezone: 'Europe/London',
+      status: 'Unclaimed',
+    };
+
+    const social = this.form as MosqueSeedFormValue & {
+      facebookUrl?: string;
+      instagramUrl?: string;
+      twitterUrl?: string;
+      youtubeUrl?: string;
+    };
+    social.facebookUrl = 'https://facebook.com/mosqueos-test';
+    social.instagramUrl = 'https://instagram.com/mosqueos-test';
+    social.twitterUrl = 'https://x.com/mosqueos-test';
+    social.youtubeUrl = 'https://youtube.com/@mosqueos-test';
+  }
+
   save(): void {
     if (this.saving()) return;
 
@@ -160,6 +201,12 @@ export class MosqueSeedFormComponent implements OnChanges {
     if (Object.keys(errors).length > 0) return;
 
     const slug = normalizeSeedSlug(this.form.slug || this.form.name);
+    const social = this.form as MosqueSeedFormValue & {
+      facebookUrl?: string;
+      instagramUrl?: string;
+      twitterUrl?: string;
+      youtubeUrl?: string;
+    };
     const payload: Partial<Mosque> = {
       name: this.form.name.trim(),
       slug,
@@ -171,6 +218,10 @@ export class MosqueSeedFormComponent implements OnChanges {
       phone: this.form.phone.trim() || undefined,
       email: this.form.email.trim() || undefined,
       website: this.form.website.trim() || undefined,
+      facebookUrl: social.facebookUrl?.trim() || undefined,
+      instagramUrl: social.instagramUrl?.trim() || undefined,
+      twitterUrl: social.twitterUrl?.trim() || undefined,
+      youtubeUrl: social.youtubeUrl?.trim() || undefined,
       timezone: this.form.timezone || 'Europe/London',
     };
 

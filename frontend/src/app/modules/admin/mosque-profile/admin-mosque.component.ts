@@ -37,6 +37,7 @@ import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
 import { ROLES } from '../../../core/constants/roles';
 import { Mosque, MosqueLeadership } from '../../../core/models';
 import { environment } from '../../../../environments/environment';
+import { isMosqueProfileEditableStatus } from '../../../core/utils/mosque-status.util';
 
 type ProfileSectionId = 'basic' | 'address' | 'contact' | 'social' | 'location' | 'media' | 'profile' | 'gallery' | 'leadership';
 
@@ -155,18 +156,20 @@ export class AdminMosqueComponent implements OnInit {
     const m = this.mosque();
     if (!m) return false;
     if (this.auth.isSuperAdmin()) return true;
-    if (m.status !== 'Active') return false;
+    // Milestone 2: Claimed + Active both allow profile edits (prepare listing before go-live).
+    if (!isMosqueProfileEditableStatus(m.status)) return false;
+
     const uid = this.auth.user()?.id;
-    if (this.isOwner()) {
-      return !!uid && m.ownerId === uid;
-    }
-    if (this.isMosqueAdminOwner()) {
-      // homeMosqueId may be null on first render (before /auth/me resolves);
-      // fall back to mosqueCtx which is resolved before the component loads.
+    if (!uid) return false;
+
+    if (m.ownerId === uid) return true;
+
+    if (this.auth.hasRole(ROLES.MosqueAdmin) || this.auth.hasRole(ROLES.MosqueOwner)) {
       const homeMosqueId = this.auth.user()?.homeMosqueId ?? this.mosqueCtx.mosqueId();
       return homeMosqueId === m.id;
     }
-    return true;
+
+    return false;
   });
 
   editLockMessage = computed(() => {
@@ -179,10 +182,10 @@ export class AdminMosqueComponent implements OnInit {
     if (m.status === 'Unclaimed') {
       return 'Claim this mosque before editing the profile.';
     }
-    if (m.status === 'Claimed') {
-      return 'Your claim was approved. The mosque will be editable once it is activated.';
+    if (isMosqueProfileEditableStatus(m.status)) {
+      return 'You do not have permission to edit this mosque.';
     }
-    return 'Your mosque must be active before you can edit the profile.';
+    return 'Profile editing unlocks after claim approval (Claimed or Active status).';
   });
 
   ngOnInit(): void {

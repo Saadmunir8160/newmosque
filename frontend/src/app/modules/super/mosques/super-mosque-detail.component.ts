@@ -30,6 +30,7 @@ export class SuperMosqueDetailComponent implements OnInit {
   readonly formatStatus = formatMosqueStatus;
   readonly statusClass = statusClass;
   readonly isPublicVisible = isMosquePubliclyVisible;
+  readonly MosqueProfileCompleteness = MosqueProfileCompleteness;
 
   profileCompleteness = computed(() => {
     const m = this.detail()?.mosque;
@@ -70,6 +71,24 @@ export class SuperMosqueDetailComponent implements OnInit {
   }
 
   activate(id: number): void {
+    const mosque = this.detail()?.mosque;
+    if (!mosque) return;
+
+    const gate = MosqueProfileCompleteness.meetsActivationGate(mosque);
+    if (!gate.ok) {
+      this.error.set(
+        `Cannot activate — profile incomplete. Missing: ${gate.missing.join(', ')}.`
+      );
+      return;
+    }
+
+    const pct = this.profileCompleteness();
+    let msg = 'Activate this mosque? It will become ACTIVE and visible on the public directory.';
+    if (MosqueProfileCompleteness.isBelowWarningThreshold(pct)) {
+      msg = `Profile completeness is ${pct}% (recommended ${MosqueProfileCompleteness.ActivationThreshold}%+). Activate anyway?`;
+    }
+    if (!confirm(msg)) return;
+
     this.platform.activateMosque(id).subscribe({
       next: () => this.load(id),
       error: (err) => this.error.set(err?.error?.message ?? 'Activation failed.'),

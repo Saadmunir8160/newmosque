@@ -40,7 +40,7 @@ function Clear-PendingClaims($adminToken) {
         $pending = Invoke-RestMethod -Uri "$base/platform/claims/pending" -Headers @{ Authorization = "Bearer $adminToken" }
         foreach ($c in @($pending.items)) {
             $body = @{ reason = "Automated test cleanup" } | ConvertTo-Json
-            Invoke-RestMethod -Uri "$base/claims/$($c.claimId)/reject" -Method Post -Body $body -ContentType "application/json" -Headers @{ Authorization = "Bearer $adminToken" } | Out-Null
+            Invoke-RestMethod -Uri "$base/platform/claims/$($c.claimId)/reject" -Method Post -Body $body -ContentType "application/json" -Headers @{ Authorization = "Bearer $adminToken" } | Out-Null
         }
     } catch { }
 }
@@ -161,18 +161,20 @@ try {
     $found = $claims.items | Where-Object { $_.mosqueId -eq $mosqueId }
     Add-Result "7. Pending claims list" ($null -ne $found) "claimId=$($found.claimId)"
 
-    # 8. Approve via claims API -> Claimed
-    $approved = Invoke-RestMethod -Uri "$base/claims/$claimId/approve" -Method Post -Headers @{ Authorization = "Bearer $adminToken" } -Body '{}' -ContentType "application/json"
-    Add-Result "8. Claims API approve" ($approved.status -eq "Claimed" -and $approved.ownerId) "status=$($approved.status) owner=$($approved.ownerId)"
+    # 8. Approve via platform claims API -> Claimed (NOT Active)
+    $approved = Invoke-RestMethod -Uri "$base/platform/claims/$claimId/approve" -Method Post -Headers @{ Authorization = "Bearer $adminToken" } -Body '{}' -ContentType "application/json"
+    $approvedMosqueStatus = if ($approved.mosqueStatus) { $approved.mosqueStatus } elseif ($approved.mosque) { $approved.mosque.status } else { $null }
+    $ownerId = if ($approved.mosque) { $approved.mosque.ownerId } else { $null }
+    Add-Result "8. Claims API approve -> CLAIMED" ($approvedMosqueStatus -eq "Claimed" -and $ownerId) "mosqueStatus=$approvedMosqueStatus owner=$ownerId"
 
     # 8b. Public hidden while Claimed (not yet Active)
     $claimedHidden = Get-StatusCode { Invoke-WebRequest -Uri "$base/mosques/$slug" -UseBasicParsing | Out-Null }
     Add-Result "8b. Public hidden (Claimed)" ($claimedHidden -eq 404) "HTTP $claimedHidden"
 
-    # 9. Activate -> Active
-    $activateResp = Invoke-RestMethod -Uri "$base/claims/$claimId/activate" -Method Post -Headers @{ Authorization = "Bearer $adminToken" }
-    $activatedStatus = if ($activateResp.mosque) { $activateResp.mosque.status } else { $activateResp.status }
-    Add-Result "9. Activate mosque" ($activatedStatus -eq "Active") "status=$activatedStatus"
+    # 9. Activate -> Active (separate step)
+    $activateResp = Invoke-RestMethod -Uri "$base/platform/claims/$claimId/activate" -Method Post -Headers @{ Authorization = "Bearer $adminToken" }
+    $activatedStatus = if ($activateResp.mosqueStatus) { $activateResp.mosqueStatus } elseif ($activateResp.mosque) { $activateResp.mosque.status } else { $activateResp.status }
+    Add-Result "9. Activate mosque -> ACTIVE" ($activatedStatus -eq "Active") "status=$activatedStatus"
 
     # 10. Public live again
     $pub2 = Invoke-WebRequest -Uri "$base/mosques/$slug" -UseBasicParsing
@@ -229,7 +231,7 @@ try {
             Add-Result "17. Reject claim" $false "No pending member claim found for $submitSlug"
         } else {
             $rejectBody = @{ reason = "Test rejection - insufficient documentation" } | ConvertTo-Json
-            Invoke-RestMethod -Uri "$base/claims/$($memberClaim.claimId)/reject" -Method Post -Body $rejectBody -ContentType "application/json" -Headers @{ Authorization = "Bearer $adminToken" } | Out-Null
+            Invoke-RestMethod -Uri "$base/platform/claims/$($memberClaim.claimId)/reject" -Method Post -Body $rejectBody -ContentType "application/json" -Headers @{ Authorization = "Bearer $adminToken" } | Out-Null
             $rejectSnapshot = Invoke-RestMethod -Uri "$base/platform/mosques/$($memberClaim.mosqueId)/snapshot" -Headers @{ Authorization = "Bearer $adminToken" }
             Add-Result "17. Reject claim" ($rejectSnapshot.mosque.status -eq "Archived") "mosque=$($rejectSnapshot.mosque.status) claimId=$($memberClaim.claimId)"
         }

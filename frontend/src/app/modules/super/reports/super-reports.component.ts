@@ -29,8 +29,7 @@ export class SuperReportsComponent implements OnInit {
     const tally = (s: string) => list.filter(m => m.status === s).length;
     return [
       { label: 'Active', count: tally('Active'), tone: 'active' },
-      { label: 'Pending review', count: tally('PendingReview'), tone: 'pending' },
-      { label: 'Claim pending', count: tally('ClaimPending') + tally('Claimed'), tone: 'claimed' },
+      { label: 'Claimed', count: tally('Claimed'), tone: 'claimed' },
       { label: 'Unclaimed', count: tally('Unclaimed'), tone: 'unclaimed' },
     ];
   });

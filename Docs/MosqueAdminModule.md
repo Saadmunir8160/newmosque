@@ -33,9 +33,11 @@ Role: **Mosque Admin** — manage daily mosque operations for a single home mosq
 - `mosque.madrassah.manage` — Madrassah
 - `mosque.members.manage` — Users at home mosque
 - `mosque.reports.view` — Reports
+- Edit mosque profile when status is **Claimed** or **Active** (Milestone 2)
 
 **Cannot:**
 - Platform settings (Super Admin only)
+- Toggle module feature flags (Owner / Super Admin only; Admin is view-only)
 - Other mosques (scoped via `HomeMosqueId` + `MosqueAccessService`)
 - Global roles
 

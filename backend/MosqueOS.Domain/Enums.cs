@@ -8,10 +8,8 @@ namespace MosqueOS.Domain
         PendingReview = 3,
         Suspended = 4,
         Archived = 5,
-        /// <summary>Ownership claim submitted — awaiting super admin approval.</summary>
         ClaimPending = 6,
-        /// <summary>Owner invitation sent — awaiting invitee acceptance.</summary>
-        Invited = 7,
+        Invited = 7
     }
 
     public enum InvitationStatus
@@ -23,6 +21,13 @@ namespace MosqueOS.Domain
     }
 
     public enum OwnershipClaimStatus
+    {
+        Pending = 0,
+        Approved = 1,
+        Rejected = 2,
+    }
+
+    public enum MosqueRegistrationStatus
     {
         Pending = 0,
         Approved = 1,

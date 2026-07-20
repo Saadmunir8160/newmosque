@@ -30,8 +30,29 @@ builder.Services.AddScoped<MosqueAccessService>();
 builder.Services.AddScoped<SlugService>();
 builder.Services.AddScoped<MosqueModuleSeedService>();
 builder.Services.AddScoped<OwnershipClaimService>();
+builder.Services.AddScoped<MosqueRegistrationService>();
 builder.Services.AddScoped<MosqueInvitationService>();
+builder.Services.AddScoped<MosqueAuditService>();
+builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<MosquePublicProfileCache>();
+builder.Services.Configure<StorageOptions>(builder.Configuration.GetSection(StorageOptions.SectionName));
+builder.Services.AddSingleton<IFileStorageService, LocalFileStorageService>();
+builder.Services.AddMosqueRateLimiting();
 builder.Services.AddMemoryCache();
+
+var redisConnection = builder.Configuration.GetConnectionString("Redis");
+if (!string.IsNullOrWhiteSpace(redisConnection))
+{
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnection;
+        options.InstanceName = "MosqueOS:";
+    });
+}
+else
+{
+    builder.Services.AddDistributedMemoryCache();
+}
 builder.Services.AddScoped<EmailOtpService>();
 builder.Services.AddScoped<EmailVerificationService>();
 builder.Services.Configure<MosqueOS.API.Services.EmailOptions>(builder.Configuration.GetSection("Email"));
@@ -181,10 +202,19 @@ Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "audio"));
 Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "images"));
 Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "videos"));
 Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "mosques"));
-app.UseStaticFiles();
+Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "claims"));
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        if (ctx.Context.Request.Path.StartsWithSegments("/uploads"))
+            ctx.Context.Response.Headers.CacheControl = "public,max-age=86400";
+    }
+});
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.MapControllers();
 
 app.MapGet("/", () => Results.Ok(new

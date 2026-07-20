@@ -15,10 +15,12 @@ namespace MosqueOS.Infrastructure
         public DbSet<Mosque> Mosques => Set<Mosque>();
         public DbSet<MosqueSetting> MosqueSettings => Set<MosqueSetting>();
         public DbSet<MosqueOwnershipClaim> MosqueOwnershipClaims => Set<MosqueOwnershipClaim>();
+        public DbSet<MosqueRegistrationRequest> MosqueRegistrationRequests => Set<MosqueRegistrationRequest>();
         public DbSet<MosqueInvitation> MosqueInvitations => Set<MosqueInvitation>();
         public DbSet<DonationFund> DonationFunds => Set<DonationFund>();
         public DbSet<PlatformAuditLog> PlatformAuditLogs => Set<PlatformAuditLog>();
         public DbSet<PlatformConfig> PlatformConfigs => Set<PlatformConfig>();
+        public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
 
         // 3.2 Prayer Times
         public DbSet<PrayerTimesDaily> PrayerTimesDaily => Set<PrayerTimesDaily>();
@@ -127,6 +129,7 @@ namespace MosqueOS.Infrastructure
                 entity.Property(m => m.InstagramUrl).HasMaxLength(300);
                 entity.Property(m => m.YoutubeUrl).HasMaxLength(300);
                 entity.Property(m => m.TwitterUrl).HasMaxLength(300);
+                entity.Property(m => m.SocialLinksJson);
                 entity.Property(m => m.ShortDescription).HasMaxLength(300);
                 entity.Property(m => m.MetaTitle).HasMaxLength(200);
                 entity.Property(m => m.MetaDescription).HasMaxLength(300);
@@ -168,6 +171,38 @@ namespace MosqueOS.Infrastructure
                 .WithMany()
                 .HasForeignKey(u => u.HomeMosqueId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<MosqueRegistrationRequest>(entity =>
+            {
+                entity.ToTable("mosque_registration_requests");
+                entity.Property(r => r.Name).HasMaxLength(200).IsRequired();
+                entity.Property(r => r.Address).HasMaxLength(500).IsRequired();
+                entity.Property(r => r.City).HasMaxLength(100).IsRequired();
+                entity.Property(r => r.Country).HasMaxLength(100).IsRequired();
+                entity.Property(r => r.Phone).HasMaxLength(50);
+                entity.Property(r => r.Email).HasMaxLength(200);
+                entity.Property(r => r.Website).HasMaxLength(300);
+                entity.HasIndex(r => r.Status);
+                entity.HasOne(r => r.SubmittedBy)
+                    .WithMany()
+                    .HasForeignKey(r => r.SubmittedById)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<UserNotification>(entity =>
+            {
+                entity.ToTable("UserNotifications");
+                entity.Property(n => n.Type).HasMaxLength(80).IsRequired();
+                entity.Property(n => n.Title).HasMaxLength(200).IsRequired();
+                entity.Property(n => n.Message).HasMaxLength(1000).IsRequired();
+                entity.Property(n => n.Route).HasMaxLength(300);
+                entity.HasIndex(n => new { n.UserId, n.IsRead });
+                entity.HasIndex(n => new { n.UserId, n.CreatedAt });
+                entity.HasOne(n => n.User)
+                    .WithMany()
+                    .HasForeignKey(n => n.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
 
             builder.Entity<PrayerTimesDaily>().HasIndex(p => new { p.MosqueId, p.Date }).IsUnique();
             builder.Entity<RamadanTimetable>().HasIndex(r => new { r.MosqueId, r.Year }).IsUnique();

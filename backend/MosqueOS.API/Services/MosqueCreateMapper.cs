@@ -10,7 +10,7 @@ public static class MosqueCreateMapper
     public static Mosque MapFromEnterprise(MosqueEnterpriseCreateDto dto, string slug)
     {
         var status = ResolveStatus(dto);
-        return new Mosque
+        var mosque = new Mosque
         {
             Name = dto.Name.Trim(),
             Slug = slug,
@@ -45,6 +45,8 @@ public static class MosqueCreateMapper
             FacilitiesJson = dto.Facilities.Count > 0 ? JsonSerializer.Serialize(dto.Facilities) : null,
             PrayerSettingsJson = dto.PrayerSettings != null ? JsonSerializer.Serialize(dto.PrayerSettings) : null,
         };
+        MosqueSocialLinksHelper.SyncJsonFromLegacy(mosque);
+        return mosque;
     }
 
     public static MosqueStatus ResolveStatus(MosqueEnterpriseCreateDto dto)

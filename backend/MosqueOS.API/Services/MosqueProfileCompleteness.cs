@@ -4,6 +4,8 @@ namespace MosqueOS.API.Services;
 
 public static class MosqueProfileCompleteness
 {
+    public const int ActivationCompletenessThreshold = 60;
+
     public static (int completeness, string[] missing) Calculate(Mosque mosque)
     {
         var fields = new (string key, Func<Mosque, bool> check)[]
@@ -33,4 +35,25 @@ public static class MosqueProfileCompleteness
             : (int)Math.Round((fields.Length - missing.Length) / (double)fields.Length * 100);
         return (completeness, missing);
     }
+
+    /// <summary>
+    /// Module 3.1 activation gate (PRD BR-8):
+    /// Requires name, city, address, and phone OR email.
+    /// Overall completeness is reported for Super Admin UX warnings.
+    /// </summary>
+    public static (bool ok, int completeness, string[] missing) MeetsActivationGate(Mosque mosque)
+    {
+        var missing = new List<string>();
+        if (string.IsNullOrWhiteSpace(mosque.Name)) missing.Add("name");
+        if (string.IsNullOrWhiteSpace(mosque.City)) missing.Add("city");
+        if (string.IsNullOrWhiteSpace(mosque.Address)) missing.Add("address");
+        if (string.IsNullOrWhiteSpace(mosque.Phone) && string.IsNullOrWhiteSpace(mosque.Email))
+            missing.Add("phone or email");
+
+        var (completeness, _) = Calculate(mosque);
+        return (missing.Count == 0, completeness, missing.ToArray());
+    }
+
+    public static bool IsCompletenessBelowWarningThreshold(int completeness) =>
+        completeness < ActivationCompletenessThreshold;
 }

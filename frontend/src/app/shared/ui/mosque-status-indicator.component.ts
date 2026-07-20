@@ -60,8 +60,6 @@ export class MosqueStatusIndicatorComponent {
       case 'Unclaimed':
         return 'UNCLAIMED';
       case 'Claimed':
-      case 'ClaimPending':
-      case 'PendingReview':
         return 'CLAIMED';
       case 'Active':
         return 'ACTIVE';

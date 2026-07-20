@@ -29,6 +29,7 @@ namespace MosqueOS.API.Controllers
         private readonly SlugService _slugService;
         private readonly OwnershipClaimService _claimService;
         private readonly MosqueInvitationService _invitationService;
+        private readonly MosquePublicProfileCache _publicCache;
 
         public PlatformController(
             IUnitOfWork unitOfWork,
@@ -38,7 +39,8 @@ namespace MosqueOS.API.Controllers
             MosqueModuleSeedService moduleSeed,
             SlugService slugService,
             OwnershipClaimService claimService,
-            MosqueInvitationService invitationService)
+            MosqueInvitationService invitationService,
+            MosquePublicProfileCache publicCache)
         {
             _unitOfWork = unitOfWork;
             _db = db;
@@ -48,6 +50,7 @@ namespace MosqueOS.API.Controllers
             _slugService = slugService;
             _claimService = claimService;
             _invitationService = invitationService;
+            _publicCache = publicCache;
         }
 
         /// <summary>Batch-load Mosque Admin user IDs (avoids N+1 IsInRoleAsync per user).</summary>
@@ -616,44 +619,6 @@ namespace MosqueOS.API.Controllers
             return Ok(new { message = $"Updated {mosques.Count} mosque(s) to {dto.Status}.", count = mosques.Count });
         }
 
-        [HttpPost("mosques/{id:int}/activate")]
-        public async Task<IActionResult> ActivateMosque(int id)
-        {
-            var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
-            if (mosque == null || mosque.IsDeleted)
-                return NotFound(new ApiMessageResponse { Message = "Mosque not found." });
-
-            mosque.Status = MosqueStatus.Active;
-            mosque.UpdatedAt = DateTime.UtcNow;
-            await _unitOfWork.SaveChangesAsync();
-
-            var reviewerId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-            await LogAsync("MOSQUE_ACTIVATED", reviewerId, "Mosque", id,
-                $"Activated mosque '{mosque.Name}'");
-
-            return Ok(mosque);
-        }
-
-        [HttpPost("mosques/{id:int}/deactivate")]
-        public async Task<IActionResult> DeactivateMosque(int id)
-        {
-            var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
-            if (mosque == null || mosque.IsDeleted)
-                return NotFound(new ApiMessageResponse { Message = "Mosque not found." });
-
-            if (mosque.Status != MosqueStatus.Active)
-                return BadRequest(new ApiMessageResponse { Message = "Only active mosques can be deactivated." });
-
-            mosque.Status = MosqueStatus.Suspended;
-            mosque.UpdatedAt = DateTime.UtcNow;
-            await _unitOfWork.SaveChangesAsync();
-
-            var reviewerId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-            await LogAsync("MOSQUE_DEACTIVATED", reviewerId, "Mosque", id,
-                $"Deactivated mosque '{mosque.Name}'");
-
-            return Ok(mosque);
-        }
 
         [HttpDelete("mosques/{id:int}")]
         public async Task<IActionResult> DeleteMosque(int id)
@@ -724,12 +689,15 @@ namespace MosqueOS.API.Controllers
                 Website = dto.Website,
                 FacebookUrl = dto.FacebookUrl,
                 InstagramUrl = dto.InstagramUrl,
+                YoutubeUrl = dto.YoutubeUrl,
+                TwitterUrl = dto.TwitterUrl,
                 Description = dto.Description,
                 LogoUrl = dto.LogoUrl,
                 BannerUrl = dto.BannerUrl,
                 Status = MosqueStatus.Unclaimed,
                 Timezone = string.IsNullOrWhiteSpace(dto.Timezone) ? "Europe/London" : dto.Timezone.Trim()
             };
+            MosqueSocialLinksHelper.SyncJsonFromLegacy(mosque);
 
             _unitOfWork.Repository<Mosque>().Add(mosque);
             await _unitOfWork.SaveChangesAsync();
@@ -877,19 +845,37 @@ namespace MosqueOS.API.Controllers
             return Ok(MapClaimDetail(detail));
         }
 
-        /// <summary>Approve claim — assign owner and activate mosque.</summary>
+        /// <summary>Approve claim — assign owner and set mosque to CLAIMED (not yet public).</summary>
         [HttpPost("claims/{claimId:int}/approve")]
         public async Task<IActionResult> ApproveClaim(int claimId)
         {
             var reviewerId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
-            var (mosque, error, code) = await _claimService.ApproveAndActivateAsync(claimId, reviewerId);
+            var (mosque, error, code) = await _claimService.ApproveAsync(claimId, reviewerId);
             if (error != null) return StatusCode(code, new ApiMessageResponse { Message = error });
             return Ok(new
             {
                 success = true,
-                message = "Claim approved. Mosque is now active.",
+                message = "Claim approved. Ownership assigned. Mosque is CLAIMED — activate separately to go public.",
                 mosque,
-                status = "APPROVED"
+                status = "APPROVED",
+                mosqueStatus = mosque!.Status.ToString()
+            });
+        }
+
+        /// <summary>Activate mosque after claim approval — CLAIMED → ACTIVE.</summary>
+        [HttpPost("claims/{claimId:int}/activate")]
+        public async Task<IActionResult> ActivateClaim(int claimId)
+        {
+            var reviewerId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
+            var (mosque, error, code) = await _claimService.ActivateAsync(claimId, reviewerId);
+            if (error != null) return StatusCode(code, new ApiMessageResponse { Message = error });
+            return Ok(new
+            {
+                success = true,
+                message = "Mosque activated. Public profile is now live.",
+                mosque,
+                status = "ACTIVE",
+                mosqueStatus = mosque!.Status.ToString()
             });
         }
 
@@ -908,6 +894,80 @@ namespace MosqueOS.API.Controllers
                 status = "REJECTED"
             });
         }
+
+        /// <summary>Activate a CLAIMED mosque (Module 3.1 Step 4 — Super Admin promotes to ACTIVE).</summary>
+        [HttpPost("mosques/{id:int}/activate")]
+        public async Task<IActionResult> ActivateMosque(int id)
+        {
+            var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
+            if (mosque == null || mosque.IsDeleted)
+                return NotFound(new ApiMessageResponse { Message = "Mosque not found." });
+
+            if (mosque.Status != MosqueStatus.Claimed)
+                return BadRequest(new ApiMessageResponse { Message = "Only a CLAIMED mosque can be activated." });
+
+            if (string.IsNullOrEmpty(mosque.OwnerId))
+                return BadRequest(new ApiMessageResponse { Message = "Mosque has no assigned owner." });
+
+            var hasPending = await _unitOfWork.Repository<MosqueOwnershipClaim>().QueryNoTracking()
+                .AnyAsync(c => c.MosqueId == id && c.Status == OwnershipClaimStatus.Pending && !c.IsDeleted);
+            if (hasPending)
+                return BadRequest(new ApiMessageResponse { Message = "Cannot activate while a pending ownership claim exists." });
+
+            var (gateOk, completeness, missing) = MosqueProfileCompleteness.MeetsActivationGate(mosque);
+            if (!gateOk)
+            {
+                return BadRequest(new
+                {
+                    message = $"Mosque profile is incomplete for activation ({completeness}% complete). Missing: {string.Join(", ", missing)}.",
+                    completeness,
+                    missing,
+                    threshold = MosqueProfileCompleteness.ActivationCompletenessThreshold
+                });
+            }
+
+            mosque.Status = MosqueStatus.Active;
+            mosque.UpdatedAt = DateTime.UtcNow;
+            await _unitOfWork.SaveChangesAsync();
+            await _publicCache.InvalidateMosqueAsync(mosque);
+
+            var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
+            await LogAsync("MOSQUE_ACTIVATED", actorId, "Mosque", id,
+                $"Super Admin activated mosque '{mosque.Name}' to ACTIVE.");
+
+            return Ok(new
+            {
+                mosque,
+                completeness,
+                warning = MosqueProfileCompleteness.IsCompletenessBelowWarningThreshold(completeness)
+                    ? $"Activated with completeness {completeness}% (recommended {MosqueProfileCompleteness.ActivationCompletenessThreshold}%+)."
+                    : null
+            });
+        }
+
+        /// <summary>Deactivate an ACTIVE mosque back to CLAIMED.</summary>
+        [HttpPost("mosques/{id:int}/deactivate")]
+        public async Task<IActionResult> DeactivateMosque(int id)
+        {
+            var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
+            if (mosque == null || mosque.IsDeleted)
+                return NotFound(new ApiMessageResponse { Message = "Mosque not found." });
+
+            if (mosque.Status != MosqueStatus.Active)
+                return BadRequest(new ApiMessageResponse { Message = "Only an ACTIVE mosque can be deactivated." });
+
+            mosque.Status = MosqueStatus.Claimed;
+            mosque.UpdatedAt = DateTime.UtcNow;
+            await _unitOfWork.SaveChangesAsync();
+            await _publicCache.InvalidateMosqueAsync(mosque);
+
+            var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
+            await LogAsync("MOSQUE_DEACTIVATED", actorId, "Mosque", id,
+                $"Super Admin deactivated mosque '{mosque.Name}' back to CLAIMED.");
+
+            return Ok(mosque);
+        }
+
 
         private static object MapClaimListItem(AdminClaimListItemDto i) => new
         {
@@ -944,6 +1004,8 @@ namespace MosqueOS.API.Controllers
             mosqueCity = d.City,
             mosquePostcode = d.MosquePostcode,
             mosqueCountry = d.MosqueCountry,
+            mosquePhone = d.MosquePhone,
+            mosqueEmail = d.MosqueEmail,
             slug = d.Slug,
             applicant = new
             {

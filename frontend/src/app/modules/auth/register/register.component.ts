@@ -61,7 +61,7 @@ export class RegisterComponent {
         confirmPassword: this.confirmPassword,
         registerAsMosqueOwner: true,
       });
-      void this.router.navigate(['/verify-email-pending'], { queryParams: { email: res.email } });
+      void this.router.navigate(['/auth/login'], { queryParams: { email: res.email } });
     } catch (err) {
       this.error.set(this.readRegisterError(err));
     } finally {

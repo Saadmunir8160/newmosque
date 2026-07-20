@@ -15,6 +15,8 @@ namespace MosqueOS.Domain.Entities
         public string? InstagramUrl { get; set; }
         public string? YoutubeUrl { get; set; }
         public string? TwitterUrl { get; set; }
+        /// <summary>JSON social_links document: { "links": [ { "platform", "url", "label?" } ] }.</summary>
+        public string? SocialLinksJson { get; set; }
         public string? ShortDescription { get; set; }
         public string? Description { get; set; }
         public string? MetaTitle { get; set; }

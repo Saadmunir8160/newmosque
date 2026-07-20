@@ -1,12 +1,7 @@
 export const MOSQUE_STATUSES = [
-  'PendingReview',
   'Unclaimed',
-  'ClaimPending',
   'Claimed',
-  'Invited',
   'Active',
-  'Suspended',
-  'Archived',
 ] as const;
 
 /** Module 3.1 — Super Admin listings filter (All / Unclaimed / Claimed / Active). */
@@ -15,14 +10,10 @@ export const PROFILE_STATUS_FILTERS = ['Unclaimed', 'Claimed', 'Active'] as cons
 export type MosqueStatusValue = (typeof MOSQUE_STATUSES)[number];
 
 const STATUS_LABELS: Record<string, string> = {
-  PendingReview: 'Pending Review',
-  Unclaimed: 'Unclaimed',
-  ClaimPending: 'Claim Pending',
-  Claimed: 'Claimed',
-  Invited: 'Invited',
-  Active: 'Active',
-  Suspended: 'Suspended',
-  Archived: 'Archived',
+  // Module 3.1 core statuses
+  Unclaimed: 'UNCLAIMED',
+  Claimed: 'CLAIMED',
+  Active: 'ACTIVE',
 };
 
 export function formatMosqueStatus(status: string): string {
@@ -34,58 +25,61 @@ export function formatMosqueStatus(status: string): string {
 
 export function statusClass(status: string): string {
   const map: Record<string, string> = {
-    PendingReview: 'status--pending',
+    // Module 3.1 core
     Unclaimed: 'status--unclaimed',
-    ClaimPending: 'status--claimed',
     Claimed: 'status--claimed',
-    Invited: 'status--invited',
     Active: 'status--active',
-    Suspended: 'status--suspended',
-    Archived: 'status--archived',
   };
-  return map[status] ?? 'status--unclaimed';
+  return map[status] || 'status--unclaimed';
 }
 
-/** Public `/mosque/{slug}` is visible for these statuses. */
+/** Public `/mosque/{slug}` is visible for Unclaimed + Active only (ClaimPending/Claimed stay hidden). */
 export function isMosquePubliclyVisible(status: string): boolean {
   return status === 'Unclaimed' || status === 'Active';
+}
+
+/** Profile CRUD allowed for Claimed + Active (matches backend MosquePublicVisibility.CanEditProfile). */
+export function isMosqueProfileEditableStatus(status: string): boolean {
+  return status === 'Claimed' || status === 'Active';
 }
 
 export interface PublicStatusCard {
   label: string;
   description: string;
-  tone: 'amber' | 'blue' | 'green';
+  tone: string;
 }
 
-export function publicStatusCard(status: string): PublicStatusCard {
-  switch (status) {
-    case 'ClaimPending':
-      return {
-        label: 'Claim Under Review',
-        description: 'An ownership claim for this mosque is currently being reviewed by our team.',
-        tone: 'blue',
-      };
-    case 'Claimed':
-      return {
-        label: 'Claimed',
-        description: 'Ownership verification is currently in progress.',
-        tone: 'blue',
-      };
-    case 'Active':
-      return {
-        label: 'Verified Mosque',
-        description: 'This mosque has been verified and is managed by its official administrators.',
-        tone: 'green',
-      };
-    default:
-      return {
-        label: 'Unclaimed Mosque',
-        description: 'This mosque has not yet been claimed by its official administrators.',
-        tone: 'amber',
-      };
-  }
+export function publicStatusCard(status: string): { label: string; description: string; tone: string } {
+  const base = {
+    Unclaimed: {
+      label: 'Unclaimed listing',
+      description: 'This mosque profile was generated from a public directory. The mosque administration has not yet claimed it.',
+      tone: 'neutral',
+    },
+    ClaimPending: {
+      label: 'Claim under review',
+      description: 'An ownership claim has been submitted and is awaiting Super Admin verification.',
+      tone: 'info',
+    },
+    Claimed: {
+      label: 'Claimed — awaiting activation',
+      description: 'Ownership has been approved. A Super Admin must activate this listing before it appears on the public directory.',
+      tone: 'info',
+    },
+    Active: {
+      label: 'Active profile',
+      description: 'This mosque profile is actively managed by its authorised administration team.',
+      tone: 'success',
+    },
+  } as Record<string, { label: string; description: string; tone: string }>;
+
+  return base[status] || {
+    label: formatMosqueStatus(status),
+    description: 'Status unavailable.',
+    tone: 'neutral',
+  };
 }
 
 export function canShowPublicClaimCta(status: string): boolean {
-  return status === 'Unclaimed';
+  return ['Unclaimed'].includes(status);
 }

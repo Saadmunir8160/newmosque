@@ -19,6 +19,10 @@ public class OwnershipClaimService
     private readonly IWebHostEnvironment _env;
     private readonly IEmailSender _emailSender;
     private readonly ILogger<OwnershipClaimService> _logger;
+    private readonly MosqueAuditService _audit;
+    private readonly NotificationService _notifications;
+    private readonly IFileStorageService _storage;
+    private readonly MosquePublicProfileCache _publicCache;
 
     public OwnershipClaimService(
         IUnitOfWork unitOfWork,
@@ -28,7 +32,11 @@ public class OwnershipClaimService
         SlugService slugService,
         IWebHostEnvironment env,
         IEmailSender emailSender,
-        ILogger<OwnershipClaimService> logger)
+        ILogger<OwnershipClaimService> logger,
+        MosqueAuditService audit,
+        NotificationService notifications,
+        IFileStorageService storage,
+        MosquePublicProfileCache publicCache)
     {
         _unitOfWork = unitOfWork;
         _userManager = userManager;
@@ -38,6 +46,10 @@ public class OwnershipClaimService
         _env = env;
         _emailSender = emailSender;
         _logger = logger;
+        _audit = audit;
+        _notifications = notifications;
+        _storage = storage;
+        _publicCache = publicCache;
     }
 
     public async Task<string> GenerateClaimReferenceAsync()
@@ -100,14 +112,10 @@ public class OwnershipClaimService
         string? docsJson = null;
         if (proofFile != null)
         {
-            var (primary, json, docErr) = await ClaimFormHelper.SaveProofDocumentAsync(dto.MosqueId, _env, proofFile);
+            var (primary, json, docErr) = await ClaimFormHelper.SaveProofDocumentAsync(dto.MosqueId, _storage, proofFile);
             if (docErr != null) return (null, docErr, 400);
             docUrl = primary;
             docsJson = json;
-        }
-        else if (string.IsNullOrWhiteSpace(docUrl))
-        {
-            return (null, "Please upload a valid PDF document (maximum 10 MB).", 400);
         }
 
         var claimRef = await GenerateClaimReferenceAsync();
@@ -137,11 +145,34 @@ public class OwnershipClaimService
 
         _unitOfWork.Repository<MosqueOwnershipClaim>().Add(claim);
         await _unitOfWork.SaveChangesAsync();
+        await _publicCache.InvalidateMosqueAsync(mosque);
 
         await LogAuditAsync("CLAIM_SUBMITTED", userId, mosque.Id,
             $"New ownership claim received for {mosque.Name}. Reference {claimRef}.");
 
         await SendClaimEmailsAsync(claimant, mosque, claim);
+
+        await _notifications.CreateAsync(
+            userId,
+            "CLAIM_SUBMITTED",
+            "Claim submitted",
+            $"Your ownership claim for '{mosque.Name}' ({claimRef}) is under review.",
+            "/dashboard/owner/my-claims",
+            relatedMosqueId: mosque.Id,
+            relatedClaimId: claim.Id);
+
+        var admins = await _userManager.GetUsersInRoleAsync(Roles.SuperAdmin);
+        foreach (var admin in admins)
+        {
+            await _notifications.CreateAsync(
+                admin.Id,
+                "CLAIM_SUBMITTED",
+                "New ownership claim",
+                $"{mosque.Name} — claim {claimRef} awaits review.",
+                "/dashboard/super/claims",
+                relatedMosqueId: mosque.Id,
+                relatedClaimId: claim.Id);
+        }
 
         return (new SubmitMosqueClaimResponse
         {
@@ -247,7 +278,7 @@ public class OwnershipClaimService
         string? docsJson = null;
         if (documents.Count > 0)
         {
-            var (primary, json, docErr) = await ClaimFormHelper.SaveDocumentsAsync(mosqueId, _env, documents);
+            var (primary, json, docErr) = await ClaimFormHelper.SaveDocumentsAsync(mosqueId, _storage, documents);
             if (docErr != null) return (null, docErr, 400);
             docUrl = primary;
             docsJson = json;
@@ -277,6 +308,7 @@ public class OwnershipClaimService
 
         _unitOfWork.Repository<MosqueOwnershipClaim>().Add(claim);
         await _unitOfWork.SaveChangesAsync();
+        await _publicCache.InvalidateMosqueAsync(mosque);
 
         var claimant = await _userManager.FindByIdAsync(userId);
         if (claimant != null)
@@ -284,6 +316,15 @@ public class OwnershipClaimService
 
         await LogAuditAsync("CLAIM_SUBMITTED", userId, mosqueId,
             $"Ownership claim {claim.ClaimReference} submitted for '{mosque.Name}'.");
+
+        await _notifications.CreateAsync(
+            userId,
+            "CLAIM_SUBMITTED",
+            "Claim submitted",
+            $"Your ownership claim for '{mosque.Name}' ({claim.ClaimReference}) is under review.",
+            "/dashboard/owner/my-claims",
+            relatedMosqueId: mosque.Id,
+            relatedClaimId: claim.Id);
 
         return (BuildClaimResponse(mosque, claim), null, 200);
     }
@@ -352,6 +393,10 @@ public class OwnershipClaimService
         return (BuildClaimResponse(mosque, claim), null, 200);
     }
 
+    /// <summary>
+    /// Module 3.1 Step 1 of verification: approve ownership → CLAIMED (not yet public).
+    /// Activation is a separate Super Admin step.
+    /// </summary>
     public async Task<(Mosque? Mosque, string? Error, int StatusCode)> ApproveAsync(int claimId, string reviewerId)
     {
         var claim = await LoadClaimAsync(claimId);
@@ -360,6 +405,9 @@ public class OwnershipClaimService
             return (null, "Claim is not pending.", 400);
 
         var mosque = claim.Mosque!;
+        if (!string.IsNullOrEmpty(mosque.OwnerId) && mosque.OwnerId != claim.ClaimantId)
+            return (null, "Mosque ownership has already been assigned.", 409);
+
         var claimant = await _userManager.FindByIdAsync(claim.ClaimantId);
         if (claimant == null) return (null, "Claimant not found.", 404);
 
@@ -383,64 +431,38 @@ public class OwnershipClaimService
         }
 
         await _unitOfWork.SaveChangesAsync();
-        await LogAuditAsync("CLAIM_APPROVED", reviewerId, mosque.Id,
-            $"Approved claim {claim.ClaimReference} for '{mosque.Name}'.");
-
-        return (mosque, null, 200);
-    }
-
-    /// <summary>Approve claim, assign owner, and activate mosque in one step (Module 3.1 Step 5).</summary>
-    public async Task<(Mosque? Mosque, string? Error, int StatusCode)> ApproveAndActivateAsync(int claimId, string reviewerId)
-    {
-        var claim = await LoadClaimAsync(claimId);
-        if (claim == null) return (null, "Claim not found.", 404);
-        if (claim.Status != OwnershipClaimStatus.Pending)
-            return (null, "This claim has already been reviewed.", 400);
-
-        var mosque = claim.Mosque!;
-        if (!string.IsNullOrEmpty(mosque.OwnerId) && mosque.OwnerId != claim.ClaimantId)
-            return (null, "Mosque ownership has already been assigned.", 409);
-
-        var claimant = await _userManager.FindByIdAsync(claim.ClaimantId);
-        if (claimant == null) return (null, "Claimant not found.", 404);
-
-        mosque.OwnerId = claim.ClaimantId;
-        mosque.Status = MosqueStatus.Active;
-        mosque.UpdatedAt = DateTime.UtcNow;
-
-        claim.Status = OwnershipClaimStatus.Approved;
-        claim.ReviewedAt = DateTime.UtcNow;
-        claim.ReviewedById = reviewerId;
-
-        if (!await _userManager.IsInRoleAsync(claimant, Roles.MosqueOwner))
-            await _userManager.AddToRoleAsync(claimant, Roles.MosqueOwner);
-        if (!await _userManager.IsInRoleAsync(claimant, Roles.MosqueAdmin))
-            await _userManager.AddToRoleAsync(claimant, Roles.MosqueAdmin);
-
-        if (claimant.HomeMosqueId == null)
-        {
-            claimant.HomeMosqueId = mosque.Id;
-            await _userManager.UpdateAsync(claimant);
-        }
-
-        await _unitOfWork.SaveChangesAsync();
+        await _publicCache.InvalidateMosqueAsync(mosque);
 
         await LogClaimAuditAsync(
-            "Claim Approved",
+            "CLAIM_APPROVED",
             reviewerId,
             mosque.Id,
             claim.Id,
-            $"Approved claim {claim.ClaimReference} for '{mosque.Name}'. Owner assigned and mosque activated.");
+            $"Approved claim {claim.ClaimReference} for '{mosque.Name}'. Owner assigned; mosque remains CLAIMED pending activation.");
 
         await SendClaimApprovedEmailAsync(claimant, mosque, claim);
+
+        await _notifications.CreateAsync(
+            claimant.Id,
+            "CLAIM_APPROVED",
+            "Claim approved",
+            $"Ownership of '{mosque.Name}' was assigned to you. A Super Admin will activate the public listing next.",
+            "/dashboard/owner/my-mosque",
+            relatedMosqueId: mosque.Id,
+            relatedClaimId: claim.Id);
 
         return (mosque, null, 200);
     }
 
+    /// <summary>
+    /// Module 3.1 Step 2 of verification: CLAIMED → ACTIVE (public listing goes live).
+    /// </summary>
     public async Task<(Mosque? Mosque, string? Error, int StatusCode)> ActivateAsync(int claimId, string reviewerId)
     {
         var claim = await LoadClaimAsync(claimId);
         if (claim == null) return (null, "Claim not found.", 404);
+        if (claim.Status != OwnershipClaimStatus.Approved)
+            return (null, "Only an approved claim can be used to activate the mosque.", 400);
 
         var mosque = claim.Mosque!;
         if (mosque.Status != MosqueStatus.Claimed && mosque.Status != MosqueStatus.Suspended)
@@ -449,12 +471,40 @@ public class OwnershipClaimService
         if (string.IsNullOrEmpty(mosque.OwnerId))
             return (null, "Mosque has no assigned owner.", 400);
 
+        var hasPending = await _unitOfWork.Repository<MosqueOwnershipClaim>().QueryNoTracking()
+            .AnyAsync(c => c.MosqueId == mosque.Id && c.Status == OwnershipClaimStatus.Pending && !c.IsDeleted);
+        if (hasPending)
+            return (null, "Cannot activate while a pending ownership claim exists.", 400);
+
+        var (gateOk, completeness, missing) = MosqueProfileCompleteness.MeetsActivationGate(mosque);
+        if (!gateOk)
+            return (null, $"Mosque profile is incomplete for activation ({completeness}% complete). Missing: {string.Join(", ", missing)}.", 400);
+
         mosque.Status = MosqueStatus.Active;
         mosque.UpdatedAt = DateTime.UtcNow;
         await _unitOfWork.SaveChangesAsync();
+        await _publicCache.InvalidateMosqueAsync(mosque);
 
-        await LogAuditAsync("MOSQUE_ACTIVATED", reviewerId, mosque.Id,
+        await LogClaimAuditAsync(
+            "MOSQUE_ACTIVATED",
+            reviewerId,
+            mosque.Id,
+            claim.Id,
             $"Activated mosque '{mosque.Name}' via claim {claim.ClaimReference}.");
+
+        var owner = await _userManager.FindByIdAsync(mosque.OwnerId);
+        if (owner != null)
+        {
+            await SendMosqueActivatedEmailAsync(owner, mosque, claim);
+            await _notifications.CreateAsync(
+                owner.Id,
+                "MOSQUE_ACTIVATED",
+                "Mosque activated",
+                $"'{mosque.Name}' is now ACTIVE on the public directory.",
+                "/dashboard/owner/my-mosque",
+                relatedMosqueId: mosque.Id,
+                relatedClaimId: claim.Id);
+        }
 
         return (mosque, null, 200);
     }
@@ -500,7 +550,7 @@ public class OwnershipClaimService
         await _unitOfWork.SaveChangesAsync();
 
         await LogClaimAuditAsync(
-            "Claim Rejected",
+            "CLAIM_REJECTED",
             reviewerId,
             mosque.Id,
             claim.Id,
@@ -508,6 +558,18 @@ public class OwnershipClaimService
 
         if (claimant != null)
             await SendClaimRejectedEmailAsync(claimant, mosque, claim);
+
+        if (claimant != null)
+        {
+            await _notifications.CreateAsync(
+                claimant.Id,
+                "CLAIM_REJECTED",
+                "Claim rejected",
+                $"Your claim for '{mosque.Name}' was rejected: {claim.RejectionReason}",
+                "/dashboard/owner/my-claims",
+                relatedMosqueId: mosque.Id,
+                relatedClaimId: claim.Id);
+        }
 
         return (mosque, null, 200);
     }
@@ -529,6 +591,8 @@ public class OwnershipClaimService
             City = claim.Mosque?.City ?? "",
             Slug = claim.Mosque?.Slug ?? "",
             MosqueAddress = claim.Mosque?.Address,
+            MosquePhone = claim.Mosque?.Phone,
+            MosqueEmail = claim.Mosque?.Email,
             MosquePostcode = claim.Mosque?.Postcode,
             MosqueCountry = claim.Mosque?.Country,
             ApplicantUserId = claim.ClaimantId,
@@ -607,6 +671,7 @@ public class OwnershipClaimService
             MosqueName = c.Mosque?.Name ?? "",
             MosqueSlug = c.Mosque?.Slug,
             Status = c.Status.ToString(),
+            MosqueStatus = c.Mosque?.Status.ToString() ?? "Unclaimed",
             ReviewStatus = c.Status switch
             {
                 OwnershipClaimStatus.Pending => "Pending Review",
@@ -645,20 +710,44 @@ public class OwnershipClaimService
         var html = $@"
             <p>Congratulations!</p>
             <p>Your ownership request for <strong>{mosque.Name}</strong> has been approved.</p>
-            <p>You are now the official mosque administrator.</p>
-            <p>You can now log in to your Mosque Dashboard and manage your mosque.</p>
+            <p>You are now the assigned mosque owner. The listing is <strong>CLAIMED</strong> and not yet public.</p>
+            <p>A Super Admin must still <strong>activate</strong> the mosque before it appears live on the public directory.</p>
+            <p>You can log in to your Mosque Dashboard and prepare your profile while you wait.</p>
             <p>Reference: {claim.ClaimReference}</p>";
 
         try
         {
             await _emailSender.SendEmailAsync(
                 claimant.Email,
-                "Congratulations! Your Mosque Ownership Has Been Approved",
+                "Your Mosque Ownership Has Been Approved",
                 html);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to send claim approval email to {Email}", claimant.Email);
+        }
+    }
+
+    private async Task SendMosqueActivatedEmailAsync(ApplicationUser owner, Mosque mosque, MosqueOwnershipClaim claim)
+    {
+        if (string.IsNullOrWhiteSpace(owner.Email)) return;
+
+        var html = $@"
+            <p>Good news!</p>
+            <p><strong>{mosque.Name}</strong> is now <strong>ACTIVE</strong> and live on the public directory.</p>
+            <p>Public profile: /mosque/{mosque.Slug}</p>
+            <p>Reference: {claim.ClaimReference}</p>";
+
+        try
+        {
+            await _emailSender.SendEmailAsync(
+                owner.Email,
+                "Your Mosque Is Now Active",
+                html);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send mosque activation email to {Email}", owner.Email);
         }
     }
 
@@ -687,36 +776,11 @@ public class OwnershipClaimService
         }
     }
 
-    private async Task LogClaimAuditAsync(string action, string actorId, int mosqueId, int claimId, string description)
-    {
-        var actor = await _userManager.FindByIdAsync(actorId);
-        _unitOfWork.Repository<PlatformAuditLog>().Add(new PlatformAuditLog
-        {
-            Action = action,
-            Module = "Claims",
-            ActorId = actorId,
-            ActorName = actor?.FullName ?? actor?.UserName,
-            TargetType = "Claim",
-            TargetId = claimId,
-            Description = $"{description} (MosqueId={mosqueId})"
-        });
-        await _unitOfWork.SaveChangesAsync();
-    }
+    private Task LogClaimAuditAsync(string action, string actorId, int mosqueId, int claimId, string description) =>
+        _audit.LogClaimAsync(action, actorId, mosqueId, claimId, description);
 
-    private async Task LogAuditAsync(string action, string actorId, int mosqueId, string description)
-    {
-        var actor = await _userManager.FindByIdAsync(actorId);
-        _unitOfWork.Repository<PlatformAuditLog>().Add(new PlatformAuditLog
-        {
-            Action = action,
-            ActorId = actorId,
-            ActorName = actor?.UserName,
-            TargetType = "Mosque",
-            TargetId = mosqueId,
-            Description = description
-        });
-        await _unitOfWork.SaveChangesAsync();
-    }
+    private Task LogAuditAsync(string action, string actorId, int mosqueId, string description) =>
+        _audit.LogMosqueAsync(action, actorId, mosqueId, description);
 
     public async Task<(bool Success, string? Error)> UpdateClaimAsync(int claimId, UpdateClaimRequest dto)
     {

@@ -9,23 +9,16 @@ const MODULE_LABELS: Record<string, string> = {
   PrayerTimes: 'Prayer times',
   Announcements: 'Announcements',
   Events: 'Events',
-  Madrassah: 'Madrassah',
-  Communities: 'Communities',
-  Awrad: 'Awrad & Wird',
-  Adhkar: 'Daily adhkar',
-  Duas: 'Duas library',
-  Quran: 'Qur\'an plans',
-  RitualGuides: 'Ritual guides',
   Janaza: 'Janaza',
-  DeathReadings: 'Death readings',
-  Participation: 'Community participation',
-  JourneyGuides: 'Umrah & Hajj guides',
+  Donations: 'Donations',
+  Courses: 'Courses',
+  VolunteerManagement: 'Volunteer Management',
+  CommunityServices: 'Community Services',
 };
 
 const MODULE_ORDER = [
-  'PrayerTimes', 'Announcements', 'Events', 'Madrassah', 'Communities',
-  'Awrad', 'Adhkar', 'Duas', 'Quran', 'RitualGuides', 'Janaza',
-  'DeathReadings', 'Participation', 'JourneyGuides',
+  'PrayerTimes', 'Announcements', 'Events', 'Janaza', 
+  'Donations', 'Courses', 'VolunteerManagement', 'CommunityServices'
 ];
 
 @Component({
@@ -133,13 +126,14 @@ export class SuperFeaturesComponent implements OnInit {
   }
 
   private sortSettings(list: MosqueSetting[]): MosqueSetting[] {
-    return [...list].sort((a, b) => {
-      const ai = MODULE_ORDER.indexOf(a.moduleKey);
-      const bi = MODULE_ORDER.indexOf(b.moduleKey);
-      const aRank = ai === -1 ? 999 : ai;
-      const bRank = bi === -1 ? 999 : bi;
-      return aRank - bRank || a.moduleKey.localeCompare(b.moduleKey);
-    });
+    const allowed = new Set(MODULE_ORDER);
+    return list
+      .filter(s => allowed.has(s.moduleKey))
+      .sort((a, b) => {
+        const ai = MODULE_ORDER.indexOf(a.moduleKey);
+        const bi = MODULE_ORDER.indexOf(b.moduleKey);
+        return ai - bi;
+      });
   }
 
   private showToast(msg: string, ok: boolean): void {

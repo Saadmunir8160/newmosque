@@ -22,7 +22,7 @@
     <div class="claim-drawer__body" [class.claim-drawer__body--busy]="submitting()">
       <div *ngIf="submitting()" class="claim-drawer__overlay" aria-live="polite">
         <span class="claim-spinner" aria-hidden="true"></span>
-        <p>Submitting claim… {{ uploadPercent() }}%</p>
+        <p>Submitting claim…</p>
       </div>
 
       <div *ngIf="blockReason()" class="claim-alert claim-alert--warn" role="alert">{{ blockReason() }}</div>
@@ -61,29 +61,9 @@
         </label>
       </section>
 
-      <section class="claim-section">
-        <h3>Proof of ownership</h3>
-        <p class="claim-hint">Upload a PDF (max 10 MB). Examples: charity registration, utility bill, official mosque letter, committee appointment letter.</p>
-        <div class="claim-upload" [class.claim-upload--invalid]="fieldErrors()['proof']">
-          <div *ngIf="!proofFileName()" class="claim-upload__empty">
-            <label class="claim-upload__btn">
-              Choose PDF
-              <input type="file" accept="application/pdf,.pdf" (change)="onProofSelected($event)" [disabled]="!!blockReason() || submitting()">
-            </label>
-          </div>
-          <div *ngIf="proofFileName()" class="claim-upload__file">
-            <span class="claim-upload__name">{{ proofFileName() }}</span>
-            <button type="button" class="claim-upload__remove" (click)="removeProof()" [disabled]="submitting()">Remove</button>
-          </div>
-          <div *ngIf="uploadPercent() > 0 && submitting()" class="claim-upload__progress">
-            <span [style.width.%]="uploadPercent()"></span>
-          </div>
-        </div>
-        <small *ngIf="fieldErrors()['proof']" class="claim-error">{{ fieldErrors()['proof'] }}</small>
-      </section>
 
       <section class="claim-section">
-        <h3>Additional notes</h3>
+        <h3>Reason for claim</h3>
         <label class="claim-field">
           <span>Optional</span>
           <textarea class="claim-input claim-textarea" rows="4" [(ngModel)]="notes" name="notes"

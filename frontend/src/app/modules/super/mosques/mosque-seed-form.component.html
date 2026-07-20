@@ -124,6 +124,51 @@
   </section>
 
   <section class="seed-section">
+    <h3 class="seed-section__title">Social Links</h3>
+    <div class="seed-grid">
+      <label class="seed-field">
+        <span class="seed-label">Facebook URL</span>
+        <input
+          class="seed-input"
+          [(ngModel)]="$any(form).facebookUrl"
+          (ngModelChange)="onFieldInput($any('facebookUrl'))"
+          [disabled]="saving()"
+          placeholder="Optional">
+      </label>
+
+      <label class="seed-field">
+        <span class="seed-label">Instagram URL</span>
+        <input
+          class="seed-input"
+          [(ngModel)]="$any(form).instagramUrl"
+          (ngModelChange)="onFieldInput($any('instagramUrl'))"
+          [disabled]="saving()"
+          placeholder="Optional">
+      </label>
+
+      <label class="seed-field">
+        <span class="seed-label">X (Twitter) URL</span>
+        <input
+          class="seed-input"
+          [(ngModel)]="$any(form).twitterUrl"
+          (ngModelChange)="onFieldInput($any('twitterUrl'))"
+          [disabled]="saving()"
+          placeholder="Optional">
+      </label>
+
+      <label class="seed-field">
+        <span class="seed-label">YouTube URL</span>
+        <input
+          class="seed-input"
+          [(ngModel)]="$any(form).youtubeUrl"
+          (ngModelChange)="onFieldInput($any('youtubeUrl'))"
+          [disabled]="saving()"
+          placeholder="Optional">
+      </label>
+    </div>
+  </section>
+
+  <section class="seed-section">
     <h3 class="seed-section__title">Branding</h3>
     <div class="seed-upload-grid">
       <div class="seed-upload">
@@ -160,33 +205,7 @@
     </div>
   </section>
 
-  <section class="seed-section" *ngIf="!editMosque">
-    <h3 class="seed-section__title">Owner invitation</h3>
-    <p class="seed-hint seed-hint--block">Optional — invite the mosque owner now. If left blank, the mosque contact email above is used.</p>
-    <div class="seed-grid">
-      <label class="seed-field">
-        <span class="seed-label">Owner email</span>
-        <input
-          class="seed-input"
-          type="email"
-          [class.seed-input--invalid]="fieldErrors()['ownerInviteEmail']"
-          [(ngModel)]="form.ownerInviteEmail"
-          (ngModelChange)="onFieldInput('ownerInviteEmail')"
-          [disabled]="saving()"
-          placeholder="owner@example.com">
-        <span *ngIf="fieldErrors()['ownerInviteEmail']" class="seed-error">{{ fieldErrors()['ownerInviteEmail'] }}</span>
-      </label>
-      <label class="seed-field">
-        <span class="seed-label">Owner name</span>
-        <input
-          class="seed-input"
-          [(ngModel)]="form.ownerInviteName"
-          (ngModelChange)="onFieldInput('ownerInviteName')"
-          [disabled]="saving()"
-          placeholder="Optional">
-      </label>
-    </div>
-  </section>
+
 
   <section class="seed-section">
     <h3 class="seed-section__title">Settings</h3>
@@ -217,7 +236,18 @@
   </section>
 
   <footer *ngIf="showFooter" class="seed-form__footer">
-    <button type="button" class="seed-btn seed-btn--ghost" (click)="cancel()" [disabled]="saving()">Cancel</button>
+    <div class="seed-form__footer-left">
+      <button type="button" class="seed-btn seed-btn--ghost" (click)="cancel()" [disabled]="saving()">Cancel</button>
+      <button
+        *ngIf="showFillTestData && !editMosque"
+        type="button"
+        class="seed-btn seed-btn--test"
+        (click)="fillTestData()"
+        [disabled]="saving()"
+        title="Development only — fills unique sample data">
+        Fill test data
+      </button>
+    </div>
     <button type="button" class="seed-btn seed-btn--primary" (click)="save()" [disabled]="saving()">
       {{ saving() ? saveStageLabel() : (editMosque ? 'Save Changes' : 'Save Mosque') }}
     </button>

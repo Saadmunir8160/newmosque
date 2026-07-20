@@ -10,23 +10,23 @@
 | # | Client requirement | Status | Implementation |
 |---|-------------------|--------|----------------|
 | 1 | Public mosque profile at `/mosque/[slug]` | **Pass** | Canonical route `mosque/:slug` → `MosqueProfilePageComponent`; `/mosques/:slug` redirects |
-| 2 | Admin can edit all mosque details | **Pass** | Super Admin, Mosque Admin, Owner via `/dashboard/admin/mosque` and `/dashboard/owner/profile`; partial PUT preserves omitted fields |
+| 2 | Admin can edit all mosque details | **Pass** | Super Admin, Mosque Owner, Mosque Admin via `/dashboard/admin/mosque` and `/dashboard/owner/profile`; **Claimed + Active** both editable (Milestone 2) |
 | 3 | Mosque manually seeded by super admin | **Pass** | `/dashboard/super/mosques` → `POST /api/v1/platform/mosques/seed` → `Unclaimed` |
-| 4 | Mosque admins can claim an existing listing | **Pass** | `MosqueProfilePolicies.Claim` allows **MosqueOwner + MosqueAdmin**; claim via `/mosque/:slug/claim` |
+| 4 | Mosque admins can claim an existing listing | **Pass** | Any authenticated email-verified user may claim (ModuleRequirements); Super Admin blocked; CTA on `/mosque/:slug` |
 | 5 | Verification flow after claim (manual approval MVP) | **Pass** | Claim → `ClaimPending` (public 404) → Super approve → `Claimed` → activate → `Active` |
 | 6 | Module feature flags per mosque | **Pass** | `MosqueSettings`; Owner toggles at `/dashboard/owner/settings`; public tabs + Events API gated |
 
-**Claim role (per client spec):** `mosqueadmin` (Mosque Admin) — not Owner-only.  
+**Claim policy (canonical):** Any authenticated, email-verified user may submit an ownership claim for an `Unclaimed` mosque. Super Admins cannot claim. Mosque Admins/Owners are included under this rule.  
 **Canonical public URL:** `/mosque/{slug}` (e.g. `http://localhost:4200/mosque/masjid-al-noor-bradford`)
 
 ## Lifecycle (end-to-end)
 
 ```
 Super Admin seed → UNCLAIMED (public 200)
-→ Mosque Admin claims → ClaimPending (public 404)
+→ User claims → ClaimPending (public 404)
 → Super Admin approve → CLAIMED + owner_id = claimant (public 404)
 → Super Admin activate → ACTIVE (public 200)
-→ Mosque Admin dashboard + profile edit; Owner module flags
+→ Owner/Admin dashboard + profile edit; Owner module flags
 ```
 
 | Status | Public `GET /api/v1/mosques/{slug}` | Owner assigned | Notes |
@@ -36,6 +36,12 @@ Super Admin seed → UNCLAIMED (public 200)
 | Claimed | 404 | Yes (`owner_id`) | Hidden until activation |
 | Active | 200 | Yes | Full public profile + module-gated tabs |
 | Reject | → Unclaimed | Cleared | Mosque returns to open listing |
+
+**Two-step verification (required):**
+1. `POST /api/v1/platform/claims/{claimId}/approve` → mosque `CLAIMED`
+2. `POST /api/v1/platform/claims/{claimId}/activate` → mosque `ACTIVE`
+
+One-step approve+activate was removed. Approve never sets ACTIVE.
 
 ## Phase 0 — Automated API flow (`test-module31-flow.ps1`)
 
@@ -106,10 +112,24 @@ Run: `powershell -ExecutionPolicy Bypass -File MosqueOS/backend/test-module31-fl
 2. **Public** — Open `/mosque/{slug}` → profile visible (no owner shown).
 3. **Mosque Admin** — Login `mosqueadmin` / `Admin@123` → `/mosque/{slug}/claim` → submit claim form.
 4. **Public hidden** — Refresh `/mosque/{slug}` → not found (ClaimPending).
-5. **Super Admin** — `/dashboard/super/claims` → Approve claim → mosque becomes Claimed; claimant is `owner_id`.
+5. **Super Admin** — `/dashboard/super/claims` → **Approve** → mosque becomes **Claimed** (still public 404); claimant is `owner_id`.
 6. **Still hidden** — `/mosque/{slug}` still 404 until activation.
-7. **Activate** — Super Admin activates → status Active → `/mosque/{slug}` live again.
-8. **Dashboards** — `mosqueadmin` edits at `/dashboard/admin/mosque`; `owner` toggles modules at `/dashboard/owner/settings` (mosqueadmin cannot toggle).
+7. **Activate** — Super Admin clicks **Activate Mosque** (separate step). Requires name, city, address, and phone or email; blocked if a pending claim exists. Status → **Active** → `/mosque/{slug}` live again.
+8. **Dashboards** — claimant can open owner/admin dashboard; owner toggles modules at `/dashboard/owner/settings`.
+
+### Activation quality gate (Milestone 6)
+
+| Rule | Behaviour |
+|------|-----------|
+| Required fields | name, city, address, phone **OR** email |
+| Pending claims | Block activate while any pending ownership claim exists on the mosque |
+| Soft completeness | UI warns when overall completeness &lt; 60% (does not hard-block if required fields present) |
+
+### Social links (Milestone 5)
+
+- Source of truth: `Mosque.SocialLinksJson` (`{ "links": [{ "platform", "url", "label?" }] }`)
+- Legacy `FacebookUrl` / `InstagramUrl` / `YoutubeUrl` / `TwitterUrl` remain and stay in sync on write
+- Public profile prefers `socialLinks` from the API and falls back to legacy columns
 
 ## UI checklist (manual spot-check)
 

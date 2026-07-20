@@ -32,6 +32,8 @@
           <div><dt>Mosque name</dt><dd>{{ d.mosqueName }}</dd></div>
           <div><dt>Address</dt><dd>{{ d.mosqueAddress || '—' }}</dd></div>
           <div><dt>City</dt><dd>{{ d.mosqueCity || '—' }}</dd></div>
+          <div><dt>Phone</dt><dd>{{ d.mosquePhone || '—' }}</dd></div>
+          <div><dt>Email</dt><dd>{{ d.mosqueEmail || '—' }}</dd></div>
           <div><dt>Current status</dt><dd><span class="scr-badge scr-badge--pending">{{ d.mosqueStatus }}</span></dd></div>
         </dl>
       </section>
@@ -60,8 +62,21 @@
           <button type="button" class="scr-btn scr-btn--danger" (click)="openRejectDialog()" [disabled]="acting()">Reject</button>
           <button type="button" class="scr-btn scr-btn--primary" (click)="openApproveConfirm()" [disabled]="acting()">Approve</button>
         </ng-container>
-        <span *ngIf="detail()!.status.toLowerCase() !== 'pending'" class="scr-reviewed-badge scr-badge scr-badge--{{ detail()!.status.toLowerCase() === 'approved' ? 'ok' : 'rejected' }}">
-          {{ detail()!.status }}
+        <ng-container *ngIf="detail()!.status.toLowerCase() === 'approved' && detail()!.mosqueStatus.toLowerCase() !== 'active'">
+          <span class="scr-reviewed-badge scr-badge scr-badge--ok">Approved · Awaiting activation</span>
+          <button type="button" class="scr-btn scr-btn--primary" (click)="confirmActivate()" [disabled]="acting()">
+            {{ acting() ? 'Activating...' : 'Activate Mosque' }}
+          </button>
+        </ng-container>
+        <span
+          *ngIf="detail()!.status.toLowerCase() === 'approved' && detail()!.mosqueStatus.toLowerCase() === 'active'"
+          class="scr-reviewed-badge scr-badge scr-badge--ok">
+          Approved · Active
+        </span>
+        <span
+          *ngIf="detail()!.status.toLowerCase() === 'rejected'"
+          class="scr-reviewed-badge scr-badge scr-badge--rejected">
+          Rejected
         </span>
       </div>
     </footer>
@@ -74,8 +89,8 @@
     <h3 id="approve-title">Approve Mosque Claim?</h3>
     <p id="approve-desc" class="scr-modal__text">
       This user will become the official owner of this mosque.
-      Ownership will be transferred and the mosque will become <strong>ACTIVE</strong>.
-      This action cannot be undone.
+      Ownership will be assigned and the mosque will move to <strong>CLAIMED</strong>.
+      The listing stays hidden from the public directory until you <strong>Activate</strong> it in a separate step.
     </p>
     <footer class="scr-modal__foot">
       <button type="button" class="scr-btn scr-btn--ghost" (click)="cancelApprove()" [disabled]="acting()">Cancel</button>

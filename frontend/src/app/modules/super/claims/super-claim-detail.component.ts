@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuditLogEntry, PlatformClaimDetail, PlatformService } from '../../../core/services/platform.service';
+import { MosqueProfileCompleteness } from '../../../core/utils/mosque-profile.util';
 import { environment } from '../../../../environments/environment';
 
 @Component({
@@ -90,7 +91,7 @@ import { environment } from '../../../../environments/environment';
         <section *ngIf="d.status.toLowerCase() === 'pending'" class="scd-decision">
           <div>
             <h2>Actions</h2>
-            <p>Approving assigns the applicant as owner, adds owner/admin roles, activates the mosque, writes an audit log, and sends notification email.</p>
+            <p>Approve assigns ownership and sets the mosque to <strong>CLAIMED</strong> (still hidden). Activate is a separate step that makes the public profile live.</p>
           </div>
           <div class="scd-decision__buttons">
             <button type="button" class="scd-btn scd-btn--danger" (click)="showReject.set(true)" [disabled]="acting()">Reject</button>
@@ -100,7 +101,15 @@ import { environment } from '../../../../environments/environment';
 
         <section *ngIf="d.status.toLowerCase() !== 'pending'" class="scd-panel">
           <h2>Decision</h2>
-          <p *ngIf="d.status.toLowerCase() === 'approved'" class="scd-ok">This claim has been approved and ownership assignment is complete.</p>
+          <p *ngIf="d.status.toLowerCase() === 'approved' && d.mosqueStatus.toLowerCase() !== 'active'" class="scd-ok">
+            Ownership assigned. Mosque is <strong>CLAIMED</strong> and awaiting activation before it appears on the public directory.
+          </p>
+          <p *ngIf="d.status.toLowerCase() === 'approved' && d.mosqueStatus.toLowerCase() === 'active'" class="scd-ok">
+            This claim is approved and the mosque is <strong>ACTIVE</strong> on the public directory.
+          </p>
+          <div *ngIf="d.status.toLowerCase() === 'approved' && d.mosqueStatus.toLowerCase() !== 'active'" class="scd-decision__buttons" style="margin-top: 1rem;">
+            <button type="button" class="scd-btn" (click)="activateMosque()" [disabled]="acting()">{{ acting() ? 'Activating...' : 'Activate Mosque' }}</button>
+          </div>
           <p *ngIf="d.status.toLowerCase() === 'rejected'" class="scd-rejected">Rejected: {{ d.rejectionReason || 'No reason recorded.' }}</p>
         </section>
 
@@ -249,7 +258,7 @@ export class SuperClaimDetailComponent implements OnInit {
   }
 
   approve(): void {
-    if (!confirm('Approve this claim and activate the mosque?')) return;
+    if (!confirm('Approve this claim? Ownership will be assigned and the mosque will become CLAIMED (not yet public).')) return;
     this.acting.set(true);
     this.platform.approvePlatformClaim(this.claimId).subscribe({
       next: () => {
@@ -259,6 +268,36 @@ export class SuperClaimDetailComponent implements OnInit {
       },
       error: err => {
         this.error.set(err?.error?.message ?? 'Approval failed.');
+        this.acting.set(false);
+      },
+    });
+  }
+
+  activateMosque(): void {
+    const d = this.detail();
+    if (d) {
+      const gate = MosqueProfileCompleteness.meetsActivationGate({
+        name: d.mosqueName,
+        city: d.mosqueCity ?? '',
+        address: d.mosqueAddress ?? '',
+        phone: d.mosquePhone,
+        email: d.mosqueEmail,
+      });
+      if (!gate.ok) {
+        this.error.set(`Cannot activate — profile incomplete. Missing: ${gate.missing.join(', ')}.`);
+        return;
+      }
+    }
+    if (!confirm('Activate this mosque? It will become ACTIVE and visible on the public directory.')) return;
+    this.acting.set(true);
+    this.platform.activatePlatformClaim(this.claimId).subscribe({
+      next: () => {
+        this.acting.set(false);
+        this.load();
+        this.loadAudit();
+      },
+      error: err => {
+        this.error.set(err?.error?.message ?? 'Activation failed.');
         this.acting.set(false);
       },
     });

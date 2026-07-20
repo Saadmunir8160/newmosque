@@ -8,12 +8,18 @@ import { toObservable } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
 import { MosqueService } from '../../../core/services/mosque.service';
 import { AuthService } from '../../../core/auth/auth.service';
-import { Mosque } from '../../../core/models';
+import { Announcement, Mosque, MosqueEvent, PrayerTimesDaily } from '../../../core/models';
 import {
   canShowPublicClaimCta,
   formatMosqueStatus,
   publicStatusCard,
 } from '../../../core/utils/mosque-status.util';
+import { canShowClaimCta, claimCtaHint } from '../../../core/utils/mosque-claim.util';
+import {
+  resolveMosqueSocialLinks,
+  socialLinkCssClass,
+  socialLinkLabel,
+} from '../../../core/utils/mosque-social.util';
 import { environment } from '../../../../environments/environment';
 import { MosqueClaimDrawerComponent } from '../mosque-claim-drawer/mosque-claim-drawer.component';
 
@@ -27,7 +33,7 @@ import { MosqueClaimDrawerComponent } from '../mosque-claim-drawer/mosque-claim-
 export class PublicMosqueProfileComponent implements OnInit, OnDestroy {
   @Input() openClaimOnLoad = false;
   private mosqueService = inject(MosqueService);
-  private auth = inject(AuthService);
+  public auth = inject(AuthService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private title = inject(Title);
@@ -44,12 +50,22 @@ export class PublicMosqueProfileComponent implements OnInit, OnDestroy {
   stats = signal<{ members: number; establishedYear?: number; capacity?: number } | null>(null);
   leadership = signal<{ name: string; role: string; bio?: string; photoUrl?: string }[]>([]);
 
+  prayerTimes = signal<PrayerTimesDaily | null>(null);
+  prayerLoading = signal(false);
+  announcements = signal<Announcement[]>([]);
+  announcementsLoading = signal(false);
+  events = signal<MosqueEvent[]>([]);
+  eventsLoading = signal(false);
+
   slug = '';
   private apiOrigin = environment.apiUrl.replace(/\/api\/v1\/?$/, '');
 
   readonly formatStatus = formatMosqueStatus;
   readonly publicStatusCard = publicStatusCard;
   readonly canShowClaim = canShowPublicClaimCta;
+  readonly resolveSocialLinks = resolveMosqueSocialLinks;
+  readonly socialLinkLabel = socialLinkLabel;
+  readonly socialLinkCssClass = socialLinkCssClass;
 
   ngOnInit(): void {
     this.slug = this.route.snapshot.paramMap.get('slug') ?? '';
@@ -92,8 +108,32 @@ export class PublicMosqueProfileComponent implements OnInit, OnDestroy {
     return this.publicStatusCard(m.status).label;
   }
 
-  claimRoute(): string {
-    return `/claim-mosque/${this.slug}`;
+  claimHint(): string {
+    return claimCtaHint({
+      isAuthenticated: this.auth.isAuthenticated(),
+      emailConfirmed: this.auth.user()?.emailConfirmed,
+    });
+  }
+
+  formatClock(value?: string | null): string {
+    if (!value?.trim()) return '—';
+    const raw = value.trim();
+    const match = raw.match(/^(\d{1,2}):(\d{2})/);
+    if (!match) return raw;
+    const hours = Number(match[1]);
+    const minutes = match[2];
+    const suffix = hours >= 12 ? 'PM' : 'AM';
+    const h12 = hours % 12 || 12;
+    return `${h12}:${minutes} ${suffix}`;
+  }
+
+  canClaimMosque(m: Mosque): boolean {
+    return canShowClaimCta({
+      mosqueStatus: m.status,
+      isSuperAdmin: this.auth.isSuperAdmin(),
+      userId: this.auth.user()?.id,
+      ownerId: m.ownerId,
+    });
   }
 
   openClaimFlow(): void {
@@ -127,10 +167,9 @@ export class PublicMosqueProfileComponent implements OnInit, OnDestroy {
   }
 
   onClaimSubmitted(): void {
-    const m = this.mosque();
-    if (m) {
-      this.mosque.set({ ...m, status: 'ClaimPending' });
-    }
+    this.showClaimDrawer.set(false);
+    this.showClaimToast('Claim submitted. The listing is hidden until Super Admin review.', true);
+    void this.load();
   }
 
   private showClaimToast(msg: string, ok: boolean): void {
@@ -209,32 +248,98 @@ export class PublicMosqueProfileComponent implements OnInit, OnDestroy {
     this.loading.set(false);
     this.setSeo(mosque);
     this.maybeOpenClaimFromRoute();
-    // Load supplementary public data only for Active mosques
-    if (mosque.status === 'Active') {
-      this.mosqueService.getPublicStats(mosque.id).subscribe({
-        next: (s) => this.stats.set(s),
-        error: () => { /* non-critical */ }
+    this.loadSupplementary(mosque);
+    this.loadModuleSections(mosque);
+  }
+
+  private loadSupplementary(mosque: Mosque): void {
+    this.mosqueService.getPublicStats(mosque.id).subscribe({
+      next: (s) => this.stats.set(s),
+      error: () => { /* non-critical */ },
+    });
+    if (mosque.leadership?.length) {
+      this.leadership.set(mosque.leadership);
+    } else {
+      this.mosqueService.getPublicLeadership(mosque.id).subscribe({
+        next: (l) => this.leadership.set(l),
+        error: () => { /* non-critical */ },
       });
-      // Use leadership from DTO if already present, else fetch separately
-      if (mosque.leadership?.length) {
-        this.leadership.set(mosque.leadership);
-      } else {
-        this.mosqueService.getPublicLeadership(mosque.id).subscribe({
-          next: (l) => this.leadership.set(l),
-          error: () => { /* non-critical */ }
-        });
-      }
+    }
+  }
+
+  private loadModuleSections(mosque: Mosque): void {
+    this.prayerTimes.set(null);
+    this.announcements.set([]);
+    this.events.set([]);
+
+    if (this.isModuleEnabled(mosque, 'PrayerTimes')) {
+      this.prayerLoading.set(true);
+      this.mosqueService.getDailyPrayerTimes(mosque.id).subscribe({
+        next: (res) => {
+          this.prayerTimes.set(res.times ?? null);
+          this.prayerLoading.set(false);
+        },
+        error: () => {
+          this.prayerTimes.set(null);
+          this.prayerLoading.set(false);
+        },
+      });
+    }
+
+    if (this.isModuleEnabled(mosque, 'Announcements')) {
+      this.announcementsLoading.set(true);
+      this.mosqueService.getAnnouncements(mosque.id).subscribe({
+        next: (list) => {
+          this.announcements.set((list ?? []).slice(0, 3));
+          this.announcementsLoading.set(false);
+        },
+        error: () => {
+          this.announcements.set([]);
+          this.announcementsLoading.set(false);
+        },
+      });
+    }
+
+    if (this.isModuleEnabled(mosque, 'Events')) {
+      this.eventsLoading.set(true);
+      this.mosqueService.getEvents(mosque.id, undefined, undefined, true, 'Scheduled').subscribe({
+        next: (list) => {
+          this.events.set((list ?? []).slice(0, 3));
+          this.eventsLoading.set(false);
+        },
+        error: () => {
+          this.events.set([]);
+          this.eventsLoading.set(false);
+        },
+      });
     }
   }
 
   private setSeo(m: Mosque): void {
     const pageTitle = `${m.name} | ${m.city}`;
-    const description = `Official public profile of ${m.name} in ${m.city} including address, contact information and community details.`;
+    const description =
+      m.shortDescription?.trim()
+      || m.description?.trim()
+      || `Official public profile of ${m.name} in ${m.city} including address, contact information and community details.`;
+    const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/mosque/${m.slug}`;
     this.title.setTitle(pageTitle);
     this.meta.updateTag({ name: 'description', content: description });
     this.meta.updateTag({ property: 'og:title', content: pageTitle });
     this.meta.updateTag({ property: 'og:description', content: description });
+    this.meta.updateTag({ property: 'og:type', content: 'website' });
+    this.meta.updateTag({ property: 'og:url', content: url });
+    this.meta.updateTag({ name: 'twitter:card', content: 'summary_large_image' });
+    let link: HTMLLinkElement | null = document.querySelector('link[rel="canonical"]');
+    if (!link) {
+      link = document.createElement('link');
+      link.setAttribute('rel', 'canonical');
+      document.head.appendChild(link);
+    }
+    link.setAttribute('href', url);
     const image = this.mediaUrl(m.bannerUrl || m.logoUrl);
-    if (image) this.meta.updateTag({ property: 'og:image', content: image });
+    if (image) {
+      this.meta.updateTag({ property: 'og:image', content: image });
+      this.meta.updateTag({ name: 'twitter:image', content: image });
+    }
   }
 }

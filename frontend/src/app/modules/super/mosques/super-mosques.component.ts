@@ -93,11 +93,17 @@ export class SuperMosquesComponent implements OnInit {
         this.listings.set(res.items ?? []);
         this.page.set(1);
         const s = res.summary as Record<string, number> | undefined;
+        // Module 3.1: count all statuses that display as UNCLAIMED
+        const unclaimedStatuses = new Set(['Unclaimed', 'Invited', 'ClaimPending', 'PendingReview', 'Archived']);
+        const allItems = res.items ?? [];
+        const unclaimedCount = allItems.filter(i => unclaimedStatuses.has(i.status)).length;
+        const claimedCount = allItems.filter(i => i.status === 'Claimed' || i.status === 'Suspended').length;
+        const activeCount = allItems.filter(i => i.status === 'Active').length;
         this.summary.set(s ? {
-          unclaimed: s['unclaimed'] ?? 0,
+          unclaimed: unclaimedCount,
           claimPending: s['claimPending'] ?? 0,
-          claimed: s['claimed'] ?? 0,
-          active: s['active'] ?? 0,
+          claimed: claimedCount,
+          active: activeCount,
           pendingReview: s['pendingReview'] ?? 0,
         } : null);
         this.loading.set(false);
@@ -164,6 +170,9 @@ export class SuperMosquesComponent implements OnInit {
   }
 
   activate(id: number): void {
+    if (!confirm('Activate this mosque? It must have name, city, address, and phone or email. Incomplete profiles will be rejected.')) {
+      return;
+    }
     this.platform.activateMosque(id).subscribe({
       next: () => this.load(),
       error: (err) => this.error.set(err?.error?.message ?? 'Activation failed.'),

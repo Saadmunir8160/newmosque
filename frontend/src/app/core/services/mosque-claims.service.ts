@@ -18,6 +18,7 @@ export interface MyClaimItem {
   mosqueName: string;
   mosqueSlug?: string;
   status: string;
+  mosqueStatus: string;
   reviewStatus: string;
   submittedDate: string;
   lastUpdated?: string | null;

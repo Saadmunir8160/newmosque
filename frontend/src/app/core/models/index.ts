@@ -45,6 +45,12 @@ export interface MosqueLeadership {
   photoUrl?: string;
 }
 
+export interface MosqueSocialLink {
+  platform: string;
+  label?: string;
+  url: string;
+}
+
 export interface Mosque {
   id: number;
   name: string;
@@ -60,6 +66,8 @@ export interface Mosque {
   instagramUrl?: string;
   youtubeUrl?: string;
   twitterUrl?: string;
+  /** Preferred social links (JSON). Falls back to legacy *Url fields when empty. */
+  socialLinks?: MosqueSocialLink[];
   shortDescription?: string;
   description?: string;
   facilities?: string[];

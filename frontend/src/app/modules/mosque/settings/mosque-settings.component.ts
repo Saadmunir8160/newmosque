@@ -12,7 +12,7 @@ import { AdminSettingsComponent } from '../../admin/settings/admin-settings.comp
 
 import { Mosque } from '../../../core/models';
 
-import { formatMosqueStatus } from '../../../core/utils/mosque-status.util';
+import { formatMosqueStatus, isMosqueProfileEditableStatus } from '../../../core/utils/mosque-status.util';
 
 
 
@@ -180,7 +180,7 @@ export class MosqueSettingsComponent implements OnInit {
 
     if (!m) return false;
 
-    return m.status === 'ClaimPending' || m.status === 'Claimed' || m.status === 'Active';
+    return isMosqueProfileEditableStatus(m.status);
 
   }
 

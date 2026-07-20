@@ -12,6 +12,7 @@ interface MyClaimRow {
   mosqueName: string;
   mosqueSlug?: string;
   status: string;
+  mosqueStatus?: string;
   reviewStatus: string;
   submittedDate?: string;
   rejectionReason?: string;
@@ -51,6 +52,10 @@ interface MyClaimRow {
           <span class="ov-badge" [attr.data-status]="c.status">{{ formatStatus(c.status) }}</span>
         </div>
         <p *ngIf="c.submittedDate" class="ov-date">Submitted {{ c.submittedDate | date:'medium' }}</p>
+        <p *ngIf="isApprovedAwaitingActivation(c)" class="ov-await">
+          Approved — ownership assigned. Awaiting Super Admin activation before the public listing goes live.
+        </p>
+        <p *ngIf="isActiveMosque(c)" class="ov-live">Your mosque is active on the public directory.</p>
         <p *ngIf="c.rejectionReason" class="ov-reject">Rejected: {{ c.rejectionReason }}</p>
         <div class="ov-card__actions">
           <a *ngIf="c.mosqueSlug" [routerLink]="['/mosque', c.mosqueSlug]" class="ov-btn ov-btn--ghost">View public listing</a>
@@ -80,6 +85,8 @@ interface MyClaimRow {
     .ov-badge[data-status="Rejected"] { background: #fee2e2; color: #991b1b; }
     .ov-date { margin: 0.5rem 0 0; font-size: 0.75rem; color: var(--mos-text-secondary); }
     .ov-reject { margin: 0.35rem 0 0; color: var(--mos-danger); font-size: 0.8125rem; font-weight: 600; }
+    .ov-await { margin: 0.35rem 0 0; color: #92400e; font-size: 0.8125rem; font-weight: 600; }
+    .ov-live { margin: 0.35rem 0 0; color: #166534; font-size: 0.8125rem; font-weight: 600; }
     .ov-card__actions { margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
     .ov-error { color: var(--mos-danger); font-weight: 600; font-size: 0.875rem; }
     .ov-muted { color: var(--mos-text-secondary); font-size: 0.875rem; }
@@ -99,6 +106,15 @@ export class OwnerVerificationComponent implements OnInit {
   readonly formatStatus = formatMosqueStatus;
 
   ngOnInit(): void { this.load(); }
+
+  isApprovedAwaitingActivation(c: MyClaimRow): boolean {
+    return (c.status ?? '').toLowerCase() === 'approved'
+      && (c.mosqueStatus ?? '').toLowerCase() !== 'active';
+  }
+
+  isActiveMosque(c: MyClaimRow): boolean {
+    return (c.mosqueStatus ?? '').toLowerCase() === 'active';
+  }
 
   load(): void {
     this.loading.set(true);

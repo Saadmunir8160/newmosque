@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using MosqueOS.API.Models.Common;
 using MosqueOS.API.Models.Mosques;
 using MosqueOS.API.Services;
+using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
 using System.Security.Claims;
 
@@ -23,7 +24,10 @@ public class MosqueClaimsController : ControllerBase
         _userManager = userManager;
     }
 
-    /// <summary>Submit ownership claim for an unclaimed mosque (Module 3.1 Step 4).</summary>
+    /// <summary>
+    /// Submit ownership claim for an unclaimed mosque (Module 3.1).
+    /// Policy: any authenticated, email-verified user except Super Admin (see ModuleRequirements Role Access).
+    /// </summary>
     [HttpPost]
     [RequestSizeLimit(12_582_912)]
     public async Task<IActionResult> Submit()
@@ -34,6 +38,9 @@ public class MosqueClaimsController : ControllerBase
 
         if (!user.EmailConfirmed)
             return StatusCode(403, new ApiMessageResponse { Message = "Please verify your email before submitting a claim." });
+
+        if (await _userManager.IsInRoleAsync(user, Roles.SuperAdmin))
+            return StatusCode(403, new ApiMessageResponse { Message = "Super Admins cannot submit mosque ownership claims." });
 
         SubmitMosqueClaimRequest? body = null;
         if (Request.HasFormContentType)

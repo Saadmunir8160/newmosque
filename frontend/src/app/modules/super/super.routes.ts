@@ -10,6 +10,7 @@ export const SUPER_ROUTES: Routes = [
   { path: 'mosques/:id', loadComponent: () => import('./mosques/super-mosque-detail.component').then(m => m.SuperMosqueDetailComponent) },
   { path: 'claims/:id', loadComponent: () => import('./claims/super-claim-detail.component').then(m => m.SuperClaimDetailComponent) },
   { path: 'claims', loadComponent: () => import('./claims/super-claims.component').then(m => m.SuperClaimsComponent) },
+  { path: 'registrations', loadComponent: () => import('./registrations/super-registrations.component').then(m => m.SuperRegistrationsComponent) },
   { path: 'invitations', loadComponent: () => import('./invitations/super-invitations.component').then(m => m.SuperInvitationsComponent) },
   { path: 'oversight/janaza', loadComponent: () => import('./oversight/super-oversight-janaza.component').then(m => m.SuperOversightJanazaComponent) },
   { path: 'oversight/prayer-times', loadComponent: () => import('./oversight/super-oversight-prayer-times.component').then(m => m.SuperOversightPrayerTimesComponent) },

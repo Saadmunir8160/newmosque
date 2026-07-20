@@ -70,7 +70,7 @@ public static class ClaimFormHelper
 
     public static async Task<(string? PrimaryUrl, string? DocumentsJson, string? Error)> SaveProofDocumentAsync(
         int mosqueId,
-        IWebHostEnvironment env,
+        IFileStorageService storage,
         IFormFile file)
     {
         var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
@@ -79,22 +79,16 @@ public static class ClaimFormHelper
         if (file.Length > 10 * 1024 * 1024)
             return (null, null, "Please upload a valid PDF document (maximum 10 MB).");
 
-        var dir = Path.Combine(env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"),
-            "uploads", "claims", mosqueId.ToString());
-        Directory.CreateDirectory(dir);
         var fileName = $"{Guid.NewGuid():N}{ext}";
-        var path = Path.Combine(dir, fileName);
-        await using (var stream = File.Create(path))
-            await file.CopyToAsync(stream);
-
-        var url = $"/uploads/claims/{mosqueId}/{fileName}";
+        await using var stream = file.OpenReadStream();
+        var url = await storage.SaveAsync(stream, $"uploads/claims/{mosqueId}", fileName, file.ContentType);
         var json = JsonSerializer.Serialize(new[] { new ClaimDocumentDto { Label = "Proof of Ownership", Url = url } });
         return (url, json, null);
     }
 
     public static async Task<(string? PrimaryUrl, string? DocumentsJson, string? Error)> SaveDocumentsAsync(
         int mosqueId,
-        IWebHostEnvironment env,
+        IFileStorageService storage,
         IEnumerable<(string Label, IFormFile File)> documents)
     {
         var saved = new List<ClaimDocumentDto>();
@@ -115,15 +109,9 @@ public static class ClaimFormHelper
                     ? "Please upload a valid PDF document (maximum 10 MB)."
                     : $"{label} must be under 10 MB.");
 
-            var dir = Path.Combine(env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"),
-                "uploads", "claims", mosqueId.ToString());
-            Directory.CreateDirectory(dir);
             var fileName = $"{Guid.NewGuid():N}{ext}";
-            var path = Path.Combine(dir, fileName);
-            await using (var stream = File.Create(path))
-                await file.CopyToAsync(stream);
-
-            var url = $"/uploads/claims/{mosqueId}/{fileName}";
+            await using var stream = file.OpenReadStream();
+            var url = await storage.SaveAsync(stream, $"uploads/claims/{mosqueId}", fileName, file.ContentType);
             primary ??= url;
             saved.Add(new ClaimDocumentDto { Label = label, Url = url });
         }

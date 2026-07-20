@@ -105,7 +105,13 @@ export class AdminSettingsComponent implements OnInit {
   }
 
   private loadSettings(): void {
-    this.admin.getSettings(this.mid).subscribe(s => this.settings.set(s));
+    const MVP_MODULES = new Set([
+      'PrayerTimes', 'Announcements', 'Events', 'Janaza',
+      'Donations', 'Courses', 'VolunteerManagement', 'CommunityServices'
+    ]);
+    this.admin.getSettings(this.mid).subscribe(s => {
+      this.settings.set(s.filter(x => MVP_MODULES.has(x.moduleKey)));
+    });
   }
 
   toggle(s: MosqueSetting): void {

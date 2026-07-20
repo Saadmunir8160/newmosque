@@ -25,6 +25,7 @@ public class Module31Tests
     [InlineData(MosqueStatus.Unclaimed, false, false)]
     [InlineData(MosqueStatus.ClaimPending, false, false)]
     [InlineData(MosqueStatus.Unclaimed, true, true)]
+    [InlineData(MosqueStatus.ClaimPending, true, true)]
     public void ProfileEdit_AllowedForClaimedActiveOrSuperAdmin(MosqueStatus status, bool isSuperAdmin, bool expected)
     {
         Assert.Equal(expected, MosquePublicVisibility.CanEditProfile(status, isSuperAdmin));
@@ -83,5 +84,74 @@ public class Module31Tests
         Assert.Contains(errors, e => e.Contains("Longitude", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(errors, e => e.Contains("Established year", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(errors, e => e.Contains("Capacity", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ActivationGate_RequiresCoreContactFields()
+    {
+        var incomplete = new Domain.Entities.Mosque
+        {
+            Name = "Test Mosque",
+            City = "London",
+            Address = ""
+        };
+        var (okIncomplete, _, missing) = MosqueProfileCompleteness.MeetsActivationGate(incomplete);
+        Assert.False(okIncomplete);
+        Assert.Contains("address", missing);
+        Assert.Contains("phone or email", missing);
+
+        var complete = new Domain.Entities.Mosque
+        {
+            Name = "Test Mosque",
+            City = "London",
+            Address = "1 High Street",
+            Email = "info@test.org"
+        };
+        var (okComplete, _, missingComplete) = MosqueProfileCompleteness.MeetsActivationGate(complete);
+        Assert.True(okComplete);
+        Assert.Empty(missingComplete);
+    }
+
+    [Fact]
+    public void SocialLinksHelper_RoundTripsJsonAndLegacyColumns()
+    {
+        var mosque = new Domain.Entities.Mosque
+        {
+            FacebookUrl = "https://facebook.com/test",
+            InstagramUrl = "https://instagram.com/test"
+        };
+
+        MosqueSocialLinksHelper.SyncJsonFromLegacy(mosque);
+        Assert.False(string.IsNullOrWhiteSpace(mosque.SocialLinksJson));
+
+        var parsed = MosqueSocialLinksHelper.Parse(mosque);
+        Assert.Equal(2, parsed.Count);
+        Assert.Contains(parsed, l => l.Platform == "facebook" && l.Url.Contains("facebook.com"));
+
+        MosqueSocialLinksHelper.ApplyLinks(mosque, new List<SocialLinkDto>
+        {
+            new() { Platform = "youtube", Url = "https://youtube.com/@test" },
+            new() { Platform = "x", Url = "https://x.com/test" }
+        });
+
+        Assert.Null(mosque.FacebookUrl);
+        Assert.Equal("https://youtube.com/@test", mosque.YoutubeUrl);
+        Assert.Equal("https://x.com/test", mosque.TwitterUrl);
+        Assert.Contains("youtube", mosque.SocialLinksJson!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RegistrationValidate_RequiresCoreFields()
+    {
+        var errors = MosqueRegistrationService.ValidateSubmit(new SubmitRegistrationDto
+        {
+            Name = "",
+            City = "London",
+            Address = "",
+            Country = "United Kingdom"
+        });
+        Assert.Contains(errors, e => e.Contains("name", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(errors, e => e.Contains("Address", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(errors, e => e.Contains("Phone or email", StringComparison.OrdinalIgnoreCase));
     }
 }

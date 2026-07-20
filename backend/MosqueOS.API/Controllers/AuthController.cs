@@ -78,9 +78,7 @@ public class AuthController : ControllerBase
         {
             UserName = username,
             Email = email,
-            FullName = fullName,
-            EmailConfirmed = false,
-            HomeMosqueId = null,
+            EmailConfirmed = true,
             SecurityStamp = Guid.NewGuid().ToString()
         };
 
@@ -93,13 +91,11 @@ public class AuthController : ControllerBase
         else
             await _userManager.AddToRoleAsync(user, Roles.Member);
 
-        await _emailVerification.SendVerificationEmailAsync(user);
-
         return Ok(new RegisterResponse
         {
-            Message = "Account created successfully. We've sent a verification email to your inbox.",
+            Message = "Account created successfully. You can now log in.",
             Email = email,
-            RequiresVerification = true
+            RequiresVerification = false
         });
     }
 
@@ -200,11 +196,9 @@ public class AuthController : ControllerBase
         if (user == null || !await _userManager.CheckPasswordAsync(user, model.Password))
             return Unauthorized(new ApiMessageResponse { Message = "Invalid email or password." });
 
-        if (!user.EmailConfirmed)
-            return Unauthorized(new ApiMessageResponse
-            {
-                Message = "Please verify your email before signing in."
-            });
+        if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
+            return Unauthorized(new ApiMessageResponse { Message = "Account is suspended." });
+
 
         var userRoles = await _userManager.GetRolesAsync(user);
         var (token, expiration) = _jwt.CreateToken(user, userRoles);

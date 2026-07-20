@@ -48,6 +48,7 @@ public class MyClaimListItemDto
     public string MosqueName { get; set; } = string.Empty;
     public string? MosqueSlug { get; set; }
     public string Status { get; set; } = string.Empty;
+    public string MosqueStatus { get; set; } = string.Empty;
     public string ReviewStatus { get; set; } = string.Empty;
     public DateTime SubmittedDate { get; set; }
     public DateTime? LastUpdated { get; set; }
@@ -101,6 +102,8 @@ public class MosqueCreateDto
     public string? Website { get; set; }
     public string? FacebookUrl { get; set; }
     public string? InstagramUrl { get; set; }
+    public string? YoutubeUrl { get; set; }
+    public string? TwitterUrl { get; set; }
     public string? Description { get; set; }
     public string? LogoUrl { get; set; }
     public string? BannerUrl { get; set; }
@@ -123,6 +126,7 @@ public class MosqueUpdateDto
     public string? InstagramUrl { get; set; }
     public string? YoutubeUrl { get; set; }
     public string? TwitterUrl { get; set; }
+    public List<SocialLinkDto>? SocialLinks { get; set; }
     public string? ShortDescription { get; set; }
     public string? Description { get; set; }
     public string? LogoUrl { get; set; }
@@ -163,6 +167,7 @@ public class MosquePublicDto
     public string? InstagramUrl { get; set; }
     public string? YoutubeUrl { get; set; }
     public string? TwitterUrl { get; set; }
+    public List<SocialLinkDto>? SocialLinks { get; set; }
     public string? ShortDescription { get; set; }
     public string? Description { get; set; }
     public string? MetaTitle { get; set; }
@@ -204,6 +209,7 @@ public class MosquePublicDto
         InstagramUrl = m.InstagramUrl,
         YoutubeUrl = m.YoutubeUrl,
         TwitterUrl = m.TwitterUrl,
+        SocialLinks = MosqueSocialLinksHelper.Parse(m),
         ShortDescription = m.ShortDescription,
         Description = m.Description,
         MetaTitle = m.MetaTitle,
@@ -238,12 +244,6 @@ public class MosquePublicDto
         MosqueStatus.Unclaimed => nameof(MosqueStatus.Unclaimed),
         MosqueStatus.Claimed => nameof(MosqueStatus.Claimed),
         MosqueStatus.Active => nameof(MosqueStatus.Active),
-        MosqueStatus.ClaimPending when showPendingState => nameof(MosqueStatus.ClaimPending),
-        MosqueStatus.PendingReview when showPendingState => nameof(MosqueStatus.PendingReview),
-        MosqueStatus.Suspended => nameof(MosqueStatus.Suspended),
-        MosqueStatus.Archived => nameof(MosqueStatus.Archived),
-        MosqueStatus.Invited => nameof(MosqueStatus.Invited),
-        // Never silently return Active for unknown/pending states — return actual status name
         _ => status.ToString()
     };
 
@@ -252,12 +252,7 @@ public class MosquePublicDto
         MosqueStatus.Unclaimed => "Unclaimed listing",
         MosqueStatus.Claimed => "Claimed — awaiting activation",
         MosqueStatus.Active => "Active",
-        MosqueStatus.ClaimPending when showPendingState => "Verification pending",
-        MosqueStatus.PendingReview when showPendingState => "Under review",
-        MosqueStatus.Suspended => "Suspended",
-        MosqueStatus.Archived => "Archived",
-        MosqueStatus.Invited => "Invitation sent",
-        _ => status.ToString()
+        _ => "Unknown"
     };
 
     private static List<string> ParseFacilities(string? json) => ParseJsonStringList(json);
@@ -288,6 +283,7 @@ public class MosqueAdminProfileDto
     public string? InstagramUrl { get; set; }
     public string? YoutubeUrl { get; set; }
     public string? TwitterUrl { get; set; }
+    public List<SocialLinkDto>? SocialLinks { get; set; }
     public string? ShortDescription { get; set; }
     public string? Description { get; set; }
     public string? LogoUrl { get; set; }
@@ -334,6 +330,7 @@ public class MosqueAdminProfileDto
         InstagramUrl = m.InstagramUrl,
         YoutubeUrl = m.YoutubeUrl,
         TwitterUrl = m.TwitterUrl,
+        SocialLinks = MosqueSocialLinksHelper.Parse(m),
         ShortDescription = m.ShortDescription,
         Description = m.Description,
         LogoUrl = m.LogoUrl,
@@ -518,4 +515,9 @@ public class UpdateClaimRequest
     public string? RelationshipToMosque { get; set; }
     public int? YearsAssociated { get; set; }
     public string? Reason { get; set; }
+}
+
+public class RejectClaimRequest
+{
+    public string Reason { get; set; } = string.Empty;
 }

@@ -150,9 +150,6 @@ public static class MosqueValidation
         else if (!AllowedClaimRoles.Contains(dto.Role.Trim()))
             errors.Add("Please select a valid role.");
 
-        if (!hasProofFile && !hasProofUrl)
-            errors.Add("Proof document is required.");
-
         return errors;
     }
 

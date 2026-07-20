@@ -150,8 +150,13 @@ export class SuperClaimsComponent implements OnInit {
   }
 
   onClaimApproved(): void {
+    this.showToast('Claim approved. Mosque is CLAIMED — activate to make it public.', true);
+    this.load();
+  }
+
+  onClaimActivated(): void {
     this.closeDrawer();
-    this.showToast('Claim approved. Mosque is now active.', true);
+    this.showToast('Mosque activated. Public profile is now live.', true);
     this.load();
   }
 

@@ -10,14 +10,42 @@ export const CLAIM_ROLES = [
 
 export type ClaimRole = (typeof CLAIM_ROLES)[number];
 
-const MAX_PDF_BYTES = 10 * 1024 * 1024;
+/**
+ * Module 3.1 claim eligibility (ModuleRequirements):
+ * - Mosque must be Unclaimed
+ * - Any authenticated user may claim after email verification
+ * - Super Admin cannot claim
+ */
+export function canShowClaimCta(input: {
+  mosqueStatus: string;
+  isSuperAdmin: boolean;
+  userId?: string | null;
+  ownerId?: string | null;
+}): boolean {
+  if (input.mosqueStatus !== 'Unclaimed') return false;
+  if (input.isSuperAdmin) return false;
+  if (input.userId && input.ownerId && input.userId === input.ownerId) return false;
+  return true;
+}
+
+export function claimCtaHint(input: {
+  isAuthenticated: boolean;
+  emailConfirmed?: boolean | null;
+}): string {
+  if (!input.isAuthenticated) {
+    return 'Sign in with a verified account to submit an ownership claim.';
+  }
+  if (input.emailConfirmed === false) {
+    return 'Verify your email before submitting an ownership claim.';
+  }
+  return 'If you are an authorised representative, you can submit an ownership claim.';
+}
 
 const UK_PHONE_RE = /^(\+44|0)[1-9]\d{8,10}$/;
 
 export function validateClaimForm(input: {
   phone: string;
   role: string;
-  proofFile: File | null;
 }): Record<string, string> {
   const errors: Record<string, string> = {};
   const phone = input.phone.trim().replace(/[\s-]/g, '');
@@ -29,17 +57,6 @@ export function validateClaimForm(input: {
   }
 
   if (!input.role?.trim()) errors['role'] = 'Role is required.';
-
-  if (!input.proofFile) {
-    errors['proof'] = 'Proof document is required.';
-  } else {
-    const name = input.proofFile.name.toLowerCase();
-    if (!name.endsWith('.pdf')) {
-      errors['proof'] = 'Please upload a valid PDF document (maximum 10 MB).';
-    } else if (input.proofFile.size > MAX_PDF_BYTES) {
-      errors['proof'] = 'Please upload a valid PDF document (maximum 10 MB).';
-    }
-  }
 
   return errors;
 }

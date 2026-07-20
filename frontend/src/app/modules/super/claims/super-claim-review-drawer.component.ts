@@ -11,6 +11,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PlatformClaimDetail, PlatformService } from '../../../core/services/platform.service';
+import { MosqueProfileCompleteness } from '../../../core/utils/mosque-profile.util';
 import { environment } from '../../../../environments/environment';
 
 @Component({
@@ -27,6 +28,7 @@ export class SuperClaimReviewDrawerComponent implements OnChanges {
   @Input({ required: true }) claimId = 0;
   @Output() closed = new EventEmitter<void>();
   @Output() approved = new EventEmitter<void>();
+  @Output() activated = new EventEmitter<void>();
   @Output() rejected = new EventEmitter<void>();
 
   detail = signal<PlatformClaimDetail | null>(null);
@@ -89,11 +91,43 @@ export class SuperClaimReviewDrawerComponent implements OnChanges {
       next: () => {
         this.acting.set(false);
         this.showApproveConfirm.set(false);
+        this.load();
         this.approved.emit();
       },
       error: (err) => {
         this.acting.set(false);
         this.error.set(err?.error?.message ?? 'Approval failed. Please try again.');
+      },
+    });
+  }
+
+  confirmActivate(): void {
+    if (!this.claimId || this.acting()) return;
+    const d = this.detail();
+    if (d) {
+      const gate = MosqueProfileCompleteness.meetsActivationGate({
+        name: d.mosqueName,
+        city: d.mosqueCity ?? '',
+        address: d.mosqueAddress ?? '',
+        phone: d.mosquePhone,
+        email: d.mosqueEmail,
+      });
+      if (!gate.ok) {
+        this.error.set(`Cannot activate — profile incomplete. Missing: ${gate.missing.join(', ')}.`);
+        return;
+      }
+    }
+    this.acting.set(true);
+    this.error.set('');
+    this.platform.activatePlatformClaim(this.claimId).subscribe({
+      next: () => {
+        this.acting.set(false);
+        this.load();
+        this.activated.emit();
+      },
+      error: (err) => {
+        this.acting.set(false);
+        this.error.set(err?.error?.message ?? 'Activation failed. Please try again.');
       },
     });
   }

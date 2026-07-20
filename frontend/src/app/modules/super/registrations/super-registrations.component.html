@@ -1,0 +1,85 @@
+<div class="sr-page">
+  <nav class="sr-breadcrumb" aria-label="Breadcrumb">
+    <a routerLink="/dashboard/super">Dashboard</a>
+    <span aria-hidden="true">›</span>
+    <span>Registrations</span>
+  </nav>
+
+  <header class="sr-header">
+    <div>
+      <h1>Mosque registrations</h1>
+      <p>Review requests to create a new mosque (separate from ownership claims on existing listings).</p>
+    </div>
+    <div class="sr-filters">
+      <button type="button" class="sr-chip" [class.sr-chip--on]="statusFilter() === 'Pending'" (click)="statusFilter.set('Pending')">Pending</button>
+      <button type="button" class="sr-chip" [class.sr-chip--on]="statusFilter() === 'All'" (click)="statusFilter.set('All')">All</button>
+      <button type="button" class="sr-btn sr-btn--ghost" (click)="load()" [disabled]="loading()">Refresh</button>
+    </div>
+  </header>
+
+  <p *ngIf="toast()" class="sr-toast" [class.sr-toast--ok]="toastOk()" role="status">{{ toast() }}</p>
+  <p *ngIf="error()" class="sr-error" role="alert">{{ error() }}</p>
+  <p *ngIf="loading()" class="sr-muted">Loading…</p>
+
+  <div *ngIf="!loading()" class="sr-table-wrap">
+    <table class="sr-table">
+      <thead>
+        <tr>
+          <th>Mosque</th>
+          <th>City</th>
+          <th>Submitted by</th>
+          <th>Status</th>
+          <th>Submitted</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of filtered()">
+          <td><strong>{{ r.name }}</strong></td>
+          <td>{{ r.city }}</td>
+          <td>{{ r.submittedByName }}</td>
+          <td><span class="sr-badge">{{ statusLabel(r.status) }}</span></td>
+          <td>{{ r.createdAt | date:'mediumDate' }}</td>
+          <td><button type="button" class="sr-btn sr-btn--sm" (click)="open(r)">Review</button></td>
+        </tr>
+        <tr *ngIf="!filtered().length">
+          <td colspan="6" class="sr-muted">No registration requests in this filter.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div *ngIf="selected() as s" class="sr-drawer-backdrop" (click)="close()">
+    <aside class="sr-drawer" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+      <header class="sr-drawer__head">
+        <h2>{{ s.name }}</h2>
+        <button type="button" class="sr-btn sr-btn--ghost" (click)="close()" [disabled]="acting()">Close</button>
+      </header>
+      <dl class="sr-dl">
+        <div><dt>Address</dt><dd>{{ s.address || '—' }}</dd></div>
+        <div><dt>City</dt><dd>{{ s.city }}</dd></div>
+        <div><dt>Country</dt><dd>{{ s.country }}</dd></div>
+        <div><dt>Phone</dt><dd>{{ s.phone || '—' }}</dd></div>
+        <div><dt>Email</dt><dd>{{ s.email || '—' }}</dd></div>
+        <div><dt>Website</dt><dd>{{ s.website || '—' }}</dd></div>
+        <div><dt>Submitter</dt><dd>{{ s.submittedByName }}</dd></div>
+        <div><dt>Status</dt><dd>{{ statusLabel(s.status) }}</dd></div>
+        <div *ngIf="s.description"><dt>Description</dt><dd>{{ s.description }}</dd></div>
+        <div *ngIf="s.rejectionReason"><dt>Rejection</dt><dd>{{ s.rejectionReason }}</dd></div>
+      </dl>
+
+      <div *ngIf="statusLabel(s.status) === 'Pending'" class="sr-actions">
+        <label class="sr-field">
+          <span>Reject reason</span>
+          <textarea rows="3" [(ngModel)]="rejectReason" placeholder="Required when rejecting"></textarea>
+        </label>
+        <div class="sr-actions__row">
+          <button type="button" class="sr-btn sr-btn--danger" (click)="reject()" [disabled]="acting()">Reject</button>
+          <button type="button" class="sr-btn" (click)="approve()" [disabled]="acting()">
+            {{ acting() ? 'Working…' : 'Approve & create mosque' }}
+          </button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>

@@ -26,6 +26,7 @@ namespace MosqueOS.API.Controllers
         }
 
         /// <summary>Public: published announcements only. Admins see all via ?all=true.</summary>
+        [AllowAnonymous]
         [HttpGet]
         public async Task<IActionResult> GetAll(
             int mosqueId, [FromQuery] bool all = false,

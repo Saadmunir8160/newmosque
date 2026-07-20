@@ -39,6 +39,10 @@ public static class MosqueProfileFieldMapper
             mosque.YoutubeUrl = dto.YoutubeUrl;
         if (dto.TwitterUrl != null)
             mosque.TwitterUrl = dto.TwitterUrl;
+        if (dto.SocialLinks != null)
+            MosqueSocialLinksHelper.ApplyLinks(mosque, dto.SocialLinks);
+        else if (dto.FacebookUrl != null || dto.InstagramUrl != null || dto.YoutubeUrl != null || dto.TwitterUrl != null)
+            MosqueSocialLinksHelper.SyncAfterLegacyEdit(mosque);
         if (dto.ShortDescription != null)
             mosque.ShortDescription = dto.ShortDescription.Trim();
         if (dto.Description != null)

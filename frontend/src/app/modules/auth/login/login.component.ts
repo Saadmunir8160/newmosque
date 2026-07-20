@@ -227,24 +227,6 @@ import { isValidEmail } from '../../../core/utils/auth-password.util';
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .verify-panel {
-      margin: 0 0 1rem; padding: 0.75rem;
-      border-radius: 0.625rem;
-      border: 1px solid rgba(212,175,55,0.35);
-      background: rgba(2,44,34,0.45);
-      text-align: left;
-    }
-    .verify-panel p { margin: 0 0 0.65rem; font-size: 0.75rem; color: rgba(209,250,229,0.9); line-height: 1.45; }
-    .btn-resend {
-      width: 100%; border: 1px solid rgba(212,175,55,0.45);
-      cursor: pointer; border-radius: 0.625rem;
-      padding: 0.65rem 0.75rem; color: #fff;
-      font-size: 0.8125rem; font-weight: 700;
-      background: rgba(6,78,59,0.85);
-    }
-    .btn-resend:disabled { opacity: 0.55; cursor: not-allowed; }
-    .resend-msg { margin: 0.5rem 0 0; font-size: 0.75rem; color: #6ee7b7; }
-    .resend-msg--err { color: #fca5a5; }
 
     .auth-footer {
       margin: 1.125rem 0 0; text-align: center;
@@ -298,13 +280,6 @@ import { isValidEmail } from '../../../core/utils/auth-password.util';
           <span>{{ error() }}</span>
         </div>
 
-        <div *ngIf="needsVerification()" class="verify-panel">
-          <p>Check your inbox for the verification link, or resend it below.</p>
-          <button type="button" class="btn-resend" (click)="resendVerification()" [disabled]="resendSending()">
-            {{ resendSending() ? 'Sending…' : 'Resend Verification Email' }}
-          </button>
-          <p *ngIf="resendMsg()" class="resend-msg" [class.resend-msg--err]="resendMsgErr()">{{ resendMsg() }}</p>
-        </div>
 
         <div class="hp-field" aria-hidden="true">
           <input type="text" tabindex="-1" autocomplete="username">
@@ -382,10 +357,6 @@ export class LoginComponent implements OnInit {
   rememberMe = false;
   submitting = signal(false);
   error = signal<string | null>(null);
-  needsVerification = signal(false);
-  resendSending = signal(false);
-  resendMsg = signal('');
-  resendMsgErr = signal(false);
   passwordReady = signal(false);
   showPassword = signal(false);
   private passwordFocusAllowed = false;
@@ -423,8 +394,6 @@ export class LoginComponent implements OnInit {
 
   async onLogin(): Promise<void> {
     this.error.set(null);
-    this.needsVerification.set(false);
-    this.resendMsg.set('');
     this.submitting.set(true);
     const user = this.email.trim();
     const pass = this.password;
@@ -453,9 +422,6 @@ export class LoginComponent implements OnInit {
         if (err.status === 401) {
           const msg = err.error?.message || 'Invalid email/username or password.';
           this.error.set(msg);
-          if (/verify your email/i.test(msg)) {
-            this.needsVerification.set(true);
-          }
         } else if (err.status === 0) {
           this.error.set('Cannot reach the server. Start the backend API on http://localhost:5000 and try again.');
         } else {
@@ -470,24 +436,5 @@ export class LoginComponent implements OnInit {
     }
   }
 
-  async resendVerification(): Promise<void> {
-    const email = this.email.trim();
-    if (!email || !isValidEmail(email)) {
-      this.resendMsg.set('Enter a valid email address above.');
-      this.resendMsgErr.set(true);
-      return;
-    }
-    this.resendSending.set(true);
-    this.resendMsg.set('');
-    try {
-      const res = await this.authService.resendVerification(email);
-      this.resendMsg.set(res.message);
-      this.resendMsgErr.set(false);
-    } catch {
-      this.resendMsg.set('Could not send verification email. Try again later.');
-      this.resendMsgErr.set(true);
-    } finally {
-      this.resendSending.set(false);
-    }
-  }
+
 }

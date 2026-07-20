@@ -31,12 +31,22 @@ export class NavigationService {
       this.sections.set(
         (data.navigation ?? []).map(s => ({
           section: s.section,
-          items: s.items.map(i => ({
-            label: i.label,
-            route: i.route,
-            section: i.section,
-            icon: i.icon,
-          })),
+          items: s.items
+            .filter(i => {
+              // Hide non-MVP modules from the sidebar
+              const hiddenRoutes = [
+                '/madrassah', '/communities', '/awrad', '/adhkar', '/duas', 
+                '/quran', '/ritual-guides', '/death-readings', '/participation', 
+                '/journey-guides', '/fundraising', '/memberships', '/nearby'
+              ];
+              return !hiddenRoutes.some(hr => i.route?.includes(hr));
+            })
+            .map(i => ({
+              label: i.label,
+              route: i.route,
+              section: i.section,
+              icon: i.icon,
+            })),
         }))
       );
     } catch {

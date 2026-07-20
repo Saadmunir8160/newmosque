@@ -44,9 +44,6 @@ export class MosqueClaimDrawerComponent implements OnChanges {
   phone = '';
   role = '';
   notes = '';
-  proofFile: File | null = null;
-  proofFileName = signal('');
-  uploadPercent = signal(0);
 
   fieldErrors = signal<Record<string, string>>({});
   formError = signal('');
@@ -77,19 +74,7 @@ export class MosqueClaimDrawerComponent implements OnChanges {
     this.formError.set('');
   }
 
-  onProofSelected(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0] ?? null;
-    this.proofFile = file;
-    this.proofFileName.set(file?.name ?? '');
-    this.clearField('proof');
-  }
 
-  removeProof(): void {
-    this.proofFile = null;
-    this.proofFileName.set('');
-    this.uploadPercent.set(0);
-  }
 
   submit(): void {
     if (this.submitting() || this.blockReason()) return;
@@ -97,7 +82,6 @@ export class MosqueClaimDrawerComponent implements OnChanges {
     const errors = validateClaimForm({
       phone: this.phone,
       role: this.role,
-      proofFile: this.proofFile,
     });
     this.fieldErrors.set(errors);
     if (Object.keys(errors).length) return;
@@ -115,18 +99,12 @@ export class MosqueClaimDrawerComponent implements OnChanges {
     form.append('phone', this.phone.trim());
     form.append('role', this.role);
     if (this.notes.trim()) form.append('notes', this.notes.trim());
-    if (this.proofFile) form.append('proofDocument', this.proofFile, this.proofFile.name);
 
     this.submitting.set(true);
     this.formError.set('');
-    this.uploadPercent.set(0);
 
     this.claims.submitClaim(form).subscribe({
       next: (evt) => {
-        if (evt.event === 'progress') {
-          this.uploadPercent.set(evt.percent ?? 0);
-          return;
-        }
         if (evt.result) {
           this.submitting.set(false);
           this.success.set(true);
@@ -150,9 +128,6 @@ export class MosqueClaimDrawerComponent implements OnChanges {
     this.phone = '';
     this.role = '';
     this.notes = '';
-    this.proofFile = null;
-    this.proofFileName.set('');
-    this.uploadPercent.set(0);
     this.fieldErrors.set({});
     this.formError.set('');
     this.submitting.set(false);
@@ -177,7 +152,8 @@ export class MosqueClaimDrawerComponent implements OnChanges {
       this.blockReason.set('Please verify your email before submitting a claim.');
       return;
     }
-    if (this.mosque?.status !== 'Unclaimed') {
+    const allowedStatuses = ['Unclaimed', 'Invited', 'PendingReview', 'Archived'];
+    if (!allowedStatuses.includes(this.mosque?.status || '')) {
       if (this.mosque?.status === 'ClaimPending') {
         this.blockReason.set('A claim for this mosque is already under review.');
       } else {

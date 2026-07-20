@@ -29,5 +29,6 @@ export const OWNER_ROUTES: Routes = [
   { path: 'verification', loadComponent: () => import('./verification/owner-verification.component').then(m => m.OwnerVerificationComponent) },
   { path: 'my-claims', loadComponent: () => import('./claims/owner-claims.component').then(m => m.OwnerClaimsComponent) },
   { path: 'mosque-listings', loadComponent: () => import('./mosque-listings/owner-mosque-listings.component').then(m => m.OwnerMosqueListingsComponent) },
+  { path: 'activity', loadComponent: () => import('./audit/owner-audit.component').then(m => m.OwnerAuditComponent) },
   { path: 'onboarding', loadComponent: () => import('./onboarding/owner-onboarding.component').then(m => m.OwnerOnboardingComponent) },
 ];

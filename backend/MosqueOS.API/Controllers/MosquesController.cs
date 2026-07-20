@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using MosqueOS.API.Filters;
 using MosqueOS.API.Models.Common;
@@ -26,7 +27,9 @@ namespace MosqueOS.API.Controllers
         private readonly MosqueModuleSeedService _moduleSeed;
         private readonly OwnershipClaimService _claimService;
         private readonly MosqueInvitationService _invitationService;
-        private readonly IAuditService _audit;
+        private readonly MosqueAuditService _mosqueAudit;
+        private readonly MosquePublicProfileCache _publicCache;
+        private readonly IFileStorageService _storage;
         private readonly IWebHostEnvironment _env;
 
         public MosquesController(
@@ -38,7 +41,9 @@ namespace MosqueOS.API.Controllers
             MosqueModuleSeedService moduleSeed,
             OwnershipClaimService claimService,
             MosqueInvitationService invitationService,
-            IAuditService audit,
+            MosqueAuditService mosqueAudit,
+            MosquePublicProfileCache publicCache,
+            IFileStorageService storage,
             IWebHostEnvironment env)
         {
             _unitOfWork = unitOfWork;
@@ -49,7 +54,9 @@ namespace MosqueOS.API.Controllers
             _moduleSeed = moduleSeed;
             _claimService = claimService;
             _invitationService = invitationService;
-            _audit = audit;
+            _mosqueAudit = mosqueAudit;
+            _publicCache = publicCache;
+            _storage = storage;
             _env = env;
         }
 
@@ -188,13 +195,52 @@ namespace MosqueOS.API.Controllers
             return Ok(await _claimService.GetMyClaimsAsync(userId));
         }
 
-        /// <summary>Anonymous public profile by slug.</summary>
+        /// <summary>
+        /// Submit ownership claim for an unclaimed mosque (Module 3.1).
+        /// Policy: any authenticated, email-verified user except Super Admin (ModuleRequirements).
+        /// </summary>
+        [Authorize]
+        [EnableRateLimiting(MosqueRateLimitPolicies.ClaimSubmit)]
+        [HttpPost("{id:int}/claim")]
+        [RequestSizeLimit(12_582_912)]
+        public async Task<IActionResult> ClaimMosque(int id)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+                return Unauthorized(new ApiMessageResponse { Message = "You must be logged in to submit a claim." });
+
+            if (!user.EmailConfirmed)
+                return StatusCode(403, new ApiMessageResponse { Message = "Please verify your email before submitting a claim." });
+
+            if (await _userManager.IsInRoleAsync(user, Roles.SuperAdmin))
+                return StatusCode(403, new ApiMessageResponse { Message = "Super Admins cannot submit mosque ownership claims." });
+
+            var parsed = await ClaimFormHelper.ParseAsync(Request);
+            if (parsed == null)
+                return BadRequest(new ApiMessageResponse { Message = "Invalid claim payload." });
+
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            var (result, error, code) = await _claimService.SubmitClaimAsync(id, userId, parsed.Dto, parsed.Documents);
+            if (error != null)
+                return StatusCode(code, new ApiMessageResponse { Message = error });
+
+            return Ok(result);
+        }
+
+        /// <summary>Anonymous public profile by slug (cached — Milestone 9).</summary>
         [AllowAnonymous]
         [HttpGet("{slug}")]
         public async Task<IActionResult> GetPublicBySlug(string slug)
         {
             if (int.TryParse(slug, out _))
                 return NotFound(new ApiMessageResponse { Message = "Mosque not found." });
+
+            var cached = await _publicCache.GetAsync(slug);
+            if (cached != null)
+            {
+                Response.Headers.CacheControl = "public,max-age=60";
+                return Ok(cached);
+            }
 
             var mosque = await _unitOfWork.Repository<Mosque>().QueryNoTracking()
                 .Include(m => m.Settings)
@@ -208,7 +254,10 @@ namespace MosqueOS.API.Controllers
             if (!mosque.PublicProfileEnabled)
                 return NotFound(new ApiMessageResponse { Message = "Mosque not found." });
 
-            return Ok(MosquePublicDto.FromEntity(mosque));
+            var dto = MosquePublicDto.FromEntity(mosque);
+            await _publicCache.SetAsync(slug, dto);
+            Response.Headers.CacheControl = "public,max-age=60";
+            return Ok(dto);
         }
 
         /// <summary>Public leadership list.</summary>
@@ -245,28 +294,6 @@ namespace MosqueOS.API.Controllers
                 establishedYear = mosque.EstablishedYear,
                 capacity = mosque.Capacity
             });
-        }
-
-        /// <summary>Submit ownership claim for an unclaimed mosque.</summary>
-        [Authorize]
-        [HttpPost("{id:int}/claim")]
-        [RequestSizeLimit(52_428_800)]
-        public async Task<IActionResult> SubmitClaim(int id)
-        {
-            var user = await _userManager.GetUserAsync(User);
-            if (user == null)
-                return Unauthorized(new ApiMessageResponse { Message = "You must be logged in to submit a claim." });
-            if (!user.EmailConfirmed)
-                return StatusCode(403, new ApiMessageResponse { Message = "Please verify your email before submitting a claim." });
-
-            var parsed = await ClaimFormHelper.ParseAsync(Request);
-            if (parsed == null)
-                return BadRequest(new ApiMessageResponse { Message = "Invalid claim payload." });
-
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-            var (result, error, code) = await _claimService.SubmitClaimAsync(id, userId, parsed.Dto, parsed.Documents);
-            if (error != null) return StatusCode(code, new ApiMessageResponse { Message = error });
-            return Ok(result);
         }
 
         /// <summary>Member submits a new mosque listing for review.</summary>
@@ -402,10 +429,13 @@ namespace MosqueOS.API.Controllers
                 Website = dto.Website,
                 FacebookUrl = dto.FacebookUrl,
                 InstagramUrl = dto.InstagramUrl,
+                YoutubeUrl = dto.YoutubeUrl,
+                TwitterUrl = dto.TwitterUrl,
                 Description = dto.Description,
                 Status = dto.Status == default ? MosqueStatus.Unclaimed : dto.Status,
                 Timezone = string.IsNullOrWhiteSpace(dto.Timezone) ? "Europe/London" : dto.Timezone.Trim()
             };
+            MosqueSocialLinksHelper.SyncJsonFromLegacy(mosque);
 
             _unitOfWork.Repository<Mosque>().Add(mosque);
             await _unitOfWork.SaveChangesAsync();
@@ -446,7 +476,7 @@ namespace MosqueOS.API.Controllers
                 }
             }
 
-            // Only SuperAdmin can change status or owner
+            // Only SuperAdmin can change status, owner, slug, or core visibility settings
             if (!User.IsInRole(Roles.SuperAdmin))
             {
                 dto.Status = null;
@@ -455,10 +485,6 @@ namespace MosqueOS.API.Controllers
                 dto.AllowClaimRequests = null;
                 dto.RequireManualApproval = null;
                 dto.PublicProfileEnabled = null;
-                dto.Gallery = null;
-                dto.Services = null;
-                dto.Leadership = null;
-                dto.StatsOverride = null;
             }
 
             MosqueProfileFieldMapper.ApplyUpdate(mosque, dto, newSlug);
@@ -468,6 +494,7 @@ namespace MosqueOS.API.Controllers
             var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
             await LogMosqueAuditAsync("MOSQUE_UPDATED", actorId, mosque.Id,
                 $"Mosque profile updated for '{mosque.Name}'.");
+            await _publicCache.InvalidateMosqueAsync(mosque);
 
             return Ok(MosqueAdminProfileDto.FromEntity(mosque));
         }
@@ -496,6 +523,37 @@ namespace MosqueOS.API.Controllers
         }
 
         [Authorize(Roles = Roles.Admins)]
+        [HttpPost("{id:int}/transfer-ownership")]
+        public async Task<IActionResult> TransferOwnership(int id, [FromBody] TransferOwnershipRequest req)
+        {
+            if (string.IsNullOrWhiteSpace(req.NewOwnerId))
+                return BadRequest(new ApiMessageResponse { Message = "New owner ID is required." });
+
+            var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
+            if (mosque == null || mosque.IsDeleted)
+                return NotFound(new ApiMessageResponse { Message = "Mosque not found." });
+
+            if (!await _mosqueAccess.CanEditMosqueAsync(User, mosque))
+                return StatusCode(403, new ApiMessageResponse { Message = "You do not have permission to transfer ownership." });
+
+            var newOwner = await _userManager.FindByIdAsync(req.NewOwnerId);
+            if (newOwner == null)
+                return BadRequest(new ApiMessageResponse { Message = "New owner not found." });
+
+            var oldOwnerId = mosque.OwnerId;
+            mosque.OwnerId = newOwner.Id;
+            mosque.UpdatedAt = DateTime.UtcNow;
+
+            await _unitOfWork.SaveChangesAsync();
+
+            var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
+            await LogMosqueAuditAsync("OWNERSHIP_TRANSFERRED", actorId, id,
+                $"Transferred ownership from '{oldOwnerId ?? "None"}' to '{newOwner.Id}'.");
+
+            return Ok(new ApiMessageResponse { Message = "Ownership transferred successfully." });
+        }
+
+        [Authorize(Roles = Roles.Admins)]
         [HttpPost("{id:int}/upload-image")]
         [RequestSizeLimit(10_485_760)]
         public async Task<IActionResult> UploadImage(int id, IFormFile file, [FromQuery] string field = "logo")
@@ -510,6 +568,9 @@ namespace MosqueOS.API.Controllers
 
             var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
             if (mosque == null || mosque.IsDeleted) return NotFound();
+
+            if (!await _mosqueAccess.CanEditMosqueAsync(User, mosque))
+                return StatusCode(403, new ApiMessageResponse { Message = "You do not have permission to update this mosque." });
 
             if (!file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
                 return BadRequest(new ApiMessageResponse { Message = "Only image files are allowed." });
@@ -529,18 +590,16 @@ namespace MosqueOS.API.Controllers
             if (string.IsNullOrWhiteSpace(ext) || !allowedExtensions.Contains(ext))
                 return BadRequest(new ApiMessageResponse { Message = "Image file extension must be JPG, PNG, WEBP, or GIF." });
 
-            var uploadsRoot = Path.Combine(
-                _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot"),
-                "uploads", "mosques", id.ToString());
-            Directory.CreateDirectory(uploadsRoot);
+            using var memStream = new MemoryStream();
+            await file.CopyToAsync(memStream);
+            if (!Services.FileValidationHelper.IsValidImageSignature(memStream, ext))
+            {
+                return BadRequest(new ApiMessageResponse { Message = "Invalid image file format detected." });
+            }
+            memStream.Position = 0;
 
             var storedName = $"{field}-{Guid.NewGuid():N}{ext}";
-            var fullPath = Path.Combine(uploadsRoot, storedName);
-
-            await using (var stream = System.IO.File.Create(fullPath))
-                await file.CopyToAsync(stream);
-
-            var url = $"/uploads/mosques/{id}/{storedName}";
+            var url = await _storage.SaveAsync(memStream, $"uploads/mosques/{id}", storedName, file.ContentType);
             if (field == "logo") mosque.LogoUrl = url;
             else mosque.BannerUrl = url;
             mosque.UpdatedAt = DateTime.UtcNow;
@@ -550,6 +609,7 @@ namespace MosqueOS.API.Controllers
             var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
             await LogMosqueAuditAsync("IMAGE_UPLOADED", actorId, mosque.Id,
                 $"Uploaded {field} image for '{mosque.Name}'.");
+            await _publicCache.InvalidateMosqueAsync(mosque);
 
             return Ok(new MosqueUploadResponse { Url = url, Field = field });
         }
@@ -565,6 +625,9 @@ namespace MosqueOS.API.Controllers
 
             var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(id);
             if (mosque == null || mosque.IsDeleted) return NotFound();
+
+            if (!await _mosqueAccess.CanEditMosqueAsync(User, mosque))
+                return StatusCode(403, new ApiMessageResponse { Message = "You do not have permission to update this mosque." });
 
             if (field == "logo") mosque.LogoUrl = null;
             else mosque.BannerUrl = null;
@@ -670,12 +733,12 @@ namespace MosqueOS.API.Controllers
         [HttpGet("{id:int}/modules")]
         public Task<IActionResult> GetModules(int id) => GetSettings(id);
 
-        [Authorize(Roles = Roles.SuperAdmin + "," + Roles.Admins)]
+        [Authorize(Roles = Roles.SuperAdmin + "," + Roles.MosqueOwner)]
         [HttpPut("{id:int}/settings")]
         public Task<IActionResult> PutSettings(int id, [FromBody] UpdateMosqueFeaturesRequest dto) =>
             UpdateFeatures(id, dto);
 
-        [Authorize(Roles = Roles.SuperAdmin + "," + Roles.Admins)]
+        [Authorize(Roles = Roles.SuperAdmin + "," + Roles.MosqueOwner)]
         [HttpPut("{id:int}/modules")]
         public async Task<IActionResult> PutModules(int id, [FromBody] List<MosqueModuleUpdateDto> modules)
         {
@@ -690,7 +753,7 @@ namespace MosqueOS.API.Controllers
             return await UpdateFeatures(id, dto);
         }
 
-        [Authorize(Roles = Roles.SuperAdmin + "," + Roles.Admins)]
+        [Authorize(Roles = Roles.SuperAdmin + "," + Roles.MosqueOwner)]
         [HttpPost("{id:int}/features")]
         public async Task<IActionResult> UpdateFeatures(int id, [FromBody] UpdateMosqueFeaturesRequest dto)
         {
@@ -704,6 +767,9 @@ namespace MosqueOS.API.Controllers
             if (mosque == null || mosque.IsDeleted) return NotFound();
             if (!User.IsInRole(Roles.SuperAdmin) && mosque.Status != MosqueStatus.Active)
                 return BadRequest(new ApiMessageResponse { Message = "Module settings are available only for active mosques." });
+
+            if (!User.IsInRole(Roles.SuperAdmin) && mosque.OwnerId != User.FindFirstValue(ClaimTypes.NameIdentifier))
+                return StatusCode(403, new ApiMessageResponse { Message = "Only the mosque owner can change module feature flags." });
 
             var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
             var changes = new List<string>();
@@ -739,7 +805,7 @@ namespace MosqueOS.API.Controllers
             return Ok(await _unitOfWork.Repository<MosqueSetting>().QueryNoTracking().Where(s => s.MosqueId == id).ToListAsync());
         }
 
-        [Authorize(Roles = Roles.SuperAdmin + "," + Roles.Admins)]
+        [Authorize(Roles = Roles.SuperAdmin + "," + Roles.MosqueOwner)]
         [HttpPut("{id:int}/settings/{moduleKey}")]
         public async Task<IActionResult> SetModuleFlag(int id, string moduleKey, [FromQuery] bool enabled)
         {
@@ -748,6 +814,9 @@ namespace MosqueOS.API.Controllers
             if (mosque == null || mosque.IsDeleted) return NotFound();
             if (!User.IsInRole(Roles.SuperAdmin) && mosque.Status != MosqueStatus.Active)
                 return BadRequest(new ApiMessageResponse { Message = "Module settings are available only for active mosques." });
+
+            if (!User.IsInRole(Roles.SuperAdmin) && mosque.OwnerId != User.FindFirstValue(ClaimTypes.NameIdentifier))
+                return StatusCode(403, new ApiMessageResponse { Message = "Only the mosque owner can change module feature flags." });
 
             var setting = await _unitOfWork.Repository<MosqueSetting>().Query()
                 .FirstOrDefaultAsync(s => s.MosqueId == id && s.ModuleKey == moduleKey);
@@ -908,6 +977,7 @@ namespace MosqueOS.API.Controllers
 
             await LogMosqueAuditAsync("MOSQUE_STATUS_CHANGED", userId, id,
                 $"Mosque '{mosque.Name}' submitted for super admin review.");
+            await _publicCache.InvalidateMosqueAsync(mosque);
 
             return Ok(new ApiMessageResponse
             {
@@ -962,15 +1032,43 @@ namespace MosqueOS.API.Controllers
             return Ok(new { total = mosqueClaims.Count, items = mosqueClaims });
         }
 
+        /// <summary>Owner/admin audit trail for a mosque (Milestone 8).</summary>
+        [Authorize(Roles = Roles.SuperAdmin + "," + Roles.MosqueOwner + "," + Roles.MosqueAdmin)]
+        [HttpGet("{id:int}/audit-logs")]
+        public async Task<IActionResult> GetMosqueAuditLogs(int id, [FromQuery] int limit = 50)
+        {
+            var mosque = await _unitOfWork.Repository<Mosque>().QueryNoTracking()
+                .FirstOrDefaultAsync(m => m.Id == id && !m.IsDeleted);
+            if (mosque == null) return NotFound(new ApiMessageResponse { Message = "Mosque not found." });
+
+            if (!User.IsInRole(Roles.SuperAdmin) && !await _mosqueAccess.CanAccessMosqueAsync(User, id))
+                return Forbid();
+
+            limit = Math.Clamp(limit, 1, 200);
+            var logs = await _unitOfWork.Repository<PlatformAuditLog>().QueryNoTracking()
+                .Where(l => !l.IsDeleted && l.TargetType == "Mosque" && l.TargetId == id)
+                .OrderByDescending(l => l.CreatedAt)
+                .Take(limit)
+                .Select(l => new
+                {
+                    l.Id,
+                    l.Action,
+                    l.Module,
+                    l.ActorId,
+                    l.ActorName,
+                    l.Description,
+                    l.CreatedAt
+                })
+                .ToListAsync();
+
+            return Ok(new { mosqueId = id, items = logs });
+        }
+
         private async Task LogMosqueAuditAsync(string action, string actorId, int mosqueId, string description)
         {
-            var actor = await _userManager.FindByIdAsync(actorId);
-            await _audit.LogAsync(
+            await _mosqueAudit.LogMosqueAsync(
                 action,
-                "Mosque",
                 actorId,
-                actor?.FullName ?? actor?.UserName,
-                "Mosque",
                 mosqueId,
                 description,
                 HttpContext.Connection.RemoteIpAddress?.ToString());

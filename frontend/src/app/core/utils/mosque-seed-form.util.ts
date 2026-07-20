@@ -1,15 +1,11 @@
 import { slugifyMosqueName } from './mosque-slug.util';
 import { Mosque } from '../models';
 
+/** Module 3.1 — Only these 3 statuses are exposed for Super Admin edits. */
 export const EDIT_MOSQUE_STATUSES = [
   'Unclaimed',
-  'Invited',
-  'ClaimPending',
   'Claimed',
-  'PendingReview',
   'Active',
-  'Suspended',
-  'Archived',
 ] as const;
 
 export interface MosqueSeedFormValue {
@@ -46,6 +42,10 @@ export function isValidUkPhone(phone: string): boolean {
 }
 
 export function resolveEditMosqueStatus(status: string | undefined): string {
+  // Map legacy/internal statuses to the 3 Module 3.1 public statuses
+  if (status === 'Invited' || status === 'ClaimPending' || status === 'PendingReview' || status === 'Suspended' || status === 'Archived') {
+    return 'Unclaimed';
+  }
   const value = status ?? 'Unclaimed';
   return (EDIT_MOSQUE_STATUSES as readonly string[]).includes(value) ? value : 'Unclaimed';
 }

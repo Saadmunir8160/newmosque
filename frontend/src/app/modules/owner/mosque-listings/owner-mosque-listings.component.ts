@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AdminService } from '../../../core/services/admin.service';
+import { RegistrationService } from '../../../core/services/registration.service';
 import { Mosque } from '../../../core/models';
 import { formatMosqueStatus, statusClass } from '../../../core/utils/mosque-status.util';
 
@@ -15,6 +16,7 @@ import { formatMosqueStatus, statusClass } from '../../../core/utils/mosque-stat
 })
 export class OwnerMosqueListingsComponent implements OnInit {
   private admin = inject(AdminService);
+  private registration = inject(RegistrationService);
 
   listings = signal<Mosque[]>([]);
   ownerMosque = signal<Mosque | null>(null);
@@ -88,35 +90,38 @@ export class OwnerMosqueListingsComponent implements OnInit {
 
   submitRegister(): void {
     if (!this.canRegisterNew() || this.saving()) return;
-    if (!this.registerForm.name.trim() || !this.registerForm.city.trim()) {
-      this.registerMsg.set('Mosque name and city are required.');
+    if (!this.registerForm.name.trim() || !this.registerForm.city.trim() || !this.registerForm.address.trim()) {
+      this.registerMsg.set('Mosque name, city, and address are required.');
+      this.registerOk.set(false);
+      return;
+    }
+    if (!this.registerForm.phone.trim() && !this.registerForm.email.trim()) {
+      this.registerMsg.set('Phone or email is required.');
       this.registerOk.set(false);
       return;
     }
     this.saving.set(true);
     this.registerMsg.set('');
-    this.admin.submitNewMosqueListing({
+    this.registration.submit({
       name: this.registerForm.name.trim(),
       city: this.registerForm.city.trim(),
-      postcode: this.registerForm.postcode.trim(),
       address: this.registerForm.address.trim(),
-      phone: this.registerForm.phone.trim(),
-      email: this.registerForm.email.trim(),
-      description: this.registerForm.description.trim(),
+      phone: this.registerForm.phone.trim() || undefined,
+      email: this.registerForm.email.trim() || undefined,
+      description: this.registerForm.description.trim() || undefined,
       country: 'United Kingdom',
-      timezone: 'Europe/London',
     }).subscribe({
       next: () => {
         this.saving.set(false);
         this.registerOk.set(true);
-        this.registerMsg.set('Mosque listing submitted for review. Track progress under My claims.');
+        this.registerMsg.set('Registration submitted. Super Admin will review it in the registrations queue.');
         this.showRegister.set(false);
         this.registerForm = { name: '', city: '', postcode: '', address: '', phone: '', email: '', description: '' };
       },
       error: (err) => {
         this.saving.set(false);
         this.registerOk.set(false);
-        this.registerMsg.set(err?.error?.message ?? 'Unable to submit listing.');
+        this.registerMsg.set(err?.error?.message ?? 'Unable to submit registration.');
       },
     });
   }

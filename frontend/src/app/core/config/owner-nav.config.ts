@@ -20,6 +20,7 @@ export const OWNER_NAV_SECTIONS: OwnerNavSection[] = [
       { section: 'Mosque Owner', label: 'Modules', route: '/dashboard/owner/modules', icon: 'modules' },
       { section: 'Mosque Owner', label: 'My claims', route: '/dashboard/owner/my-claims', icon: 'claims' },
       { section: 'Mosque Owner', label: 'Mosque listings', route: '/dashboard/owner/mosque-listings', icon: 'listings' },
+      { section: 'Mosque Owner', label: 'Activity', route: '/dashboard/owner/activity', icon: 'history' },
       { section: 'Mosque Owner', label: 'Admin management', route: '/dashboard/owner/staff', icon: 'staff' },
     ],
   },
@@ -40,6 +41,7 @@ export const OWNER_NAV_ICONS: Record<string, string> = {
   modules: '🔧',
   claims: '📝',
   listings: '📋',
+  history: '📜',
   settings: '⚙️',
   staff: '👤',
 };

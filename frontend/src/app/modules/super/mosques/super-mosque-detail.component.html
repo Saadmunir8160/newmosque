@@ -43,9 +43,15 @@
         class="mp-btn mp-btn--ghost">
         {{ isPublicVisible(d.mosque.status) ? 'Public profile' : 'Admin preview' }}
       </a>
-      <button *ngIf="d.mosque.status === 'Claimed' || d.mosque.status === 'PendingReview'" type="button" class="mp-btn mp-btn--success" (click)="activate(d.mosque.id)">Activate mosque</button>
+      <button *ngIf="d.mosque.status === 'Claimed'" type="button" class="mp-btn mp-btn--success" (click)="activate(d.mosque.id)">Activate mosque</button>
       <button *ngIf="d.mosque.status === 'Active'" type="button" class="mp-btn mp-btn--danger" (click)="deactivate(d.mosque.id)">Deactivate</button>
       <a routerLink="/dashboard/super/claims" class="mp-btn mp-btn--ghost" *ngIf="d.pendingClaim">Review claim</a>
+    </div>
+
+    <div *ngIf="d.mosque.status === 'Claimed' && MosqueProfileCompleteness.isBelowWarningThreshold(profileCompleteness())"
+         class="mp-alert mp-alert--warn">
+      Profile completeness is {{ profileCompleteness() }}%. Activation requires name, city, address, and phone or email.
+      Soft target is {{ MosqueProfileCompleteness.ActivationThreshold }}%+.
     </div>
 
     <div *ngIf="d.isDuplicate" class="mp-alert mp-alert--warn">
@@ -101,6 +107,18 @@
                   {{ d.mosque.description }}
                 </div>
               </li>
+              <li *ngIf="$any(d.mosque).facebookUrl || $any(d.mosque).instagramUrl || $any(d.mosque).twitterUrl || $any(d.mosque).youtubeUrl">
+                <span class="mp-info-list__icon">🔗</span>
+                <div>
+                  <span class="mp-info-list__label">Social Links</span>
+                  <div style="display:flex;gap:0.75rem;margin-top:0.25rem">
+                    <a *ngIf="$any(d.mosque).facebookUrl" [href]="$any(d.mosque).facebookUrl" target="_blank" rel="noopener" class="mp-link">Facebook</a>
+                    <a *ngIf="$any(d.mosque).instagramUrl" [href]="$any(d.mosque).instagramUrl" target="_blank" rel="noopener" class="mp-link">Instagram</a>
+                    <a *ngIf="$any(d.mosque).twitterUrl" [href]="$any(d.mosque).twitterUrl" target="_blank" rel="noopener" class="mp-link">X (Twitter)</a>
+                    <a *ngIf="$any(d.mosque).youtubeUrl" [href]="$any(d.mosque).youtubeUrl" target="_blank" rel="noopener" class="mp-link">YouTube</a>
+                  </div>
+                </div>
+              </li>
             </ul>
           </div>
         </section>
@@ -126,47 +144,10 @@
       <aside style="display:grid;gap:0.875rem;align-content:start">
         <section class="mp-panel">
           <div class="mp-panel__head">
-            <h2>Ownership</h2>
+            <h2>Ownership Status</h2>
           </div>
           <div style="padding:1rem 1.25rem">
-            <ng-container *ngIf="d.owner as o">
-              <p style="margin:0;font-size:0.9375rem;font-weight:700;color:var(--mp-text)">{{ o.name }}</p>
-              <p style="margin:0.25rem 0 0;font-size:0.8125rem;color:var(--mp-muted)">{{ o.email }}</p>
-            </ng-container>
-            <p *ngIf="!d.owner" class="mp-alert mp-alert--warn" style="margin:0">No owner assigned to this mosque.</p>
-
-            <div *ngIf="canInviteOwner(d.mosque.status) && !d.owner" style="margin-top:0.875rem">
-              <p style="margin:0 0 0.5rem;font-size:0.8125rem;font-weight:700;color:var(--mp-text)">Invite owner by email</p>
-              <input
-                type="email"
-                class="mp-input"
-                placeholder="owner@example.com"
-                [value]="inviteEmail()"
-                (input)="inviteEmail.set($any($event.target).value)"
-                style="width:100%;margin-bottom:0.5rem;padding:0.5rem 0.65rem;border-radius:0.5rem;border:1px solid var(--mp-border)">
-              <input
-                type="text"
-                class="mp-input"
-                placeholder="Full name (optional)"
-                [value]="inviteName()"
-                (input)="inviteName.set($any($event.target).value)"
-                style="width:100%;margin-bottom:0.5rem;padding:0.5rem 0.65rem;border-radius:0.5rem;border:1px solid var(--mp-border)">
-              <button type="button" class="mp-btn" (click)="sendInvite(d.mosque.id)" [disabled]="inviting()">
-                {{ inviting() ? 'Sending…' : 'Send invitation' }}
-              </button>
-              <p *ngIf="inviteMsg()" style="margin:0.5rem 0 0;font-size:0.75rem;color:var(--mp-muted)">{{ inviteMsg() }}</p>
-              <p *ngIf="lastInviteLink()" style="margin:0.5rem 0 0;font-size:0.75rem;word-break:break-all">
-                <strong>Accept link:</strong>
-                <a [href]="lastInviteLink()" target="_blank" rel="noopener">{{ lastInviteLink() }}</a>
-              </p>
-            </div>
-
-            <p style="margin:0.75rem 0 0;font-size:0.8125rem;color:var(--mp-muted)">
-              <strong style="color:var(--mp-text)">{{ d.userCount }}</strong> users linked
-            </p>
-            <p *ngIf="d.admins?.length" style="margin:0.5rem 0 0;font-size:0.8125rem;color:var(--mp-muted)">
-              <strong style="color:var(--mp-text)">{{ d.admins.length }}</strong> mosque admins
-            </p>
+            <span class="mp-status" [ngClass]="statusClass(d.mosque.status)">{{ formatStatus(d.mosque.status) }}</span>
           </div>
         </section>
 

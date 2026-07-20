@@ -10,7 +10,7 @@
   <header class="sc-header">
     <div>
       <h1>Pending Claims</h1>
-      <p>Review ownership requests, verify documents, and approve or reject claims.</p>
+      <p>Review ownership requests in two steps: <strong>Approve</strong> (assign owner → CLAIMED), then <strong>Activate</strong> (go public → ACTIVE).</p>
     </div>
     <button type="button" class="sc-btn sc-btn--ghost" (click)="load()" [disabled]="loading()">Refresh</button>
   </header>
@@ -84,6 +84,11 @@
               class="sc-link sc-link--ok"
               (click)="openClaim(c.claimId)">Approve</button>
             <button
+              *ngIf="(c.status ?? '').toLowerCase() === 'approved' && (c.mosqueStatus ?? '').toLowerCase() !== 'active'"
+              type="button"
+              class="sc-link sc-link--ok"
+              (click)="openClaim(c.claimId)">Activate</button>
+            <button
               *ngIf="(c.status ?? 'Pending').toLowerCase() === 'pending'"
               type="button"
               class="sc-link sc-link--err"
@@ -105,5 +110,6 @@
     [claimId]="selectedClaimId()"
     (closed)="closeDrawer()"
     (approved)="onClaimApproved()"
+    (activated)="onClaimActivated()"
     (rejected)="onClaimRejected()" />
 </div>

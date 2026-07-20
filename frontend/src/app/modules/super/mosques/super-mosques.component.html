@@ -23,25 +23,21 @@
     </div>
   </header>
 
-  <section *ngIf="summary()" class="mp-kpi-row mp-kpi-row--5" aria-label="Listing summary">
+  <section *ngIf="summary()" class="mp-kpi-row mp-kpi-row--4" aria-label="Listing summary">
     <button type="button" class="mp-kpi" [class.mp-kpi--active]="!statusFilter" (click)="filterByStatus('')">
       <p class="mp-kpi__label">Total shown</p>
       <p class="mp-kpi__value">{{ listings().length }}</p>
     </button>
     <button type="button" class="mp-kpi" [class.mp-kpi--active]="statusFilter === 'Unclaimed'" (click)="filterByStatus('Unclaimed')">
-      <p class="mp-kpi__label">Unclaimed</p>
+      <p class="mp-kpi__label">UNCLAIMED</p>
       <p class="mp-kpi__value mp-kpi__value--amber">{{ summary()!.unclaimed }}</p>
     </button>
-    <button type="button" class="mp-kpi" [class.mp-kpi--active]="statusFilter === 'ClaimPending'" (click)="filterByStatus('ClaimPending')">
-      <p class="mp-kpi__label">Claim pending</p>
-      <p class="mp-kpi__value mp-kpi__value--amber">{{ summary()!.claimPending }}</p>
-    </button>
     <button type="button" class="mp-kpi" [class.mp-kpi--active]="statusFilter === 'Claimed'" (click)="filterByStatus('Claimed')">
-      <p class="mp-kpi__label">Claimed</p>
+      <p class="mp-kpi__label">CLAIMED</p>
       <p class="mp-kpi__value">{{ summary()!.claimed }}</p>
     </button>
     <button type="button" class="mp-kpi" [class.mp-kpi--active]="statusFilter === 'Active'" (click)="filterByStatus('Active')">
-      <p class="mp-kpi__label">Active</p>
+      <p class="mp-kpi__label">ACTIVE</p>
       <p class="mp-kpi__value mp-kpi__value--green">{{ summary()!.active }}</p>
     </button>
   </section>
@@ -54,12 +50,9 @@
       </div>
       <select class="mp-input" [(ngModel)]="statusFilter" (change)="applyFilters()" aria-label="Filter by status">
         <option value="">All statuses</option>
-        <option value="Unclaimed">Unclaimed</option>
-        <option value="ClaimPending">Claim Pending</option>
-        <option value="Claimed">Claimed</option>
-        <option value="Active">Active</option>
-        <option value="PendingReview">Pending Review</option>
-        <option value="Suspended">Suspended</option>
+        <option value="Unclaimed">UNCLAIMED</option>
+        <option value="Claimed">CLAIMED</option>
+        <option value="Active">ACTIVE</option>
       </select>
       <label class="mp-check">
         <input type="checkbox" [(ngModel)]="missingOwnerOnly" (change)="applyFilters()">
@@ -113,7 +106,9 @@
         <div class="mp-card__info">
           <div style="display:flex;justify-content:space-between;gap:0.5rem;align-items:flex-start">
             <h2 class="mp-card__name">{{ m.name }}</h2>
-            <span class="mp-status" [ngClass]="statusClass(m.status)">{{ formatStatus(m.status) }}</span>
+            <span class="mp-status" [ngClass]="statusClass(m.status)">
+              {{ m.status === 'Invited' || m.status === 'Unclaimed' ? 'UNCLAIMED' : (m.status === 'Claimed' ? 'CLAIMED' : (m.status === 'Active' ? 'ACTIVE' : formatStatus(m.status))) }}
+            </span>
           </div>
           <p class="mp-card__meta">{{ m.city }}<span *ngIf="m.postcode"> · {{ m.postcode }}</span></p>
           <p class="mp-card__slug">/{{ m.slug }}</p>
@@ -182,7 +177,9 @@
               <span class="mp-table__meta">{{ m.city }}<span *ngIf="m.postcode"> · {{ m.postcode }}</span></span>
             </td>
             <td>
-              <span class="mp-status" [ngClass]="statusClass(m.status)">{{ formatStatus(m.status) }}</span>
+              <span class="mp-status" [ngClass]="statusClass(m.status)">
+                {{ m.status === 'Invited' || m.status === 'Unclaimed' ? 'UNCLAIMED' : (m.status === 'Claimed' ? 'CLAIMED' : (m.status === 'Active' ? 'ACTIVE' : formatStatus(m.status))) }}
+              </span>
               <p class="mp-table__warn" *ngIf="m.isDuplicate">Possible duplicate</p>
             </td>
             <td>
@@ -241,7 +238,9 @@
         Delete <strong>{{ target.name }}</strong>? This removes it from admin lists and public surfaces.
       </p>
       <div class="mp-dialog__meta">
-        <span class="mp-status" [ngClass]="statusClass(target.status)">{{ formatStatus(target.status) }}</span>
+        <span class="mp-status" [ngClass]="statusClass(target.status)">
+          {{ target.status === 'Invited' || target.status === 'Unclaimed' ? 'UNCLAIMED' : (target.status === 'Claimed' ? 'CLAIMED' : (target.status === 'Active' ? 'ACTIVE' : formatStatus(target.status))) }}
+        </span>
         <span>{{ target.city || 'No city' }}</span>
         <span>/{{ target.slug }}</span>
       </div>

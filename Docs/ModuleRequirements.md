@@ -53,7 +53,7 @@ Core identity of each mosque. Public-facing with admin management.
 - Public mosque profile page at `/mosque/[slug]`
 - Admin can edit all mosque details
 - Super Admin can manually seed a mosque listing
-- Mosque admins can claim an existing unclaimed listing
+- Mosque admins can claim an existing unclaimed listing (any authenticated email-verified user may claim; Super Admin cannot)
 - Verification flow after claim (manual approval — MVP)
 - Per-mosque feature flags to enable/disable individual modules
 

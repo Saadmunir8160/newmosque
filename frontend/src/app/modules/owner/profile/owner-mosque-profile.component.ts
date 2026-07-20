@@ -8,6 +8,8 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { MosqueContextService } from '../../../core/services/mosque-context.service';
 import { Mosque } from '../../../core/models';
 import { environment } from '../../../../environments/environment';
+import { isMosqueProfileEditableStatus } from '../../../core/utils/mosque-status.util';
+import { ROLES } from '../../../core/constants/roles';
 
 @Component({
   selector: 'app-owner-mosque-profile',
@@ -49,17 +51,21 @@ export class OwnerMosqueProfileComponent implements OnInit {
   canEdit = computed(() => {
     const m = this.mosque();
     if (!m) return false;
-    // Gap 15 fix: PRD says Claimed + Active both allow editing. Was incorrectly blocking Claimed status.
-    if (m.status !== 'Active' && m.status !== 'Claimed') return false;
+    if (this.auth.isSuperAdmin()) return true;
+    if (!isMosqueProfileEditableStatus(m.status)) return false;
     const uid = this.auth.user()?.id;
-    return !!uid && (m.ownerId === uid || this.auth.isSuperAdmin());
+    if (!uid) return false;
+    if (m.ownerId === uid) return true;
+    const homeMosqueId = this.auth.user()?.homeMosqueId ?? this.mosqueCtx.mosqueId();
+    return this.auth.hasRole(ROLES.MosqueAdmin) && homeMosqueId === m.id;
   });
 
   lockMessage = computed(() => {
     const m = this.mosque();
     if (!m) return 'No mosque linked to your account.';
+    if (this.canEdit()) return '';
     if (m.status === 'ClaimPending') return 'Your claim is under review. Editing unlocks after approval.';
-    if (m.status !== 'Active' && m.status !== 'Claimed')
+    if (!isMosqueProfileEditableStatus(m.status))
       return 'Profile editing is available only for claimed or active mosques.';
     return 'You do not have permission to edit this mosque.';
   });
