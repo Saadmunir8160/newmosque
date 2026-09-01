@@ -27,6 +27,7 @@ import { JourneyGuide, JourneyGuideDetail } from '../../core/services/content.se
       </button>
       <p *ngIf="g.description" class="desc">{{ g.description }}</p>
       <div *ngIf="openId() === g.id && detail()?.id === g.id" class="stages">
+        <p *ngIf="detail()?.description" class="detail-desc">{{ detail()!.description }}</p>
         <div *ngFor="let s of detail()!.stages" class="stage">
           <h3>{{ s.orderIndex }}. {{ s.title }}</h3>
           <p *ngIf="s.dayNumber" class="day">Day {{ s.dayNumber }}</p>
@@ -45,10 +46,11 @@ import { JourneyGuide, JourneyGuideDetail } from '../../core/services/content.se
     h2 { margin: 0; flex: 1; font-size: 0.9375rem; color: #111827; }
     .chev { color: #6b7280; }
     .desc { margin: 0.35rem 0 0; font-size: 0.8125rem; color: #4b5563; }
+    .detail-desc { margin: 0.5rem 0 1rem; font-size: 0.875rem; color: #374151; white-space: pre-wrap; line-height: 1.5; }
     .stage { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e5e7eb; }
     .stage h3 { margin: 0; font-size: 0.8125rem; color: #111827; }
     .day { margin: 0.15rem 0; font-size: 0.6875rem; color: #d97706; }
-    .stage p { margin: 0.25rem 0 0; font-size: 0.8125rem; color: #4b5563; line-height: 1.5; }
+    .stage p { margin: 0.25rem 0 0; font-size: 0.8125rem; color: #4b5563; line-height: 1.5; white-space: pre-wrap; }
   `]
 })
 export class GuestJourneyGuidesComponent implements OnInit {
@@ -72,11 +74,32 @@ export class GuestJourneyGuidesComponent implements OnInit {
   }
 
   load(): void {
-    this.guest.getJourneyGuides(this.type() || undefined).subscribe(v => {
-      const uniqueGuides = v.filter((guide, index, self) => 
-        index === self.findIndex((t) => t.title === guide.title)
-      );
-      this.guides.set(uniqueGuides);
+    const fallbackData: JourneyGuide[] = [
+      { id: 991, title: 'Umrah', type: 'Umrah', description: 'Can be performed any time of year.' },
+      { id: 992, title: 'Hajj', type: 'Hajj', description: 'Specific dates: 8th–13th Dhul Hijjah.' }
+    ];
+
+    const applyFallback = () => {
+      const filtered = this.type() ? fallbackData.filter(g => g.type === this.type()) : fallbackData;
+      this.guides.set(filtered);
+    };
+
+    this.guest.getJourneyGuides(this.type() || undefined).subscribe({
+      next: (v) => {
+        if (!v || v.length === 0) {
+          applyFallback();
+          return;
+        }
+        const uniqueGuides = v.filter((guide, index, self) => 
+          index === self.findIndex((t) => t.title === guide.title)
+        );
+        if (uniqueGuides.length === 0) {
+          applyFallback();
+        } else {
+          this.guides.set(uniqueGuides);
+        }
+      },
+      error: () => applyFallback()
     });
   }
 
@@ -86,6 +109,38 @@ export class GuestJourneyGuidesComponent implements OnInit {
       return;
     }
     this.openId.set(id);
-    this.guest.getJourneyGuide(id).subscribe(d => this.detail.set(d));
+
+    if (id > 990) {
+      let mockDetail: JourneyGuideDetail;
+      if (id === 991) {
+        mockDetail = {
+          id, title: 'Umrah', type: 'Umrah', description: 'Can be performed any time of year.',
+          stages: [
+            { id: 1, orderIndex: 1, title: 'Ihram', description: 'Enter sacred state at the Miqat, intention + two unstitched white cloths (men) / simple clothing (women).' },
+            { id: 2, orderIndex: 2, title: 'Tawaf', description: '7 counter-clockwise circuits around the Kaaba.' },
+            { id: 3, orderIndex: 3, title: 'Sa\'i', description: '7 trips between the hills of Safa and Marwah.' },
+            { id: 4, orderIndex: 4, title: 'Halq/Taqsir', description: 'Men shave head or trim hair; women trim a small portion.\n\n→ Umrah complete, Ihram restrictions lifted.' }
+          ]
+        };
+      } else {
+        mockDetail = {
+          id, title: 'Hajj', type: 'Hajj', description: 'Specific dates: 8th–13th Dhul Hijjah.',
+          stages: [
+            { id: 5, orderIndex: 1, title: '8th Dhul Hijjah', dayNumber: 8, description: 'Enter Ihram, travel to Mina.' },
+            { id: 6, orderIndex: 2, title: '9th Dhul Hijjah (Day of Arafah)', dayNumber: 9, description: 'Stand in prayer/supplication at Arafah (the pillar of Hajj).\nTravel to Muzdalifah, collect pebbles, spend the night.' },
+            { id: 7, orderIndex: 3, title: '10th Dhul Hijjah (Eid al-Adha)', dayNumber: 10, description: 'Ramy al-Jamarat (stoning the large pillar), animal sacrifice (Qurbani), Halq/Taqsir.\n\nTawaf al-Ifadah — circuits around Kaaba, plus Sa\'i (if not done earlier).' },
+            { id: 8, orderIndex: 4, title: '11th–13th Dhul Hijjah', description: 'Days at Mina, stoning all three pillars each day.' },
+            { id: 9, orderIndex: 5, title: 'Tawaf al-Wida', description: 'Farewell circuit before leaving Makkah.' }
+          ]
+        };
+      }
+      this.detail.set(mockDetail);
+      return;
+    }
+
+    this.guest.getJourneyGuide(id).subscribe({
+      next: (d) => this.detail.set(d),
+      error: () => this.detail.set(null)
+    });
   }
 }
