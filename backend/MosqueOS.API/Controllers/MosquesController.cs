@@ -195,38 +195,6 @@ namespace MosqueOS.API.Controllers
             return Ok(await _claimService.GetMyClaimsAsync(userId));
         }
 
-        /// <summary>
-        /// Submit ownership claim for an unclaimed mosque (Module 3.1).
-        /// Policy: any authenticated, email-verified user except Super Admin (ModuleRequirements).
-        /// </summary>
-        [Authorize]
-        [EnableRateLimiting(MosqueRateLimitPolicies.ClaimSubmit)]
-        [HttpPost("{id:int}/claim")]
-        [RequestSizeLimit(12_582_912)]
-        public async Task<IActionResult> ClaimMosque(int id)
-        {
-            var user = await _userManager.GetUserAsync(User);
-            if (user == null)
-                return Unauthorized(new ApiMessageResponse { Message = "You must be logged in to submit a claim." });
-
-            if (!user.EmailConfirmed)
-                return StatusCode(403, new ApiMessageResponse { Message = "Please verify your email before submitting a claim." });
-
-            if (await _userManager.IsInRoleAsync(user, Roles.SuperAdmin))
-                return StatusCode(403, new ApiMessageResponse { Message = "Super Admins cannot submit mosque ownership claims." });
-
-            var parsed = await ClaimFormHelper.ParseAsync(Request);
-            if (parsed == null)
-                return BadRequest(new ApiMessageResponse { Message = "Invalid claim payload." });
-
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-            var (result, error, code) = await _claimService.SubmitClaimAsync(id, userId, parsed.Dto, parsed.Documents);
-            if (error != null)
-                return StatusCode(code, new ApiMessageResponse { Message = error });
-
-            return Ok(result);
-        }
-
         /// <summary>Anonymous public profile by slug (cached — Milestone 9).</summary>
         [AllowAnonymous]
         [HttpGet("{slug}")]
@@ -511,7 +479,7 @@ namespace MosqueOS.API.Controllers
 
             var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
             mosque.DeletedById = actorId;
-            mosque.Status = MosqueStatus.Archived;
+            mosque.Status = MosqueStatus.Rejected;
             mosque.UpdatedAt = DateTime.UtcNow;
 
             _unitOfWork.Repository<Mosque>().Remove(mosque);
@@ -958,10 +926,10 @@ namespace MosqueOS.API.Controllers
             if (mosque.OwnerId != userId)
                 return Forbid();
 
-            if (mosque.Status is not (MosqueStatus.Claimed or MosqueStatus.Invited))
+            if (mosque.Status != MosqueStatus.Claimed)
                 return BadRequest(new ApiMessageResponse
                 {
-                    Message = "Only invited or claimed listings can be submitted for review."
+                    Message = "Only claimed listings can be submitted for review."
                 });
 
             var (completeness, _) = MosqueProfileCompleteness.Calculate(mosque);
@@ -971,7 +939,7 @@ namespace MosqueOS.API.Controllers
                     Message = "Complete more of your mosque profile (contact details, description) before submitting."
                 });
 
-            mosque.Status = MosqueStatus.PendingReview;
+            mosque.Status = MosqueStatus.PendingVerification;
             mosque.UpdatedAt = DateTime.UtcNow;
             await _unitOfWork.SaveChangesAsync();
 

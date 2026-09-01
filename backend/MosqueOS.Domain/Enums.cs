@@ -8,15 +8,10 @@ namespace MosqueOS.Domain
     public enum MosqueStatus
     {
         Unclaimed = 0,
-        Claimed = 1,
-        Active = 2,
-        /// <summary>Legacy / registration path — not Module 3.1 claim statuses.</summary>
-        PendingReview = 3,
-        Suspended = 4,
-        Archived = 5,
-        /// <summary>Obsolete: was used during claim review. Prefer Unclaimed + claim PENDING.</summary>
-        ClaimPending = 6,
-        Invited = 7
+        PendingVerification = 1,
+        Claimed = 2,
+        Active = 3,
+        Rejected = 4
     }
 
     public enum InvitationStatus

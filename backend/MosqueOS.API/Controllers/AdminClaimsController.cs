@@ -40,8 +40,8 @@ public class AdminClaimsController : ControllerBase
             {
                 Pending = all.Count(c => c.Status == nameof(OwnershipClaimStatus.Pending)),
                 Rejected = all.Count(c => c.Status == nameof(OwnershipClaimStatus.Rejected)),
-                ClaimPendingListings = all.Count(c => c.MosqueStatus == nameof(MosqueStatus.ClaimPending)),
-                PendingReviewListings = all.Count(c => c.MosqueStatus == nameof(MosqueStatus.PendingReview))
+                ClaimPendingListings = 0, // Legacy
+                PendingReviewListings = all.Count(c => c.MosqueStatus == nameof(MosqueStatus.PendingVerification))
             },
             items = items.Select(i => new
             {

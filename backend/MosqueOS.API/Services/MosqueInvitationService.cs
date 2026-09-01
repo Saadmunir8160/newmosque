@@ -63,7 +63,7 @@ public class MosqueInvitationService
 
         if (normalizedRole == Roles.MosqueOwner)
         {
-            if (mosque.Status is not (MosqueStatus.Unclaimed or MosqueStatus.Invited))
+            if (mosque.Status != MosqueStatus.Unclaimed)
                 return (null, "Owner invitations are only allowed for unclaimed mosques.", 400, false);
             if (!string.IsNullOrEmpty(mosque.OwnerId))
                 return (null, "This mosque already has an owner.", 409, false);
@@ -102,11 +102,6 @@ public class MosqueInvitationService
         };
         repo.Add(invitation);
 
-        if (normalizedRole == Roles.MosqueOwner && mosque.Status == MosqueStatus.Unclaimed)
-        {
-            mosque.Status = MosqueStatus.Invited;
-            mosque.UpdatedAt = DateTime.UtcNow;
-        }
 
         await _unitOfWork.SaveChangesAsync();
         var emailSent = await SendInvitationEmailAsync(invitation, mosque);
@@ -282,13 +277,7 @@ public class MosqueInvitationService
         invitation.UpdatedAt = DateTime.UtcNow;
 
         var mosque = invitation.Mosque!;
-        if (invitation.Role == Roles.MosqueOwner
-            && mosque.Status == MosqueStatus.Invited
-            && string.IsNullOrEmpty(mosque.OwnerId))
-        {
-            mosque.Status = MosqueStatus.Unclaimed;
-            mosque.UpdatedAt = DateTime.UtcNow;
-        }
+
 
         await _unitOfWork.SaveChangesAsync();
         return ("Invitation revoked.", null, 200);

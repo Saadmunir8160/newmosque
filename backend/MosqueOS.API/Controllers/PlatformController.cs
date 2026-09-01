@@ -160,9 +160,9 @@ namespace MosqueOS.API.Controllers
 
             var duplicateFlags = ComputeDuplicateFlags(mosques);
             var duplicateListings = duplicateFlags.Count;
-            var suspended = mosques.Count(m => m.Status == MosqueStatus.Suspended);
-            var pendingReview = mosques.Count(m => m.Status == MosqueStatus.PendingReview);
-            var claimPending = mosques.Count(m => m.Status == MosqueStatus.ClaimPending);
+            var suspended = 0; // Legacy
+            var pendingReview = mosques.Count(m => m.Status == MosqueStatus.PendingVerification);
+            var claimPending = 0; // Legacy
             var completenessScores = mosques.Select(m => MosqueProfileCompleteness.Calculate(m).completeness).ToList();
             var avgProfileCompleteness = completenessScores.Count > 0
                 ? (int)Math.Round(completenessScores.Average())
@@ -247,7 +247,7 @@ namespace MosqueOS.API.Controllers
                     total = mosques.Count,
                     active = mosques.Count(m => m.Status == MosqueStatus.Active),
                     unclaimed = mosques.Count(m => m.Status == MosqueStatus.Unclaimed),
-                    suspended,
+                    suspended = 0,
                     pendingReview,
                     avgProfileCompleteness,
                     byStatus = mosquesByStatus,
@@ -816,10 +816,10 @@ namespace MosqueOS.API.Controllers
                 summary = new
                 {
                     unclaimed = mosques.Count(m => m.Status == MosqueStatus.Unclaimed),
-                    claimPending = mosques.Count(m => m.Status == MosqueStatus.ClaimPending),
+                    claimPending = 0, // Legacy
                     claimed = mosques.Count(m => m.Status == MosqueStatus.Claimed),
                     active = mosques.Count(m => m.Status == MosqueStatus.Active),
-                    pendingReview = mosques.Count(m => m.Status == MosqueStatus.PendingReview)
+                    pendingReview = mosques.Count(m => m.Status == MosqueStatus.PendingVerification)
                 }
             });
         }

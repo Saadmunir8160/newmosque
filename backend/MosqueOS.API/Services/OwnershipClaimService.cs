@@ -84,7 +84,7 @@ public class OwnershipClaimService
             return (null, "Mosque not found.", 404);
 
         // Spec: UNCLAIMED | CLAIMED | ACTIVE — pending review is on the claim record only.
-        if (mosque.Status == MosqueStatus.ClaimPending)
+        if (mosque.Status == MosqueStatus.PendingVerification)
             mosque.Status = MosqueStatus.Unclaimed;
 
         if (mosque.Status != MosqueStatus.Unclaimed)
@@ -236,102 +236,7 @@ public class OwnershipClaimService
         }
     }
 
-    public async Task<(ClaimMosqueResponse? Result, string? Error, int StatusCode)> SubmitClaimAsync(
-        int mosqueId,
-        string userId,
-        ClaimMosqueRequest dto,
-        List<(string Label, IFormFile File)> documents)
-    {
-        var mosque = await _unitOfWork.Repository<Mosque>().FindAsync(mosqueId);
-        if (mosque == null || mosque.IsDeleted)
-            return (null, "Mosque not found.", 404);
 
-        // Spec: UNCLAIMED | CLAIMED | ACTIVE — pending review is on the claim record only.
-        if (mosque.Status == MosqueStatus.ClaimPending)
-            mosque.Status = MosqueStatus.Unclaimed;
-
-        if (mosque.Status != MosqueStatus.Unclaimed)
-            return (null, "This mosque has already been claimed.", 400);
-
-        if (!mosque.AllowClaimRequests)
-            return (null, "This mosque is not accepting claim requests.", 400);
-
-        var errors = MosqueValidation.ValidateClaim(dto, requireDocuments: documents.Count == 0 && string.IsNullOrWhiteSpace(dto.DocumentUrl));
-        if (errors.Count > 0)
-            return (null, string.Join(" ", errors), 400);
-
-        var hasPendingForUser = await _unitOfWork.Repository<MosqueOwnershipClaim>().QueryNoTracking()
-            .AnyAsync(c => c.MosqueId == mosqueId && c.ClaimantId == userId
-                && c.Status == OwnershipClaimStatus.Pending && !c.IsDeleted);
-        if (hasPendingForUser)
-            return (null, "A claim for this mosque is already under review.", 409);
-
-        var hasPendingMosque = await _unitOfWork.Repository<MosqueOwnershipClaim>().QueryNoTracking()
-            .AnyAsync(c => c.MosqueId == mosqueId && c.Status == OwnershipClaimStatus.Pending && !c.IsDeleted);
-        if (hasPendingMosque)
-            return (null, "A claim for this mosque is already under review.", 409);
-
-        var ownedActive = await _unitOfWork.Repository<Mosque>().QueryNoTracking()
-            .AnyAsync(m => m.OwnerId == userId && m.Status == MosqueStatus.Active && !m.IsDeleted);
-        var allowMulti = await PlatformConfigHelper.AllowMultiMosqueOwnershipAsync(_unitOfWork);
-        if (ownedActive && !allowMulti)
-            return (null, "You already own an active mosque listing.", 409);
-
-        string? docUrl = dto.DocumentUrl;
-        string? docsJson = null;
-        if (documents.Count > 0)
-        {
-            var (primary, json, docErr) = await ClaimFormHelper.SaveDocumentsAsync(mosqueId, _storage, documents);
-            if (docErr != null) return (null, docErr, 400);
-            docUrl = primary;
-            docsJson = json;
-        }
-
-        var claim = new MosqueOwnershipClaim
-        {
-            MosqueId = mosqueId,
-            ClaimantId = userId,
-            Status = OwnershipClaimStatus.Pending,
-            FullName = dto.FullName.Trim(),
-            Phone = dto.Phone,
-            Position = dto.Position,
-            DocumentUrl = docUrl,
-            DocumentsJson = docsJson,
-            Reason = dto.Reason,
-            Organization = dto.Organization,
-            RelationshipToMosque = dto.RelationshipToMosque,
-            YearsAssociated = dto.YearsAssociated,
-            AccurateInfoDeclaration = dto.AccurateInfoDeclaration,
-            ClaimReference = await GenerateClaimReferenceAsync(),
-            SubmittedAt = DateTime.UtcNow
-        };
-
-        mosque.Status = MosqueStatus.ClaimPending;
-        mosque.AllowClaimRequests = false;
-        mosque.UpdatedAt = DateTime.UtcNow;
-
-        _unitOfWork.Repository<MosqueOwnershipClaim>().Add(claim);
-        await _unitOfWork.SaveChangesAsync();
-        await _publicCache.InvalidateMosqueAsync(mosque);
-
-        var claimant = await _userManager.FindByIdAsync(userId);
-        if (claimant != null)
-            await SendClaimEmailsAsync(claimant, mosque, claim);
-
-        await LogAuditAsync("CLAIM_SUBMITTED", userId, mosqueId,
-            $"Ownership claim {claim.ClaimReference} submitted for '{mosque.Name}'.");
-
-        await _notifications.CreateAsync(
-            userId,
-            "CLAIM_SUBMITTED",
-            "Claim submitted",
-            $"Your ownership claim for '{mosque.Name}' ({claim.ClaimReference}) is under review.",
-            "/dashboard/owner/my-claims",
-            relatedMosqueId: mosque.Id,
-            relatedClaimId: claim.Id);
-
-        return (BuildClaimResponse(mosque, claim), null, 200);
-    }
 
     public async Task<(ClaimMosqueResponse? Result, string? Error, int StatusCode)> SubmitNewListingAsync(
         string userId,
@@ -368,7 +273,7 @@ public class OwnershipClaimService
             Email = dto.Email,
             Website = dto.Website,
             Description = dto.Description,
-            Status = MosqueStatus.PendingReview,
+            Status = MosqueStatus.PendingVerification,
             Timezone = string.IsNullOrWhiteSpace(dto.Timezone) ? "Europe/London" : dto.Timezone.Trim()
         };
 
@@ -469,7 +374,7 @@ public class OwnershipClaimService
             return (null, "Only an approved claim can be used to activate the mosque.", 400);
 
         var mosque = claim.Mosque!;
-        if (mosque.Status != MosqueStatus.Claimed && mosque.Status != MosqueStatus.Suspended)
+        if (mosque.Status != MosqueStatus.Claimed)
             return (null, "Mosque must be in Claimed status before activation.", 400);
 
         if (string.IsNullOrEmpty(mosque.OwnerId))
@@ -529,9 +434,9 @@ public class OwnershipClaimService
         claim.ReviewedAt = DateTime.UtcNow;
         claim.ReviewedById = reviewerId;
 
-        if (mosque.Status == MosqueStatus.PendingReview)
+        if (mosque.Status == MosqueStatus.PendingVerification)
         {
-            mosque.Status = MosqueStatus.Archived;
+            mosque.Status = MosqueStatus.Rejected;
             mosque.IsDeleted = true;
             mosque.DeletedAt = DateTime.UtcNow;
             mosque.DeletedById = reviewerId;
