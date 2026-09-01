@@ -90,14 +90,25 @@ namespace MosqueOS.API.Controllers
                 .Take(50)
                 .ToListAsync());
 
+        /// <summary>Feed posts — community Admin/Teacher (and Muqaddam) or platform admins (Module 3.6).</summary>
         [Authorize]
         [HttpPost("{id:int}/posts")]
         public async Task<IActionResult> CreatePost(int id, [FromBody] CommunityPost post)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-            var isMember = await _unitOfWork.Repository<CommunityMember>().Query()
-                .AnyAsync(m => m.CommunityId == id && m.UserId == userId);
-            if (!isMember) return Forbid();
+            var isPlatformAdmin = User.IsInRole(Roles.SuperAdmin)
+                || User.IsInRole(Roles.MosqueOwner)
+                || User.IsInRole(Roles.MosqueAdmin);
+            if (!isPlatformAdmin)
+            {
+                var membership = await _unitOfWork.Repository<CommunityMember>().Query()
+                    .FirstOrDefaultAsync(m => m.CommunityId == id && m.UserId == userId);
+                if (membership == null
+                    || (membership.Role != CommunityRole.Admin
+                        && membership.Role != CommunityRole.Teacher
+                        && membership.Role != CommunityRole.Muqaddam))
+                    return Forbid();
+            }
 
             post.Id = 0;
             post.CommunityId = id;
@@ -127,5 +138,67 @@ namespace MosqueOS.API.Controllers
             await _unitOfWork.SaveChangesAsync();
             return Ok(resource);
         }
+
+        /// <summary>Invite/add a member with role (Admin/Teacher/Member). Module 3.6.</summary>
+        [Authorize(Roles = Roles.Admins + "," + Roles.Muqaddam)]
+        [HttpPost("{id:int}/members")]
+        public async Task<IActionResult> InviteMember(int id, [FromBody] CommunityMember input)
+        {
+            var community = await _unitOfWork.Repository<Community>().FindAsync(id);
+            if (community == null) return NotFound();
+            if (string.IsNullOrWhiteSpace(input.UserId))
+                return BadRequest(new ApiMessageResponse { Message = "UserId is required." });
+
+            if (await _unitOfWork.Repository<CommunityMember>().Query()
+                .AnyAsync(m => m.CommunityId == id && m.UserId == input.UserId))
+                return Conflict(new ApiMessageResponse { Message = "Already a member." });
+
+            var role = input.Role;
+            if (role is not (CommunityRole.Admin or CommunityRole.Teacher or CommunityRole.Member or CommunityRole.Muqaddam))
+                role = CommunityRole.Member;
+
+            var member = new CommunityMember
+            {
+                CommunityId = id,
+                UserId = input.UserId,
+                Role = role
+            };
+            _unitOfWork.Repository<CommunityMember>().Add(member);
+            await _unitOfWork.SaveChangesAsync();
+            return Ok(member);
+        }
+
+        /// <summary>Link a mosque event to this community (community_events). Module 3.6.</summary>
+        [Authorize(Roles = Roles.Admins + "," + Roles.Muqaddam)]
+        [HttpPost("{id:int}/events")]
+        public async Task<IActionResult> LinkEvent(int id, [FromBody] CommunityEventLinkRequest request)
+        {
+            var community = await _unitOfWork.Repository<Community>().FindAsync(id);
+            if (community == null) return NotFound();
+
+            var ev = await _unitOfWork.Repository<Event>().FindAsync(request.EventId);
+            if (ev == null) return NotFound(new ApiMessageResponse { Message = "Event not found." });
+
+            if (await _unitOfWork.Repository<CommunityEvent>().Query()
+                .AnyAsync(ce => ce.CommunityId == id && ce.EventId == request.EventId))
+                return Conflict(new ApiMessageResponse { Message = "Event already linked." });
+
+            var link = new CommunityEvent { CommunityId = id, EventId = request.EventId };
+            _unitOfWork.Repository<CommunityEvent>().Add(link);
+            await _unitOfWork.SaveChangesAsync();
+            return Ok(link);
+        }
+
+        [HttpGet("{id:int}/events")]
+        public async Task<IActionResult> GetLinkedEvents(int id) =>
+            Ok(await _unitOfWork.Repository<CommunityEvent>().QueryNoTracking()
+                .Include(ce => ce.Event)
+                .Where(ce => ce.CommunityId == id)
+                .ToListAsync());
+    }
+
+    public class CommunityEventLinkRequest
+    {
+        public int EventId { get; set; }
     }
 }

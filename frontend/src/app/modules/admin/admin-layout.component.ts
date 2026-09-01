@@ -14,6 +14,7 @@ const MODULE_LABELS: Record<string, string> = {
   mosque: 'Mosque Profile',
   modules: 'Module Settings',
   'prayer-times': 'Prayer Times',
+  templates: 'Jamaah Templates',
   announcements: 'Announcements',
   events: 'Events',
   janaza: 'Janaza',

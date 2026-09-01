@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AdminRegistrationItem, RegistrationService } from '../../../core/services/registration.service';
+import { SuperAdminPageHeaderComponent } from '../../../shared/ui/super-admin-page-header.component';
 
 @Component({
   selector: 'app-super-registrations',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, SuperAdminPageHeaderComponent],
   templateUrl: './super-registrations.component.html',
   styleUrls: ['./super-registrations.component.css'],
 })

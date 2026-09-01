@@ -38,7 +38,7 @@ import { worshipRoles } from './modules/member/member.routes';
 const adminRoles = [ROLES.SuperAdmin, ROLES.MosqueOwner, ROLES.MosqueAdmin];
 const mosqueAdminOnly = [ROLES.MosqueAdmin, ROLES.SuperAdmin, ROLES.MosqueOwner];
 const prayerRoles = [ROLES.SuperAdmin, ROLES.MosqueAdmin, ROLES.PrayerTimesEditor];
-const contentRolesGuard = [ROLES.ContentEditor, ROLES.SuperAdmin, ROLES.MosqueOwner, ROLES.MosqueAdmin];
+const contentRolesGuard = [ROLES.ContentEditor, ROLES.Muqaddam, ROLES.SuperAdmin, ROLES.MosqueOwner, ROLES.MosqueAdmin];
 
 export const routes: Routes = [
   { path: '', component: LandingComponent },
@@ -57,6 +57,8 @@ export const routes: Routes = [
   { path: 'auth/login', component: LoginComponent },
   { path: 'login', redirectTo: 'auth/login', pathMatch: 'full' },
   { path: 'auth/callback', component: AuthCallbackComponent },
+  { path: 'auth/forgot-password', loadComponent: () => import('./modules/auth/forgot-password/forgot-password.component').then(m => m.ForgotPasswordComponent) },
+  { path: 'auth/reset-password', loadComponent: () => import('./modules/auth/reset-password/reset-password.component').then(m => m.ResetPasswordComponent) },
   { path: 'register', component: RegisterComponent },
   { path: 'verify-otp', component: VerifyOtpComponent },
   { path: 'verify-email-pending', component: VerifyEmailPendingComponent },

@@ -7,7 +7,7 @@ import { JumuahTime, MosqueEvent, PrayerTimesDaily } from '../../../core/models'
 import { environment } from '../../../../environments/environment';
 import {
   countdownToJamaat, formatTime12, getPrayerSlots, nextJumuahCountdown,
-  resolveNextPrayer
+  nowInTimezone, resolveNextPrayer, DEFAULT_PRAYER_TIMEZONE
 } from '../../../core/utils/prayer.utils';
 
 @Component({
@@ -800,23 +800,26 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private refreshDateLabel(): void {
+    const zoned = nowInTimezone(DEFAULT_PRAYER_TIMEZONE);
     const now = new Date();
-    const weekday = now.toLocaleDateString('en-GB', { weekday: 'long' });
+    // Date label still from browser calendar day; weekday/Friday from London clock.
+    const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const weekday = weekdayNames[zoned.dayOfWeek] ?? now.toLocaleDateString('en-GB', { weekday: 'long' });
     this.todayDayLabel.set(`Today · ${weekday}`);
-    this.todayDateStr.set(now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }));
-    this.isFriday.set(now.getDay() === 5);
+    this.todayDateStr.set(now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: DEFAULT_PRAYER_TIMEZONE }));
+    this.isFriday.set(zoned.dayOfWeek === 5);
   }
 
   private tickPrayer(times: PrayerTimesDaily): void {
-    const next = resolveNextPrayer(times);
+    const next = resolveNextPrayer(times, DEFAULT_PRAYER_TIMEZONE);
     this.nextPrayerName.set(next.name);
     this.nextJamaat.set(formatTime12(next.jamaat));
-    this.countdown.set(countdownToJamaat(next.jamaat));
+    this.countdown.set(countdownToJamaat(next.jamaat, DEFAULT_PRAYER_TIMEZONE));
     this.updateShowcase();
   }
 
   private tickJumuah(slots: JumuahTime[]): void {
-    this.nextJumuah.set(nextJumuahCountdown(slots));
+    this.nextJumuah.set(nextJumuahCountdown(slots, DEFAULT_PRAYER_TIMEZONE));
     this.updateShowcase();
   }
 

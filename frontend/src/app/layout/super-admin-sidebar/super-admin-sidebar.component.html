@@ -1,0 +1,155 @@
+<aside
+  class="mos-side"
+  [class.mos-side--collapsed]="collapsed() && !mobile"
+  [class.mos-side--mobile]="mobile"
+  [attr.aria-label]="'Mosque Operating System Super Admin navigation'"
+  role="navigation">
+
+  <!-- Brand -->
+  <header class="mos-side__brand">
+    <a routerLink="/dashboard/super" class="mos-side__logo" (click)="mobile && closeMobile()" title="MOS Dashboard">
+      <span class="mos-side__logo-mark" aria-hidden="true">
+        <span class="material-symbols-outlined">mosque</span>
+      </span>
+      <span class="mos-side__logo-text" *ngIf="!collapsed() || mobile">
+        <strong>MOS</strong>
+        <small>Mosque Operating System</small>
+      </span>
+    </a>
+
+    <button
+      *ngIf="!mobile"
+      type="button"
+      class="mos-side__icon-btn mos-side__collapse-btn"
+      (click)="toggleCollapse()"
+      [attr.aria-label]="collapsed() ? 'Expand sidebar' : 'Collapse sidebar'"
+      [attr.title]="collapsed() ? 'Expand' : 'Collapse'">
+      <span class="material-symbols-outlined">{{ collapsed() ? 'keyboard_double_arrow_right' : 'keyboard_double_arrow_left' }}</span>
+    </button>
+
+    <button
+      *ngIf="mobile"
+      type="button"
+      class="mos-side__icon-btn"
+      (click)="closeMobile()"
+      aria-label="Close menu">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+  </header>
+
+  <!-- Search -->
+  <div class="mos-side__search" *ngIf="!collapsed() || mobile">
+    <label class="sr-only" for="mos-nav-search">Search navigation</label>
+    <span class="material-symbols-outlined mos-side__search-icon" aria-hidden="true">search</span>
+    <input
+      id="mos-nav-search"
+      type="search"
+      autocomplete="off"
+      placeholder="Search…"
+      [ngModel]="searchQuery()"
+      (ngModelChange)="onSearch($event)"
+      (keydown.escape)="clearSearch()" />
+    <kbd class="mos-side__search-kbd" *ngIf="!searchQuery()" aria-hidden="true">⌘K</kbd>
+    <button
+      *ngIf="searchQuery()"
+      type="button"
+      class="mos-side__search-clear"
+      (click)="clearSearch()"
+      aria-label="Clear search">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+  </div>
+
+  <!-- Search results -->
+  <div class="mos-side__search-panel" *ngIf="searchResults().length && (!collapsed() || mobile)" role="listbox" aria-label="Search results">
+    <button
+      type="button"
+      class="mos-side__link"
+      *ngFor="let hit of searchResults()"
+      role="option"
+      (click)="navigate(hit)">
+      <span class="material-symbols-outlined" aria-hidden="true">{{ hit.matIcon }}</span>
+      <span class="mos-side__link-label">
+        <strong>{{ hit.label }}</strong>
+        <small>{{ hit.section }}</small>
+      </span>
+    </button>
+  </div>
+
+  <!-- Nav -->
+  <nav class="mos-side__nav" *ngIf="!searchResults().length || (collapsed() && !mobile)">
+    <ul class="mos-side__list mos-side__list--top">
+      <li *ngFor="let item of topItems">
+        <a
+          [routerLink]="item.route"
+          [class.is-active]="isItemActive(item)"
+          class="mos-side__link"
+          [attr.title]="collapsed() && !mobile ? item.label : null"
+          (click)="mobile && closeMobile()">
+          <span class="material-symbols-outlined" aria-hidden="true">{{ item.matIcon }}</span>
+          <span class="mos-side__link-text" *ngIf="!collapsed() || mobile">{{ item.label }}</span>
+        </a>
+      </li>
+    </ul>
+
+    <div class="mos-side__section" *ngFor="let section of sections">
+      <button
+        *ngIf="!collapsed() || mobile"
+        type="button"
+        class="mos-side__section-btn"
+        (click)="toggleSection(section.id)"
+        [attr.aria-expanded]="isSectionOpen(section.id)"
+        [attr.aria-controls]="'mos-sec-' + section.id">
+        <span class="material-symbols-outlined" aria-hidden="true">{{ section.matIcon }}</span>
+        <span class="mos-side__section-title">{{ section.title }}</span>
+        <span class="mos-side__badge" *ngIf="sectionBadge(section) as n" [attr.aria-label]="n + ' pending'">{{ n > 99 ? '99+' : n }}</span>
+        <span class="material-symbols-outlined mos-side__chevron" aria-hidden="true">
+          {{ isSectionOpen(section.id) ? 'expand_more' : 'chevron_right' }}
+        </span>
+      </button>
+
+      <a
+        *ngIf="collapsed() && !mobile"
+        [routerLink]="section.items[0].route"
+        class="mos-side__link mos-side__link--rail"
+        [attr.title]="section.title"
+        [attr.aria-label]="section.title">
+        <span class="material-symbols-outlined" aria-hidden="true">{{ section.matIcon }}</span>
+        <span class="mos-side__dot" *ngIf="sectionBadge(section)" aria-hidden="true"></span>
+      </a>
+
+      <div
+        *ngIf="!collapsed() || mobile"
+        class="mos-side__section-body"
+        [class.is-closed]="!isSectionOpen(section.id)"
+        [id]="'mos-sec-' + section.id">
+        <ul class="mos-side__list">
+          <li *ngFor="let item of section.items">
+            <a
+              [routerLink]="item.route"
+              [class.is-active]="isItemActive(item)"
+              class="mos-side__link mos-side__link--child"
+              (click)="mobile && closeMobile()">
+              <span class="material-symbols-outlined" aria-hidden="true">{{ item.matIcon }}</span>
+              <span class="mos-side__link-text">{{ item.label }}</span>
+              <span class="mos-side__badge" *ngIf="badgeFor(item) as n" [attr.aria-label]="n + ' pending'">{{ n > 99 ? '99+' : n }}</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Sticky footer -->
+  <footer class="mos-side__footer">
+    <button
+      type="button"
+      class="mos-side__footer-btn mos-side__footer-btn--danger"
+      (click)="logout()"
+      [attr.title]="collapsed() && !mobile ? 'Logout' : null"
+      aria-label="Logout">
+      <span class="material-symbols-outlined" aria-hidden="true">logout</span>
+      <span *ngIf="!collapsed() || mobile">Logout</span>
+    </button>
+  </footer>
+</aside>

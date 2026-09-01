@@ -123,7 +123,7 @@ namespace MosqueOS.API.Controllers
         private async Task<IActionResult> RedirectWithTokenAsync(ApplicationUser user, string frontend)
         {
             var roles = await _userManager.GetRolesAsync(user);
-            var (token, _) = _jwt.CreateToken(user, roles);
+            var (token, _, _) = _jwt.CreateToken(user, roles);
             return Redirect($"{frontend}?token={Uri.EscapeDataString(token)}");
         }
 

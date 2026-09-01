@@ -101,14 +101,35 @@ export class ContentService {
     return this.http.get<AdhkarItem[]>(`${this.base}/adhkar/items`);
   }
 
-  getMyAdhkar(): Observable<{ userAdhkar: UserAdhkar; todayCount: number }[]> {
-    return this.http.get<{ userAdhkar: UserAdhkar; todayCount: number }[]>(`${this.base}/adhkar/mine`);
+  getMyAdhkar(relevantOnly = false): Observable<{ userAdhkar: UserAdhkar; todayCount: number }[]> {
+    const params = relevantOnly ? { relevantOnly: 'true' } : undefined;
+    return this.http.get<{ userAdhkar: UserAdhkar; todayCount: number }[]>(`${this.base}/adhkar/mine`, { params });
   }
 
-  incrementAdhkar(id: number, by = 1): Observable<{ completed: number; target: number; isComplete: boolean }> {
-    return this.http.post<{ completed: number; target: number; isComplete: boolean }>(
+  getAdhkarSummary(): Observable<{
+    itemCount: number;
+    completedItemCount: number;
+    todayCompleted: number;
+    todayTarget: number;
+    progressLabel: string;
+  }> {
+    return this.http.get<{
+      itemCount: number;
+      completedItemCount: number;
+      todayCompleted: number;
+      todayTarget: number;
+      progressLabel: string;
+    }>(`${this.base}/adhkar/mine/summary`);
+  }
+
+  incrementAdhkar(id: number, by = 1): Observable<{ completed: number; target: number; isComplete: boolean; progressLabel?: string }> {
+    return this.http.post<{ completed: number; target: number; isComplete: boolean; progressLabel?: string }>(
       `${this.base}/adhkar/mine/${id}/increment?by=${by}`, {}
     );
+  }
+
+  updateMyAdhkar(id: number, data: { targetCount?: number; prayerSlot?: number | string | null; occasion?: number | string; customTitle?: string }): Observable<UserAdhkar> {
+    return this.http.put<UserAdhkar>(`${this.base}/adhkar/mine/${id}`, data);
   }
 
   addToMyAdhkar(adhkarItemId: number, targetCount: number): Observable<UserAdhkar> {

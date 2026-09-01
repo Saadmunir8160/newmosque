@@ -17,7 +17,7 @@ import {
 } from '../../../core/models';
 import {
   countdownToJamaat, formatTime12, getPrayerSlots, nextJumuahCountdown,
-  resolveJumuahCountdowns, resolveNextPrayer, JumuahSlotCountdown
+  nowInTimezone, resolveJumuahCountdowns, resolveNextPrayer, JumuahSlotCountdown
 } from '../../../core/utils/prayer.utils';
 import { environment } from '../../../../environments/environment';
 import { HasRoleDirective } from '../../../shared/directives/has-role.directive';
@@ -304,6 +304,9 @@ const SAVED_MOSQUES_KEY = 'mos_saved_mosques';
       gap: 0.625rem;
       width: 100%;
       margin-top: 0.25rem;
+    }
+    @media (max-width: 380px) {
+      .demo-today-widgets { grid-template-columns: 1fr; }
     }
     .demo-widget {
       padding: 0.75rem 0.875rem;
@@ -972,6 +975,9 @@ const SAVED_MOSQUES_KEY = 'mos_saved_mosques';
     .demo-overview-grid {
       display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem 1rem; margin: 0;
     }
+    @media (max-width: 420px) {
+      .demo-overview-grid { grid-template-columns: 1fr; }
+    }
     .demo-overview-grid dt { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; color: var(--demo-muted); }
     .demo-overview-grid dd { margin: 0.2rem 0 0; font-size: 0.9375rem; color: var(--demo-text); line-height: 1.5; }
     .demo-overview-grid__full { grid-column: 1 / -1; }
@@ -1348,16 +1354,20 @@ export class DemoMosqueComponent implements OnInit, OnDestroy {
   }
 
   isUnclaimed(): boolean {
-    return this.mosque()?.status === 'Unclaimed';
+    const s = this.mosque()?.status;
+    return s === 'Unclaimed' || s === 'ClaimPending';
   }
 
   isActive(): boolean {
     return this.mosque()?.status === 'Active';
   }
 
+  /** Claim under review (mosque stays Unclaimed; CTA gated by allowClaimRequests) or Claimed awaiting activation. */
   isClaimPending(): boolean {
-    const s = this.mosque()?.status;
-    return s === 'ClaimPending' || s === 'Claimed' || s === 'PendingReview';
+    const m = this.mosque();
+    if (!m) return false;
+    if (m.status === 'Claimed') return true;
+    return this.isUnclaimed() && m.allowClaimRequests === false;
   }
 
   canSeePendingBadge(): boolean {
@@ -1812,28 +1822,31 @@ export class DemoMosqueComponent implements OnInit, OnDestroy {
   }
 
   private tickPrayer(times: PrayerTimesDaily): void {
-    const next = resolveNextPrayer(times);
+    const tz = this.mosque()?.timezone || 'Europe/London';
+    const next = resolveNextPrayer(times, tz);
     this.nextPrayerName.set(next.name);
     this.nextJamaat.set(formatTime12(next.jamaat));
-    this.countdown.set(countdownToJamaat(next.jamaat));
+    this.countdown.set(countdownToJamaat(next.jamaat, tz));
   }
 
   private tickJumuah(slots: JumuahTime[]): void {
-    this.isFriday.set(new Date().getDay() === 5);
-    this.jumuahCountdowns.set(resolveJumuahCountdowns(slots));
-    this.nextJumuah.set(nextJumuahCountdown(slots));
+    const tz = this.mosque()?.timezone || 'Europe/London';
+    this.isFriday.set(nowInTimezone(tz).dayOfWeek === 5);
+    this.jumuahCountdowns.set(resolveJumuahCountdowns(slots, tz));
+    this.nextJumuah.set(nextJumuahCountdown(slots, tz));
   }
 
   prayerSlots(): { name: string; jamaat: string; active: boolean; countdown: string }[] {
     const pt = this.prayerTimes();
     if (!pt) return [];
-    const next = resolveNextPrayer(pt);
+    const tz = this.mosque()?.timezone || 'Europe/London';
+    const next = resolveNextPrayer(pt, tz);
     const activeName = next.name.replace(' (tomorrow)', '');
     return getPrayerSlots(pt).map(p => ({
       name: p.name,
       jamaat: formatTime12(p.jamaat),
       active: p.name === activeName,
-      countdown: p.name === activeName ? countdownToJamaat(p.jamaat) : '',
+      countdown: p.name === activeName ? countdownToJamaat(p.jamaat, tz) : '',
     }));
   }
 

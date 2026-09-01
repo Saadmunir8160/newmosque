@@ -177,7 +177,7 @@ namespace MosqueOS.API.Controllers
 
         // ---- Fees ----
 
-        [Authorize(Roles = Roles.MadrassahManagers)]
+        [Authorize(Roles = Roles.Admins)]
         [HttpPost("students/{studentId:int}/fees")]
         public async Task<IActionResult> CreateFee(int studentId, [FromBody] Fee fee)
         {
@@ -188,7 +188,7 @@ namespace MosqueOS.API.Controllers
             return Ok(fee);
         }
 
-        [Authorize(Roles = Roles.MadrassahManagers)]
+        [Authorize(Roles = Roles.Admins)]
         [HttpPost("fees/{feeId:int}/mark-paid")]
         public async Task<IActionResult> MarkFeePaid(int feeId)
         {

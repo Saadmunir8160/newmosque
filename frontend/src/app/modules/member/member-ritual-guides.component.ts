@@ -1,49 +1,48 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatExpansionModule } from '@angular/material/expansion';
-import { MatChipsModule } from '@angular/material/chips';
 import { ContentService, RitualGuide, RitualGuideDetail } from '../../core/services/content.service';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 
 @Component({
   selector: 'app-member-ritual-guides',
   standalone: true,
-  imports: [
-    CommonModule, PageHeaderComponent,
-    MatCardModule, MatExpansionModule, MatChipsModule,
-  ],
+  imports: [CommonModule, PageHeaderComponent],
   template: `
     <app-page-header badge="Member" title="Ritual guides" subtitle="Step-by-step wudu, ghusl, salah" />
 
-    <mat-chip-set class="member-filters" style="border: none; padding-bottom: 0;">
-      <mat-chip [highlighted]="!filterType()" (click)="setFilter(null)">All</mat-chip>
-      <mat-chip [highlighted]="filterType() === 'Wudu'" (click)="setFilter('Wudu')">Wudu</mat-chip>
-      <mat-chip [highlighted]="filterType() === 'Ghusl'" (click)="setFilter('Ghusl')">Ghusl</mat-chip>
-      <mat-chip [highlighted]="filterType() === 'Salah'" (click)="setFilter('Salah')">Salah</mat-chip>
-    </mat-chip-set>
+    <div class="member-filters">
+      <button type="button" class="member-chip" [class.member-chip--on]="!filterType()" (click)="setFilter(null)">All</button>
+      <button type="button" class="member-chip" [class.member-chip--on]="filterType() === 'Wudu'" (click)="setFilter('Wudu')">Wudu</button>
+      <button type="button" class="member-chip" [class.member-chip--on]="filterType() === 'Ghusl'" (click)="setFilter('Ghusl')">Ghusl</button>
+      <button type="button" class="member-chip" [class.member-chip--on]="filterType() === 'Salah'" (click)="setFilter('Salah')">Salah</button>
+    </div>
 
-    <mat-accordion multi>
-      <mat-expansion-panel *ngFor="let g of guides()" class="member-mat-panel" (opened)="loadDetail(g.id)">
-        <mat-expansion-panel-header>
-          <mat-panel-title>{{ g.title }}</mat-panel-title>
-          <mat-panel-description>{{ g.type }}</mat-panel-description>
-        </mat-expansion-panel-header>
-        <p *ngIf="g.description" class="member-desc mb-3">{{ g.description }}</p>
-        <div *ngIf="detail()?.id === g.id">
-          <mat-card *ngFor="let s of detail()!.steps" class="member-step-card mb-2">
-            <h4 class="member-title text-sm">{{ s.orderIndex }}. {{ s.title }}</h4>
-            <p class="member-desc mt-1">{{ s.description }}</p>
-            <div *ngIf="s.dua" class="member-dua-box">
-              <p class="member-tag" style="margin-bottom: 0.35rem;">{{ s.dua.title }}</p>
-              <p class="member-arabic text-right" dir="rtl">{{ s.dua.arabicText }}</p>
-              <p *ngIf="s.dua.translation" class="member-translation mt-1">{{ s.dua.translation }}</p>
+    <p *ngIf="!guides().length" class="member-empty">No ritual guides available yet.</p>
+
+    <div class="member-guide-list">
+      <article *ngFor="let g of guides()" class="member-guide-item" [class.member-guide-item--open]="openId() === g.id">
+        <button type="button" class="member-guide-item__head" (click)="toggle(g.id)">
+          <span class="member-guide-item__title">{{ g.title }}</span>
+          <span class="member-guide-item__type">{{ g.type }}</span>
+          <span class="member-guide-item__chev" aria-hidden="true">▾</span>
+        </button>
+        <div class="member-guide-item__body" *ngIf="openId() === g.id">
+          <p *ngIf="g.description" class="member-desc">{{ g.description }}</p>
+          <p *ngIf="loadingId() === g.id" class="member-meta">Loading steps…</p>
+          <div *ngIf="detail()?.id === g.id" class="member-guide-steps">
+            <div *ngFor="let s of detail()!.steps" class="member-step-card">
+              <h4 class="member-title" style="font-size: 0.9rem;">{{ s.orderIndex }}. {{ s.title }}</h4>
+              <p class="member-desc" style="margin-top: 0.35rem;">{{ s.description }}</p>
+              <div *ngIf="s.dua" class="member-dua-box">
+                <p class="member-tag" style="margin-bottom: 0.35rem;">{{ s.dua.title }}</p>
+                <p class="member-arabic text-right" dir="rtl">{{ s.dua.arabicText }}</p>
+                <p *ngIf="s.dua.translation" class="member-translation" style="margin-top: 0.35rem;">{{ s.dua.translation }}</p>
+              </div>
             </div>
-          </mat-card>
+          </div>
         </div>
-        <p *ngIf="loadingId() === g.id" class="member-meta">Loading steps…</p>
-      </mat-expansion-panel>
-    </mat-accordion>
+      </article>
+    </div>
   `,
 })
 export class MemberRitualGuidesComponent implements OnInit {
@@ -51,16 +50,28 @@ export class MemberRitualGuidesComponent implements OnInit {
   guides = signal<RitualGuide[]>([]);
   detail = signal<RitualGuideDetail | null>(null);
   loadingId = signal<number | null>(null);
+  openId = signal<number | null>(null);
   filterType = signal<string | null>(null);
 
   ngOnInit(): void { this.load(); }
 
   setFilter(type: string | null): void {
     this.filterType.set(type);
+    this.openId.set(null);
+    this.detail.set(null);
     this.load();
   }
 
-  loadDetail(id: number): void {
+  toggle(id: number): void {
+    if (this.openId() === id) {
+      this.openId.set(null);
+      return;
+    }
+    this.openId.set(id);
+    this.loadDetail(id);
+  }
+
+  private loadDetail(id: number): void {
     if (this.detail()?.id === id) return;
     this.loadingId.set(id);
     this.content.getRitualGuide(id).subscribe({

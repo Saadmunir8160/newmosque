@@ -70,11 +70,15 @@ export const NAV_ITEMS: NavItem[] = [
 
   { section: 'Super Admin', label: 'Claim management', route: '/dashboard/super/claims', roles: [ROLES.SuperAdmin] },
 
-  { section: 'Super Admin', label: 'Mosque data', route: '/dashboard/super/mosque-data', roles: [ROLES.SuperAdmin] },
+  { section: 'Super Admin', label: 'Registrations', route: '/dashboard/super/registrations', roles: [ROLES.SuperAdmin] },
+
+  { section: 'Super Admin', label: 'Invitations', route: '/dashboard/super/invitations', roles: [ROLES.SuperAdmin] },
 
   { section: 'Super Admin', label: 'Module flags', route: '/dashboard/super/features', roles: [ROLES.SuperAdmin] },
 
   { section: 'Super Admin', label: 'User Management', route: '/dashboard/super/users', roles: [ROLES.SuperAdmin] },
+
+  { section: 'Super Admin', label: 'Audit logs', route: '/dashboard/super/audit', roles: [ROLES.SuperAdmin] },
 
 
 
@@ -206,7 +210,7 @@ export function homeRouteForRoles(userRoles: string[]): string {
 
   if (userRoles.includes(ROLES.Muqaddam)) return '/dashboard/muqaddam';
 
-  if (userRoles.includes(ROLES.Parent)) return '/dashboard';
+  if (userRoles.includes(ROLES.Parent)) return '/dashboard/parent';
 
   if (userRoles.includes(ROLES.Member)) return '/dashboard';
 
@@ -266,6 +270,15 @@ export function navIsContentEditor(userRoles: string[]): boolean {
   return isSinglePurpose(userRoles, ROLES.ContentEditor, ADMINS);
 }
 
+/** Dedicated parent sidebar (takes precedence over Member). */
+export function navIsParent(userRoles: string[]): boolean {
+  if (!userRoles.includes(ROLES.Parent)) return false;
+  if (navIsSuperAdmin(userRoles) || navIsMosqueOwner(userRoles) || navIsMosqueAdmin(userRoles)) return false;
+  if (navIsPrayerEditor(userRoles) || navIsTeacher(userRoles) || navIsMuqaddam(userRoles)) return false;
+  if (navIsContentEditor(userRoles)) return false;
+  return true;
+}
+
 /** Dedicated member sidebar (not admin / editor / teacher / content / muqaddam-only). */
 export function navIsMember(userRoles: string[]): boolean {
   if (!userRoles.includes(ROLES.Member)) return false;
@@ -273,6 +286,7 @@ export function navIsMember(userRoles: string[]): boolean {
   if (navIsPrayerEditor(userRoles)) return false;
   if (navIsTeacher(userRoles)) return false;
   if (navIsMuqaddam(userRoles)) return false;
+  if (navIsParent(userRoles)) return false;
   if (isSinglePurpose(userRoles, ROLES.ContentEditor, ADMINS)) return false;
   return true;
 }

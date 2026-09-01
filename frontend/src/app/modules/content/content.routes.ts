@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
 import { ROLES } from '../../core/constants/roles';
 
-const contentRoles = [ROLES.ContentEditor, ROLES.SuperAdmin, ROLES.MosqueOwner, ROLES.MosqueAdmin];
+const contentRoles = [ROLES.ContentEditor, ROLES.Muqaddam, ROLES.SuperAdmin, ROLES.MosqueOwner, ROLES.MosqueAdmin];
 
 export const CONTENT_ROUTES: Routes = [
   { path: '', loadComponent: () => import('./content-dashboard.component').then(m => m.ContentDashboardComponent) },

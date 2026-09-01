@@ -507,6 +507,29 @@
   50% { opacity: 0.45; transform: scale(0.7); }
 }
 
+@media (max-width: 639px) {
+  .dir-search__actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .dir-search__actions .dir-btn {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .dir-search__bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dir-hero {
+    padding: 2.25rem 1rem 2rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dir-hero__inner,
   .dir-results,

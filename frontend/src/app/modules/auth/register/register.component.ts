@@ -11,7 +11,7 @@ import { passwordStrength, validateRegistrationForm } from '../../../core/utils/
   standalone: true,
   imports: [CommonModule, RouterModule, FormsModule],
   templateUrl: './register.component.html',
-  styleUrls: ['./register.component.css'],
+  styleUrls: ['../auth-shell.shared.css'],
 })
 export class RegisterComponent {
   fullName = '';
@@ -53,16 +53,24 @@ export class RegisterComponent {
     if (Object.keys(errors).length) return;
 
     this.submitting.set(true);
+    const email = this.email.trim().toLowerCase();
     try {
       const res = await this.authService.register({
         fullName: this.fullName.trim(),
-        email: this.email.trim().toLowerCase(),
+        email,
         password: this.password,
         confirmPassword: this.confirmPassword,
-        registerAsMosqueOwner: true,
       });
-      void this.router.navigate(['/auth/login'], { queryParams: { email: res.email } });
+      // New account OR existing unverified email → OTP screen
+      void this.router.navigate(['/verify-otp'], { queryParams: { email: res.email || email } });
     } catch (err) {
+      if (err instanceof HttpErrorResponse && err.status === 409) {
+        // Already verified — send them to login with this email
+        void this.router.navigate(['/login'], {
+          queryParams: { email, registered: '1' },
+        });
+        return;
+      }
       this.error.set(this.readRegisterError(err));
     } finally {
       this.submitting.set(false);
@@ -76,7 +84,7 @@ export class RegisterComponent {
     const body = err.error as { message?: string; errors?: string[] } | null;
     if (body?.message) return body.message;
     if (body?.errors?.length) return body.errors.join(' ');
-    if (err.status === 409) return 'Email already registered.';
+    if (err.status === 409) return 'Email already registered. Please log in.';
     if (err.status === 0) {
       return 'Cannot reach the server. Please try again later.';
     }

@@ -11,71 +11,74 @@ import { AuthService } from '../../../core/auth/auth.service';
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule],
   styles: [`
-    :host { display: block; min-height: 100dvh; }
+    :host { display: block; min-height: 100dvh; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; }
     .auth-page {
       min-height: 100dvh; display: flex; align-items: center; justify-content: center;
-      padding: 1.25rem; background: linear-gradient(165deg, #022c22 0%, #064e3b 100%);
+      padding: 1.25rem; background: #0B3D2E;
     }
     .auth-inner {
       width: 100%; max-width: 420px;
-      background: rgba(255,255,255,0.07);
-      border: 1px solid rgba(212,175,55,0.28);
-      border-radius: 1.25rem;
+      background: #0F4C3A;
+      border: 1px solid #2B6A55;
+      border-radius: 14px;
       padding: 1.65rem;
-      color: #ecfdf5;
+      color: #EAF4EF;
       text-align: center;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.25);
     }
     .icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
-    h1 { margin: 0 0 0.5rem; font-size: 1.35rem; color: #fff; }
-    .sub { margin: 0 0 1rem; font-size: 0.875rem; color: rgba(167,243,208,0.85); line-height: 1.5; }
+    h1 { margin: 0 0 0.5rem; font-size: 1.35rem; font-weight: 700; color: #fff; }
+    .sub { margin: 0 0 1rem; font-size: 0.875rem; color: #C9D8D0; line-height: 1.5; }
     .email-chip {
       display: inline-block; margin-bottom: 1rem; padding: 0.35rem 0.75rem;
-      border-radius: 999px; background: rgba(212,175,55,0.12);
-      border: 1px solid rgba(212,175,55,0.35); color: #fcd34d; font-size: 0.8125rem;
+      border-radius: 999px; background: rgba(200,162,74,0.12);
+      border: 1px solid rgba(200,162,74,0.35); color: #C8A24A; font-size: 0.8125rem;
     }
     .field { margin-bottom: 0.75rem; text-align: left; }
-    .label { display: block; font-size: 0.75rem; color: #6ee7b7; margin-bottom: 0.35rem; }
+    .label { display: block; font-size: 0.75rem; color: #C9D8D0; margin-bottom: 0.35rem; font-weight: 600; }
     .input {
-      width: 100%; box-sizing: border-box; padding: 0.65rem 0.75rem; border-radius: 0.75rem;
-      border: 1px solid rgba(212,175,55,0.35); background: rgba(2,44,34,0.55); color: #fff;
+      width: 100%; box-sizing: border-box; padding: 0.65rem 0.75rem; border-radius: 10px;
+      border: 1px solid #2B6A55; background: #0B3D2E; color: #fff; font-family: inherit;
     }
+    .input:focus { outline: none; border-color: #C8A24A; }
     .otp-row {
       display: flex; gap: 0.5rem; justify-content: center; margin-top: 0.35rem;
     }
     .otp-cell {
       width: 2.75rem; height: 3rem; text-align: center; font-size: 1.35rem; font-weight: 700;
-      border-radius: 0.65rem; border: 1px solid rgba(212,175,55,0.35);
-      background: rgba(2,44,34,0.55); color: #fff; font-variant-numeric: tabular-nums;
-      outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+      border-radius: 10px; border: 1px solid #2B6A55;
+      background: #0B3D2E; color: #fff; font-variant-numeric: tabular-nums;
+      outline: none; transition: border-color 200ms ease, box-shadow 200ms ease;
+      font-family: inherit;
     }
     .otp-cell:focus {
-      border-color: #D4AF37;
-      box-shadow: 0 0 0 3px rgba(212,175,55,0.15);
+      border-color: #C8A24A;
+      box-shadow: 0 0 0 3px rgba(200,162,74,0.18);
     }
-    .otp-cell--filled { border-color: rgba(212,175,55,0.55); }
-    .sr-only {
-      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
-    }
-    .paste-hint { margin: 0.5rem 0 0; font-size: 0.6875rem; color: rgba(167,243,208,0.65); text-align: center; }
+    .otp-cell--filled { border-color: rgba(200,162,74,0.55); }
+    .paste-hint { margin: 0.5rem 0 0; font-size: 0.6875rem; color: rgba(201,216,208,0.75); text-align: center; }
     .btn {
-      width: 100%; margin-top: 0.25rem; padding: 0.875rem; border-radius: 0.75rem;
-      border: 1px solid rgba(212,175,55,0.45); background: linear-gradient(180deg, rgba(6,78,59,0.95), rgba(2,44,34,0.98));
-      color: #fff; font-weight: 700; cursor: pointer;
+      width: 100%; margin-top: 0.25rem; min-height: 44px; padding: 0.875rem; border-radius: 10px;
+      border: none; background: #C8A24A;
+      color: #0B3D2E; font-family: inherit; font-weight: 700; cursor: pointer;
+      transition: background 200ms ease;
     }
+    .btn:hover:not(:disabled) { background: #D4B56A; }
     .btn:disabled { opacity: 0.55; cursor: not-allowed; }
     .btn-ghost {
-      margin-top: 0.5rem; background: transparent; border-color: rgba(212,175,55,0.35);
+      margin-top: 0.5rem; background: transparent; border: 1px solid #2B6A55; color: #EAF4EF;
     }
-    .msg { margin-top: 0.75rem; font-size: 0.8125rem; color: #6ee7b7; }
+    .btn-ghost:hover:not(:disabled) { background: #16624A; border-color: transparent; }
+    .msg { margin-top: 0.75rem; font-size: 0.8125rem; color: #C9D8D0; }
     .msg--err { color: #fca5a5; }
-    .msg--ok { color: #34d399; }
-    .footer { margin-top: 1.25rem; font-size: 0.8125rem; }
-    .footer a { color: #D4AF37; font-weight: 700; }
+    .msg--ok { color: #86efac; }
+    .footer { margin-top: 1.25rem; font-size: 0.8125rem; color: #C9D8D0; }
+    .footer a { color: #C8A24A; font-weight: 700; text-decoration: none; }
+    .footer a:hover { color: #D4B56A; text-decoration: underline; }
     .dev-hint {
-      margin-top: 0.75rem; padding: 0.65rem; border-radius: 0.5rem;
-      background: rgba(212,175,55,0.1); border: 1px dashed rgba(212,175,55,0.35);
-      font-size: 0.75rem; color: rgba(252,211,77,0.9); text-align: left; line-height: 1.45;
+      margin-top: 0.75rem; padding: 0.65rem; border-radius: 10px;
+      background: rgba(200,162,74,0.1); border: 1px dashed rgba(200,162,74,0.35);
+      font-size: 0.75rem; color: #C8A24A; text-align: left; line-height: 1.45;
     }
   `],
   template: `
@@ -93,21 +96,22 @@ import { AuthService } from '../../../core/auth/auth.service';
         </div>
 
         <div class="field">
-          <label class="label">Verification code</label>
-          <!-- Hidden input helps iOS/Android suggest OTP from Mail -->
-          <input class="sr-only" type="text" inputmode="numeric" autocomplete="one-time-code"
-            [value]="otpCode" (input)="onAutofillInput($event)" tabindex="-1" aria-hidden="true">
-          <div class="otp-row" (paste)="onPaste($event)">
+          <label class="label" id="otp-label">Verification code</label>
+          <!-- Visible first cell carries autocomplete so Mail/SMS OTP autofills all 6 digits -->
+          <div class="otp-row" role="group" aria-labelledby="otp-label" (paste)="onPaste($event)">
             <input *ngFor="let d of digits; let i = index" #otpCell
               class="otp-cell" [class.otp-cell--filled]="digits[i]"
-              type="text" inputmode="numeric" maxlength="1"
+              type="text" inputmode="numeric" pattern="[0-9]*"
+              [attr.maxlength]="i === 0 ? 6 : 1"
+              [attr.autocomplete]="i === 0 ? 'one-time-code' : 'off'"
+              [attr.name]="i === 0 ? 'one-time-code' : null"
               [value]="digits[i]"
-              [attr.aria-label]="'Digit ' + (i + 1)"
+              [attr.aria-label]="'Digit ' + (i + 1) + ' of 6'"
               (input)="onDigitInput(i, $event)"
               (keydown)="onDigitKeydown(i, $event)"
               (focus)="onDigitFocus($event)">
           </div>
-          <p class="paste-hint">Tap a box and paste the code from your email, or type each digit.</p>
+          <p class="paste-hint">Code autofills from email when suggested, or paste / type the 6 digits.</p>
         </div>
 
         <button type="button" class="btn" (click)="verify()" [disabled]="verifying()">
@@ -120,7 +124,7 @@ import { AuthService } from '../../../core/auth/auth.service';
         <p *ngIf="msg()" class="msg" [class.msg--err]="msgErr()" [class.msg--ok]="msgOk()">{{ msg() }}</p>
 
         <p class="dev-hint">
-          No email yet? Add Gmail SMTP in <code>appsettings.Local.json</code>, or check the API terminal for the OTP in dev mode.
+          Check inbox and spam for the 6-digit code from MosqueOS. In local/dev the code is also printed in the API terminal.
         </p>
 
         <p class="footer">
@@ -157,12 +161,8 @@ export class VerifyOtpComponent implements OnInit, AfterViewInit {
   }
 
   ngAfterViewInit(): void {
+    // Focus first cell so browser OTP autofill targets autocomplete="one-time-code".
     setTimeout(() => this.otpCells?.first?.nativeElement?.focus(), 100);
-  }
-
-  onAutofillInput(event: Event): void {
-    const val = (event.target as HTMLInputElement).value;
-    this.applyOtpString(val);
   }
 
   onPaste(event: ClipboardEvent): void {
@@ -173,7 +173,15 @@ export class VerifyOtpComponent implements OnInit, AfterViewInit {
 
   onDigitInput(index: number, event: Event): void {
     const input = event.target as HTMLInputElement;
-    const char = input.value.replace(/\D/g, '').slice(-1);
+    const raw = input.value.replace(/\D/g, '');
+
+    // Autofill / paste into one box often delivers the full 6-digit code at once.
+    if (raw.length > 1) {
+      this.applyOtpString(raw);
+      return;
+    }
+
+    const char = raw.slice(-1);
     const next = [...this.digits];
     next[index] = char;
     this.digits = next;

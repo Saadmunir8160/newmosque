@@ -94,39 +94,42 @@ interface ReaderView {
 
     <div *ngIf="reader()" class="member-reader-backdrop" (click)="closeReader()">
       <div class="member-reader" (click)="$event.stopPropagation()">
-        <button type="button" class="member-reader__close" (click)="closeReader()">✕</button>
-        <h3 class="member-reader__title">{{ reader()!.title }}</h3>
-        <p *ngIf="reader()!.subtitle" class="member-reader__sub">{{ reader()!.subtitle }}</p>
-        <p *ngIf="reader()!.source" class="member-reader__source">Source: {{ reader()!.source }}</p>
-
-        <div *ngIf="readerLoading()" class="member-reader__loading">Loading Qur'an text…</div>
-
-        <div *ngIf="reader()!.mode === 'para'">
-          <label class="member-label" for="reader-para">Change para</label>
-          <div class="member-para-picker member-para-picker--full" (click)="$event.stopPropagation()">
-            <button id="reader-para" type="button" class="member-para-picker__trigger" (click)="toggleReaderParaMenu($event)">
-              <span>{{ selectedParaLabel() }}</span>
-              <span class="member-para-picker__chev" [class.member-para-picker__chev--open]="readerParaMenuOpen()">▾</span>
-            </button>
-            <ul *ngIf="readerParaMenuOpen()" class="member-para-picker__menu" role="listbox">
-              <li *ngFor="let p of paraList()" role="option">
-                <button type="button" class="member-para-picker__item" [class.member-para-picker__item--on]="p.number === selectedPara()"
-                  (click)="pickPara(p.number, true)">{{ p.label }}</button>
-              </li>
-            </ul>
-          </div>
+        <button type="button" class="member-reader__close" (click)="closeReader()" aria-label="Close">✕</button>
+        <div class="member-reader__head">
+          <h3 class="member-reader__title">{{ reader()!.title }}</h3>
+          <p *ngIf="reader()!.subtitle" class="member-reader__sub">{{ reader()!.subtitle }}</p>
+          <p *ngIf="reader()!.source" class="member-reader__source">Source: {{ reader()!.source }}</p>
         </div>
+        <div class="member-reader__body">
+          <div *ngIf="reader()!.mode === 'para'">
+            <label class="member-label" for="reader-para">Change para</label>
+            <div class="member-para-picker member-para-picker--full" (click)="$event.stopPropagation()">
+              <button id="reader-para" type="button" class="member-para-picker__trigger" (click)="toggleReaderParaMenu($event)">
+                <span>{{ selectedParaLabel() }}</span>
+                <span class="member-para-picker__chev" [class.member-para-picker__chev--open]="readerParaMenuOpen()">▾</span>
+              </button>
+              <ul *ngIf="readerParaMenuOpen()" class="member-para-picker__menu" role="listbox">
+                <li *ngFor="let p of paraList()" role="option">
+                  <button type="button" class="member-para-picker__item" [class.member-para-picker__item--on]="p.number === selectedPara()"
+                    (click)="pickPara(p.number, true)">{{ p.label }}</button>
+                </li>
+              </ul>
+            </div>
+          </div>
 
-        <p *ngIf="!readerLoading()" class="member-reader__arabic" dir="rtl">{{ reader()!.arabic }}</p>
-        <p *ngIf="!readerLoading() && reader()!.mode === 'adhkar' && reader()!.translation" class="member-reader__trans">
-          {{ reader()!.translation }}
-        </p>
-        <p *ngIf="reader()!.instruction" class="member-reader__instruction">{{ reader()!.instruction }}</p>
+          <div *ngIf="readerLoading()" class="member-reader__loading">Loading Qur'an text…</div>
 
-        <button *ngIf="readerAllocationId()" type="button" class="member-btn-primary member-reader__done"
-          (click)="complete(readerAllocationId()!)">
-          Mark complete after reading
-        </button>
+          <p *ngIf="!readerLoading()" class="member-reader__arabic" dir="rtl">{{ reader()!.arabic }}</p>
+          <p *ngIf="!readerLoading() && reader()!.mode === 'adhkar' && reader()!.translation" class="member-reader__trans">
+            {{ reader()!.translation }}
+          </p>
+          <p *ngIf="reader()!.instruction" class="member-reader__instruction">{{ reader()!.instruction }}</p>
+
+          <button *ngIf="readerAllocationId()" type="button" class="member-btn-primary member-reader__done"
+            (click)="complete(readerAllocationId()!)">
+            Mark complete after reading
+          </button>
+        </div>
       </div>
     </div>
   `,

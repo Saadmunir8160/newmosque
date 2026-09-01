@@ -2,11 +2,6 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuthService } from '../../core/auth/auth.service';
 import { ContentService } from '../../core/services/content.service';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
@@ -14,19 +9,17 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 @Component({
   selector: 'app-member-profile',
   standalone: true,
-  imports: [
-    CommonModule, FormsModule, RouterModule, PageHeaderComponent,
-    MatCardModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatSnackBarModule,
-  ],
+  imports: [CommonModule, FormsModule, RouterModule, PageHeaderComponent],
   template: `
     <app-page-header [useAuthRole]="true" title="Profile" subtitle="Manage your account details" />
 
-    <mat-card *ngIf="auth.user() as u" class="member-profile-card">
+    <section *ngIf="auth.user() as u" class="member-card member-profile-card">
       <form (ngSubmit)="save()" class="grid md:grid-cols-2 gap-4">
-        <mat-form-field appearance="outline" class="w-full">
-          <mat-label>Full name</mat-label>
-          <input matInput [(ngModel)]="fullName" name="fullName" />
-        </mat-form-field>
+        <div>
+          <label class="member-profile-label" for="profile-full-name">Full name</label>
+          <input id="profile-full-name" class="member-profile-input" name="fullName"
+            [(ngModel)]="fullName" autocomplete="name" />
+        </div>
         <div>
           <p class="member-profile-label">Username</p>
           <p class="member-profile-val">{{ u.userName || '-' }}</p>
@@ -47,21 +40,25 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
           <p class="member-profile-label">Level</p>
           <p class="member-profile-val">{{ u.level || '-' }}</p>
         </div>
-        <div class="md:col-span-2 flex flex-wrap gap-3">
-          <button mat-flat-button color="primary" type="submit" [disabled]="saving()">Save profile</button>
-          <a mat-stroked-button routerLink="/dashboard/member/preferences">Edit preferences</a>
+        <div class="md:col-span-2 flex flex-wrap gap-3" style="margin-top: 0.25rem;">
+          <button type="submit" class="member-btn-primary" [disabled]="saving()">
+            {{ saving() ? 'Saving…' : 'Save profile' }}
+          </button>
+          <a routerLink="/dashboard/member/preferences" class="member-btn-secondary">Edit preferences</a>
         </div>
+        <p *ngIf="msg()" class="member-toast md:col-span-2" [class.member-toast--err]="msgErr()">{{ msg() }}</p>
       </form>
-    </mat-card>
+    </section>
   `,
 })
 export class MemberProfileComponent implements OnInit {
   auth = inject(AuthService);
   private content = inject(ContentService);
-  private snack = inject(MatSnackBar);
 
   fullName = '';
   saving = signal(false);
+  msg = signal('');
+  msgErr = signal(false);
 
   ngOnInit(): void {
     const u = this.auth.user();
@@ -70,15 +67,18 @@ export class MemberProfileComponent implements OnInit {
 
   save(): void {
     this.saving.set(true);
+    this.msg.set('');
     this.content.updatePreferences({ fullName: this.fullName.trim() }).subscribe({
       next: () => {
         this.saving.set(false);
-        this.snack.open('Profile updated', 'OK', { duration: 3000 });
+        this.msgErr.set(false);
+        this.msg.set('Profile updated');
         this.auth.refreshProfile();
       },
       error: () => {
         this.saving.set(false);
-        this.snack.open('Could not save profile', 'OK', { duration: 4000 });
+        this.msgErr.set(true);
+        this.msg.set('Could not save profile');
       },
     });
   }

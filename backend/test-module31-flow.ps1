@@ -28,7 +28,7 @@ function Clear-ClaimantActiveTestMosques($adminToken) {
         if (-not $claimant) { return }
         $listings = Invoke-RestMethod -Uri "$base/platform/mosques/listings?status=Active" -Headers @{ Authorization = "Bearer $adminToken" }
         foreach ($m in @($listings.items)) {
-            if ($m.ownerId -eq $claimant.id -and $m.slug -like 'test-auto-mosque-*') {
+            if ($m.ownerId -eq $claimant.id) {
                 Invoke-RestMethod -Uri "$base/platform/mosques/$($m.id)/deactivate" -Method Post -Headers @{ Authorization = "Bearer $adminToken" } | Out-Null
             }
         }
@@ -108,7 +108,7 @@ try {
         services = @("DailyPrayers", "Jumuah")
         leadership = @(@{ name = "Test Imam"; role = "Imam"; bio = "Demo leader" })
     } | ConvertTo-Json -Depth 5
-    Invoke-RestMethod -Uri "$base/mosque/$mosqueId" -Method Put -Body $profileBody -ContentType "application/json" -Headers @{ Authorization = "Bearer $adminToken" } | Out-Null
+    Invoke-RestMethod -Uri "$base/mosques/$mosqueId" -Method Put -Body $profileBody -ContentType "application/json" -Headers @{ Authorization = "Bearer $adminToken" } | Out-Null
     $pub2 = Invoke-RestMethod -Uri "$base/mosques/$slug"
     $hasCapacity = $pub2.capacity -eq 500
     $hasGallery = ($pub2.gallery | Measure-Object).Count -ge 1
@@ -199,7 +199,7 @@ try {
 
     # 15. Bulk settings PUT
     $bulkBody = @{ modules = @(@{ moduleKey = "Events"; isEnabled = $true }) } | ConvertTo-Json -Depth 4
-    $bulk = Invoke-RestMethod -Uri "$base/mosque/$mosqueId/settings" -Method Put -Headers @{ Authorization = "Bearer $adminToken" } -Body $bulkBody -ContentType "application/json"
+    $bulk = Invoke-RestMethod -Uri "$base/mosques/$mosqueId/settings" -Method Put -Headers @{ Authorization = "Bearer $adminToken" } -Body $bulkBody -ContentType "application/json"
     $eventsEnabled = ($bulk | Where-Object { $_.moduleKey -eq "Events" }).isEnabled
     Add-Result "15. Bulk settings PUT" ($eventsEnabled -eq $true) "Events enabled=$eventsEnabled"
 

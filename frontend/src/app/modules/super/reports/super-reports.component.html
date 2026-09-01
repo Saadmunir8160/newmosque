@@ -1,26 +1,19 @@
 <div class="pa-page">
   <div *ngIf="toast()" class="toast" [class.toast--ok]="toastOk()" [class.toast--err]="!toastOk()">{{ toast() }}</div>
 
-  <nav class="breadcrumb" aria-label="Breadcrumb">
-    <a routerLink="/dashboard/super">Dashboard</a>
-    <span class="breadcrumb__sep">›</span>
-    <span class="breadcrumb__current">Platform analytics</span>
-  </nav>
-
-  <header class="pa-header">
-    <div>
-      <p class="pa-badge">Overview</p>
-      <h1 class="pa-title">Platform analytics</h1>
-      <p class="pa-sub">Live metrics across all mosques on MOS</p>
-    </div>
-    <button type="button" class="btn-outline" [disabled]="loading()" (click)="reload()">
+  <app-super-admin-page-header
+    crumb="Reports"
+    [title]="pageTitle()"
+    [subtitle]="pageSubtitle()">
+    <button actions type="button" class="btn-outline" [disabled]="loading()" (click)="reload()">
       {{ loading() ? 'Refreshing…' : 'Refresh' }}
     </button>
-  </header>
+  </app-super-admin-page-header>
 
   <div *ngIf="loading()" class="state-loading"><span class="pulse-dot"></span> Loading analytics…</div>
 
-  <ng-container *ngIf="!loading() && stats() as s">
+  <!-- PLATFORM REPORTS -->
+  <ng-container *ngIf="!loading() && view() === 'platform' && stats() as s">
     <section class="kpi-row">
       <a routerLink="/dashboard/super/mosques" class="kpi-card kpi-card--link">
         <p class="kpi-label">Total mosques</p>
@@ -76,6 +69,126 @@
           </tbody>
         </table>
       </div>
+    </section>
+  </ng-container>
+
+  <!-- USAGE STATISTICS -->
+  <ng-container *ngIf="!loading() && view() === 'usage' && dashboard() as d">
+    <section class="kpi-row">
+      <article class="kpi-card">
+        <p class="kpi-label">User growth (30d)</p>
+        <p class="kpi-value">{{ d.analytics?.userGrowth30d ?? 0 }}</p>
+      </article>
+      <article class="kpi-card">
+        <p class="kpi-label">Mosque growth (30d)</p>
+        <p class="kpi-value">{{ d.analytics?.mosqueGrowth30d ?? 0 }}</p>
+      </article>
+      <article class="kpi-card">
+        <p class="kpi-label">Active users</p>
+        <p class="kpi-value">{{ d.users?.active ?? 0 }}</p>
+      </article>
+      <article class="kpi-card">
+        <p class="kpi-label">New users (30d)</p>
+        <p class="kpi-value">{{ d.users?.newUsers30d ?? 0 }}</p>
+      </article>
+    </section>
+
+    <section class="panel panel--table">
+      <div class="panel__head">
+        <h2 class="panel__title">Feature / module usage</h2>
+        <span class="entry-count">{{ featureUsage().length }} modules</span>
+      </div>
+      <div class="table-scroll" *ngIf="featureUsage().length; else noUsage">
+        <table class="pa-table">
+          <thead>
+            <tr>
+              <th>Module</th>
+              <th>Usage count</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of featureUsage()">
+              <td class="cell-name">{{ row.module }}</td>
+              <td>{{ row.count }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ng-template #noUsage>
+        <p class="empty-hint">No feature-usage rows yet. Enable modules via Feature Flags to start collecting signals.</p>
+      </ng-template>
+    </section>
+
+    <section class="panel panel--table">
+      <div class="panel__head">
+        <h2 class="panel__title">Users by role</h2>
+      </div>
+      <div class="table-scroll">
+        <table class="pa-table">
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th>Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of d.users?.byRole || []">
+              <td class="cell-name">{{ row.role }}</td>
+              <td>{{ row.count }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </ng-container>
+
+  <!-- ACTIVITY REPORTS -->
+  <ng-container *ngIf="!loading() && view() === 'activity' && dashboard() as d">
+    <section class="kpi-row">
+      <article class="kpi-card">
+        <p class="kpi-label">Activity (last 7d)</p>
+        <p class="kpi-value">{{ d.analytics?.activityLast7 ?? 0 }}</p>
+      </article>
+      <article class="kpi-card">
+        <p class="kpi-label">Previous 7d</p>
+        <p class="kpi-value">{{ d.analytics?.activityPrev7 ?? 0 }}</p>
+      </article>
+      <article class="kpi-card">
+        <p class="kpi-label">Content — announcements</p>
+        <p class="kpi-value">{{ d.content?.announcements ?? 0 }}</p>
+      </article>
+      <article class="kpi-card">
+        <p class="kpi-label">Content — events</p>
+        <p class="kpi-value">{{ d.content?.events ?? 0 }}</p>
+      </article>
+    </section>
+
+    <section class="panel panel--table">
+      <div class="panel__head">
+        <h2 class="panel__title">Recent platform activity</h2>
+        <a routerLink="/dashboard/super/audit" class="entry-count">Full audit logs →</a>
+      </div>
+      <div class="table-scroll" *ngIf="recentActivity().length; else noAct">
+        <table class="pa-table">
+          <thead>
+            <tr>
+              <th>Action</th>
+              <th>User</th>
+              <th>When</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of recentActivity()">
+              <td class="cell-name">{{ activityLabel(row) }}</td>
+              <td>{{ row.actorName || row.actorId || '—' }}</td>
+              <td>{{ row.createdAt | date:'medium' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ng-template #noAct>
+        <p class="empty-hint">No recent activity entries available.</p>
+      </ng-template>
     </section>
   </ng-container>
 </div>

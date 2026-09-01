@@ -1,21 +1,75 @@
 <div class="rm-page">
   <div *ngIf="toast()" class="toast" [class.toast--ok]="toastOk()" [class.toast--err]="!toastOk()">{{ toast() }}</div>
 
-  <header class="rm-header">
-    <div>
-      <h1 class="rm-title">Role Management Monitor</h1>
-      <p class="rm-sub">Super Admin Dashboard — assign and track roles across the platform.</p>
-    </div>
-    <div class="date-range">
+  <app-super-admin-page-header
+    crumb="Audit & Monitoring"
+    [title]="pageTitle()"
+    [subtitle]="pageSubtitle()">
+    <div actions class="date-range" *ngIf="view() === 'logs'">
       <input type="date" class="date-input" [(ngModel)]="dateFrom" (change)="reload()">
       <span class="date-sep">–</span>
       <input type="date" class="date-input" [(ngModel)]="dateTo" (change)="reload()">
     </div>
-  </header>
+    <button *ngIf="view() === 'system'" actions type="button" class="btn-outline" (click)="reload()" [disabled]="loading()">
+      Refresh
+    </button>
+  </app-super-admin-page-header>
 
-  <div *ngIf="loading()" class="state-loading"><span class="pulse-dot"></span> Loading role monitor…</div>
+  <div *ngIf="loading()" class="state-loading"><span class="pulse-dot"></span> Loading…</div>
 
-  <ng-container *ngIf="!loading() && data() as d">
+  <!-- SYSTEM ACTIVITY -->
+  <ng-container *ngIf="!loading() && view() === 'system' && dashboard() as dash">
+    <section class="kpi-row">
+      <article class="kpi-card">
+        <p class="kpi-label">Active sessions</p>
+        <p class="kpi-value">{{ (dash.security?.activeSessions ?? 0) | number }}</p>
+      </article>
+      <article class="kpi-card">
+        <p class="kpi-label">Failed logins</p>
+        <p class="kpi-value">{{ (dash.security?.failedLoginAttempts ?? 0) | number }}</p>
+      </article>
+      <article class="kpi-card">
+        <p class="kpi-label">Blocked accounts</p>
+        <p class="kpi-value">{{ (dash.security?.blockedAccounts ?? 0) | number }}</p>
+      </article>
+      <article class="kpi-card">
+        <p class="kpi-label">Suspicious activity</p>
+        <p class="kpi-value">{{ (dash.security?.suspiciousActivity ?? 0) | number }}</p>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel__head"><h2>System health</h2></div>
+      <div class="status-strip" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;padding:16px">
+        <article *ngFor="let row of healthRows()" class="status-cell">
+          <p class="status-cell__label" style="margin:0;font-size:12px;color:#64748b">{{ row.label }}</p>
+          <p class="status-cell__value" style="margin:4px 0 0;font-weight:700;color:#0f172a">{{ row.value || '—' }}</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel panel--audit">
+      <div class="panel__head">
+        <div class="panel__head-left">
+          <h2>Recent system events</h2>
+          <a routerLink="/dashboard/super/audit" class="entry-count">Open audit logs →</a>
+        </div>
+      </div>
+      <ul class="leaderboard" *ngIf="(dash.recentActivity || dash.auditPreview || []).length; else noSys">
+        <li *ngFor="let log of (dash.recentActivity || dash.auditPreview || []).slice(0, 10)" class="leader-row">
+          <span class="leader-row__avatar">{{ actionIcon(log.action) }}</span>
+          <div class="leader-row__info">
+            <p class="leader-row__name">{{ log.description || actionLabel(log.action) }}</p>
+            <p class="leader-row__role">{{ log.actorName || log.actorId }} · {{ log.createdAt | date:'medium' }}</p>
+          </div>
+        </li>
+      </ul>
+      <ng-template #noSys><p class="panel-empty">No recent system events.</p></ng-template>
+    </section>
+  </ng-container>
+
+  <!-- AUDIT LOGS -->
+  <ng-container *ngIf="!loading() && view() === 'logs' && data() as d">
     <section class="kpi-row">
       <article class="kpi-card">
         <p class="kpi-label">Total Users</p>
@@ -40,7 +94,6 @@
     </section>
 
     <div class="grid-main">
-      <!-- Workflow -->
       <section class="panel panel--wide">
         <div class="panel__head"><h2>Role Assignment Overview</h2></div>
         <div class="workflow">
@@ -53,7 +106,6 @@
         <div class="progress-bar"><div class="progress-bar__fill" [style.width.%]="d.assignmentCompletionPercent"></div></div>
       </section>
 
-      <!-- Top assignments -->
       <section class="panel">
         <div class="panel__head"><h2>Top User-Role Assignments</h2></div>
         <ul class="leaderboard">
@@ -70,7 +122,6 @@
         <p *ngIf="!d.topAssignments.length" class="panel-empty">No role assignments yet.</p>
       </section>
 
-      <!-- Audit trail -->
       <section class="panel panel--audit">
         <div class="panel__head">
           <div class="panel__head-left">
@@ -122,11 +173,10 @@
         </div>
       </section>
 
-      <!-- Admin actions -->
       <section class="panel panel--actions">
         <div class="panel__head"><h2>Admin Role Actions</h2></div>
         <div class="action-btns">
-          <a routerLink="/dashboard/super/users" [queryParams]="{ tab: 'roles' }" class="btn-solid">New Role</a>
+          <a routerLink="/dashboard/super/users/roles" class="btn-solid">Roles & Permissions</a>
           <button type="button" class="btn-outline" (click)="focusRoleAudit()">Role Audit</button>
           <button type="button" class="btn-outline" (click)="exportAccessReport()">User Access Report</button>
         </div>

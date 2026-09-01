@@ -23,7 +23,7 @@
 
 ```
 Super Admin seed → UNCLAIMED (public 200)
-→ User claims → ClaimPending (public 404)
+→ User claims → mosque stays UNCLAIMED, claim PENDING, Claim CTA off
 → Super Admin approve → CLAIMED + owner_id = claimant (public 404)
 → Super Admin activate → ACTIVE (public 200)
 → Owner/Admin dashboard + profile edit; Owner module flags
@@ -31,11 +31,13 @@ Super Admin seed → UNCLAIMED (public 200)
 
 | Status | Public `GET /api/v1/mosques/{slug}` | Owner assigned | Notes |
 |--------|-------------------------------------|----------------|-------|
-| Unclaimed | 200 | No | Listing visible, no `ownerId` in response |
-| ClaimPending | 404 | No | Hidden during verification |
+| Unclaimed | 200 | No | Listing visible; CTA off while claim PENDING |
 | Claimed | 404 | Yes (`owner_id`) | Hidden until activation |
 | Active | 200 | Yes | Full public profile + module-gated tabs |
-| Reject | → Unclaimed | Cleared | Mosque returns to open listing |
+| Reject | → Unclaimed | Cleared | Mosque returns to open listing; CTA on again |
+
+**Module 3.1 mosque statuses (requirements):** `UNCLAIMED | CLAIMED | ACTIVE` only.  
+Pending verification = ownership claim `PENDING` (not a 4th mosque status).
 
 **Two-step verification (required):**
 1. `POST /api/v1/platform/claims/{claimId}/approve` → mosque `CLAIMED`

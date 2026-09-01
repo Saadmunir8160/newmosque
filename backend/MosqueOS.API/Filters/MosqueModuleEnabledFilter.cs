@@ -47,7 +47,7 @@ public class MosqueModuleEnabledFilter : IAsyncActionFilter
                 Message = $"Module '{_moduleKey}' is not enabled for this mosque."
             })
             {
-                StatusCode = StatusCodes.Status404NotFound
+                StatusCode = StatusCodes.Status403Forbidden
             };
             return;
         }

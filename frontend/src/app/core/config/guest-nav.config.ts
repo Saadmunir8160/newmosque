@@ -5,22 +5,22 @@ export interface GuestNavSection {
   items: NavItem[];
 }
 
-/** Guest sidebar — public read-only mosque browsing. */
+/** Guest sidebar — Module 3.1–3.3 public browse; other modules under Extended. */
 export const GUEST_NAV_SECTIONS: GuestNavSection[] = [
   {
-    title: 'Browse',
+    title: 'Dashboard',
     items: [
       { section: 'Browse', label: 'Home', route: '/dashboard/guest', icon: 'home' },
       { section: 'Browse', label: 'Prayer Times', route: '/dashboard/guest/prayer-times', icon: 'prayer' },
       { section: 'Browse', label: 'Announcements', route: '/dashboard/guest/announcements', icon: 'announcements' },
-      { section: 'Browse', label: 'Events', route: '/dashboard/guest/events', icon: 'events' },
-      { section: 'Browse', label: 'Janaza Notices', route: '/dashboard/guest/janaza', icon: 'janaza' },
-      { section: 'Browse', label: 'Communities', route: '/dashboard/guest/communities', icon: 'communities' },
     ],
   },
   {
-    title: 'Content',
+    title: 'Extended',
     items: [
+      { section: 'Browse', label: 'Events', route: '/dashboard/guest/events', icon: 'events' },
+      { section: 'Browse', label: 'Janaza Notices', route: '/dashboard/guest/janaza', icon: 'janaza' },
+      { section: 'Browse', label: 'Communities', route: '/dashboard/guest/communities', icon: 'communities' },
       { section: 'Content', label: 'Duas Library', route: '/dashboard/guest/duas', icon: 'duas' },
       { section: 'Content', label: 'Adhkar Library', route: '/dashboard/guest/adhkar', icon: 'adhkar' },
       { section: 'Content', label: 'Ritual Guides', route: '/dashboard/guest/ritual-guides', icon: 'ritual' },

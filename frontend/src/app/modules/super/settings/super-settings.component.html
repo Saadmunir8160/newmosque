@@ -1,21 +1,14 @@
 <div class="ps-page">
   <div *ngIf="toast()" class="toast" [class.toast--ok]="toastOk()" [class.toast--err]="!toastOk()">{{ toast() }}</div>
 
-  <nav class="breadcrumb" aria-label="Breadcrumb">
-    <a routerLink="/dashboard/super">Dashboard</a>
-    <span class="breadcrumb__sep">›</span>
-    <span class="breadcrumb__current">Platform settings</span>
-  </nav>
-
-  <header class="ps-header">
-    <p class="ps-badge">System</p>
-    <h1 class="ps-title">Platform settings</h1>
-    <p class="ps-sub">Configure tariqa defaults, maintenance banner, and view integrations.</p>
-  </header>
+  <app-super-admin-page-header
+    crumb="Platform Settings"
+    [title]="tab() === 'email' ? 'Email Templates' : tab() === 'system' ? 'System Configuration' : 'Global Settings'"
+    [subtitle]="tab() === 'email' ? 'Platform notification email templates (coming soon).' : tab() === 'system' ? 'Read-only API endpoints and integration status.' : 'Configure tariqa defaults and the platform-wide banner.'" />
 
   <div *ngIf="loading()" class="state-loading"><span class="pulse-dot"></span> Loading settings…</div>
 
-  <div *ngIf="!loading()" class="settings-grid">
+  <div *ngIf="!loading() && tab() === 'global'" class="settings-grid">
     <article class="panel">
       <div class="panel__head">
         <span class="panel__icon">📿</span>
@@ -69,7 +62,22 @@
         </button>
       </div>
     </article>
+  </div>
 
+  <div *ngIf="!loading() && tab() === 'email'" class="settings-grid">
+    <article class="panel panel--wide">
+      <div class="panel__head">
+        <span class="panel__icon">✉️</span>
+        <div>
+          <h2 class="panel__title">Email templates</h2>
+          <p class="panel__sub">Invite, password reset, and notification templates will be managed here.</p>
+        </div>
+      </div>
+      <p class="ps-sub" style="margin:0">No editable templates yet — this page is reserved for the Platform Settings nav item.</p>
+    </article>
+  </div>
+
+  <div *ngIf="!loading() && tab() === 'system'" class="settings-grid">
     <article class="panel panel--wide">
       <div class="panel__head">
         <span class="panel__icon">🔌</span>

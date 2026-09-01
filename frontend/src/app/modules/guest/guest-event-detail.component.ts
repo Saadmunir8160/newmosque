@@ -14,7 +14,7 @@ import { formatTime12 } from '../../core/utils/prayer.utils';
   imports: [CommonModule, RouterModule, PageHeaderComponent, GuestLoginCtaComponent],
   template: `
     <a routerLink="/dashboard/guest/events" class="back">← Back to events</a>
-    <app-page-header *ngIf="event() as e" badge="Guest" [title]="e.title" subtitle="Event details" />
+    <app-page-header *ngIf="event() as e" badge="" [title]="e.title" subtitle="Event details" />
     <app-guest-login-cta />
     <section *ngIf="event() as e" class="card">
       <p><strong>Date:</strong> {{ e.date | date:'fullDate' }}</p>

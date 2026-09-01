@@ -1,19 +1,10 @@
 <div class="mf-page">
   <div *ngIf="toast()" class="toast" [class.toast--ok]="toastOk()" [class.toast--err]="!toastOk()">{{ toast() }}</div>
 
-  <nav class="breadcrumb" aria-label="Breadcrumb">
-    <a routerLink="/dashboard/super">Dashboard</a>
-    <span class="breadcrumb__sep">›</span>
-    <span class="breadcrumb__current">Module toggles</span>
-  </nav>
-
-  <header class="mf-header">
-    <div>
-      <p class="mf-badge">Super Admin</p>
-      <h1 class="mf-title">Module toggles</h1>
-      <p class="mf-sub">Turn features on or off for each mosque. Disabled modules are hidden from that mosque's menu.</p>
-    </div>
-  </header>
+  <app-super-admin-page-header
+    crumb="Platform Settings"
+    title="Feature Flags"
+    subtitle="Turn modules on or off for each mosque. Disabled modules stay hidden from that mosque menu." />
 
   <section class="panel panel--select">
     <label class="field-label" for="mosque-select">Select mosque</label>

@@ -21,5 +21,7 @@ namespace MosqueOS.API.Models.Ritual
         public string Title { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public int OrderIndex { get; set; }
+        public string? ImageUrl { get; set; }
+        public int? DuaId { get; set; }
     }
 }

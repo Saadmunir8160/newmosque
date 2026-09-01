@@ -7,6 +7,8 @@ public class RecommendedWirdResponse
     public string Slot { get; set; } = string.Empty;
     public WirdCollection? Collection { get; set; }
     public string Mode { get; set; } = string.Empty;
+    public string? UserLevel { get; set; }
+    public int StepCount { get; set; }
 }
 
 public class WirdCompletionResponse

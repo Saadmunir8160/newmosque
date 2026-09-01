@@ -92,29 +92,105 @@
 
         <!-- Prayer times widget (module-gated, live data) -->
         <section *ngIf="isModuleEnabled(m, 'PrayerTimes')" class="pub-card pub-module-section">
-          <h2 class="pub-card__title">Prayer Times</h2>
-          <p *ngIf="prayerLoading()" class="pub-card__text pub-card__text--muted">Loading today's timetable…</p>
-          <ng-container *ngIf="!prayerLoading() && prayerTimes() as pt">
-            <p class="pub-card__text pub-card__text--muted" style="margin-bottom:0.75rem">Today · {{ pt.date | date:'mediumDate' }}</p>
-            <div class="pub-prayer-grid">
-              <div class="pub-prayer"><span>Fajr</span><strong>{{ formatClock(pt.fajrJamaat || pt.fajrStart) }}</strong></div>
-              <div class="pub-prayer"><span>Dhuhr</span><strong>{{ formatClock(pt.dhuhrJamaat || pt.dhuhrStart) }}</strong></div>
-              <div class="pub-prayer"><span>Asr</span><strong>{{ formatClock(pt.asrJamaat || pt.asrStart) }}</strong></div>
-              <div class="pub-prayer"><span>Maghrib</span><strong>{{ formatClock(pt.maghribJamaat || pt.maghribStart) }}</strong></div>
-              <div class="pub-prayer"><span>Isha</span><strong>{{ formatClock(pt.ishaJamaat || pt.ishaStart) }}</strong></div>
+          <div class="pub-prayer-head">
+            <h2 class="pub-card__title">Prayer Times</h2>
+            <div class="pub-prayer-tabs">
+              <button type="button" class="pub-prayer-tab" [class.pub-prayer-tab--on]="prayerView() === 'daily'" (click)="showDailyPrayer()">Today</button>
+              <button type="button" class="pub-prayer-tab" [class.pub-prayer-tab--on]="prayerView() === 'monthly'" (click)="showMonthlyPrayer()">Monthly</button>
             </div>
+          </div>
+
+          <ng-container *ngIf="prayerView() === 'daily'">
+            <p *ngIf="prayerLoading()" class="pub-card__text pub-card__text--muted">Loading today's timetable…</p>
+            <ng-container *ngIf="!prayerLoading() && prayerTimes() as pt">
+              <div *ngIf="nextPrayer() as np" class="pub-prayer-next">
+                <div>
+                  <p class="pub-prayer-next__label">Next prayer</p>
+                  <p class="pub-prayer-next__name">{{ np.name }} · {{ formatClock(np.jamaat) }}</p>
+                </div>
+                <div class="pub-prayer-next__count" aria-live="polite">{{ prayerCountdown() }}</div>
+              </div>
+              <p class="pub-card__text pub-card__text--muted" style="margin-bottom:0.75rem">
+                Today · {{ pt.date | date:'mediumDate' }}
+                <span *ngIf="m.timezone"> · {{ m.timezone }}</span>
+              </p>
+              <div class="pub-prayer-grid">
+                <div class="pub-prayer" [class.pub-prayer--next]="isNextPrayer('Fajr')">
+                  <span>Fajr</span><strong>{{ formatClock(pt.fajrJamaat || pt.fajrStart) }}</strong>
+                </div>
+                <div class="pub-prayer" [class.pub-prayer--next]="isNextPrayer('Dhuhr')">
+                  <span>Dhuhr</span><strong>{{ formatClock(pt.dhuhrJamaat || pt.dhuhrStart) }}</strong>
+                </div>
+                <div class="pub-prayer" [class.pub-prayer--next]="isNextPrayer('Asr')">
+                  <span>Asr</span><strong>{{ formatClock(pt.asrJamaat || pt.asrStart) }}</strong>
+                </div>
+                <div class="pub-prayer" [class.pub-prayer--next]="isNextPrayer('Maghrib')">
+                  <span>Maghrib</span><strong>{{ formatClock(pt.maghribJamaat || pt.maghribStart) }}</strong>
+                </div>
+                <div class="pub-prayer" [class.pub-prayer--next]="isNextPrayer('Isha')">
+                  <span>Isha</span><strong>{{ formatClock(pt.ishaJamaat || pt.ishaStart) }}</strong>
+                </div>
+              </div>
+              <div class="pub-jumuah" *ngIf="jumuahSlots().length">
+                <p class="pub-jumuah__title">Friday · Jumuah</p>
+                <div class="pub-jumuah__grid">
+                  <div class="pub-jumuah__slot" *ngFor="let s of jumuahSlots()">
+                    <span>Slot {{ s.slotNumber }}</span>
+                    <strong>Khutbah {{ formatClock(s.khutbahTime) }} · Jamaah {{ formatClock(s.jamaatTime) }}</strong>
+                  </div>
+                </div>
+              </div>
+            </ng-container>
+            <p *ngIf="!prayerLoading() && !prayerTimes()" class="pub-card__text pub-card__text--muted">
+              Today's prayer times have not been published yet.
+            </p>
           </ng-container>
-          <p *ngIf="!prayerLoading() && !prayerTimes()" class="pub-card__text pub-card__text--muted">
-            Today's prayer times have not been published yet.
-          </p>
+
+          <ng-container *ngIf="prayerView() === 'monthly'">
+            <div class="pub-month-nav">
+              <button type="button" (click)="shiftMonth(-1)">←</button>
+              <span>{{ monthLabel() }}</span>
+              <button type="button" (click)="shiftMonth(1)">→</button>
+            </div>
+            <p *ngIf="monthlyLoading()" class="pub-card__text pub-card__text--muted">Loading monthly timetable…</p>
+            <div *ngIf="!monthlyLoading() && monthlyDays().length" class="pub-month-table-wrap">
+              <table class="pub-month-table">
+                <thead>
+                  <tr><th>Date</th><th>Fajr</th><th>Dhuhr</th><th>Asr</th><th>Maghrib</th><th>Isha</th></tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let d of monthlyDays()">
+                    <td>{{ d.date | date:'d MMM' }}</td>
+                    <td>{{ formatClock(d.fajrJamaat) }}</td>
+                    <td>{{ formatClock(d.dhuhrJamaat) }}</td>
+                    <td>{{ formatClock(d.asrJamaat) }}</td>
+                    <td>{{ formatClock(d.maghribJamaat) }}</td>
+                    <td>{{ formatClock(d.ishaJamaat) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p *ngIf="!monthlyLoading() && !monthlyDays().length" class="pub-card__text pub-card__text--muted">
+              No monthly timetable published for this month.
+            </p>
+          </ng-container>
         </section>
 
-        <!-- Announcements teaser (module-gated, live data) -->
+        <!-- Announcements (Module 3.3) -->
         <section *ngIf="isModuleEnabled(m, 'Announcements')" class="pub-card pub-module-section">
           <h2 class="pub-card__title">Announcements</h2>
           <p *ngIf="announcementsLoading()" class="pub-card__text pub-card__text--muted">Loading announcements…</p>
-          <ul *ngIf="!announcementsLoading() && announcements().length" class="pub-feed">
-            <li *ngFor="let a of announcements()" class="pub-feed__item">
+
+          <div *ngIf="!announcementsLoading() && featuredAnnouncement() as fa" class="pub-announce-featured">
+            <span class="pub-announce-featured__pill">Featured</span>
+            <img *ngIf="fa.imageUrl" [src]="fa.imageUrl" [alt]="fa.title" />
+            <strong>{{ fa.title }}</strong>
+            <p *ngIf="fa.summary?.trim()">{{ fa.summary }}</p>
+            <time *ngIf="fa.publishedAt">{{ fa.publishedAt | date:'mediumDate' }}</time>
+          </div>
+
+          <ul *ngIf="!announcementsLoading() && otherAnnouncements().length" class="pub-feed">
+            <li *ngFor="let a of otherAnnouncements()" class="pub-feed__item">
               <strong>{{ a.title }}</strong>
               <p *ngIf="a.summary?.trim()">{{ a.summary }}</p>
               <time *ngIf="a.publishedAt">{{ a.publishedAt | date:'mediumDate' }}</time>
@@ -216,16 +292,16 @@
             </div>
             <div *ngIf="m.website?.trim()">
               <dt>Website</dt>
-              <dd><a [href]="m.website" target="_blank" rel="noopener noreferrer">{{ m.website }}</a></dd>
+              <dd><a [href]="externalUrl(m.website)" target="_blank" rel="noopener noreferrer">{{ m.website }}</a></dd>
             </div>
           </dl>
 
           <!-- Social links (socialLinks JSON preferred; legacy URLs as fallback) -->
           <div *ngIf="resolveSocialLinks(m).length" class="pub-social">
             <a *ngFor="let link of resolveSocialLinks(m)"
-               [href]="link.url"
+               [href]="externalUrl(link.url) || link.url"
                target="_blank"
-               rel="noopener"
+               rel="noopener noreferrer"
                class="pub-social__link"
                [ngClass]="socialLinkCssClass(link.platform)"
                [attr.aria-label]="socialLinkLabel(link)">
@@ -253,7 +329,7 @@
             <div><dt>City</dt><dd>{{ m.city }}</dd></div>
             <div><dt>Country</dt><dd>{{ m.country }}</dd></div>
             <div><dt>Timezone</dt><dd>{{ m.timezone }}</dd></div>
-            <div *ngIf="m.website?.trim()"><dt>Website</dt><dd><a [href]="m.website" target="_blank" rel="noopener">{{ m.website }}</a></dd></div>
+            <div *ngIf="m.website?.trim()"><dt>Website</dt><dd><a [href]="externalUrl(m.website)" target="_blank" rel="noopener noreferrer">{{ m.website }}</a></dd></div>
             <div><dt>Public status</dt><dd>{{ publicStatusLabel(m) }}</dd></div>
           </dl>
         </section>

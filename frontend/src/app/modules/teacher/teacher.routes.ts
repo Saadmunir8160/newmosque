@@ -11,6 +11,7 @@ export const TEACHER_ROUTES: Routes = [
   { path: 'progress-notes', redirectTo: 'progress', pathMatch: 'full' },
   { path: 'assignments', loadComponent: () => import('./teacher-assignments.component').then(m => m.TeacherAssignmentsComponent) },
   { path: 'reports', loadComponent: () => import('./teacher-reports.component').then(m => m.TeacherReportsComponent) },
+  { path: 'participation', loadComponent: () => import('./teacher-participation.component').then(m => m.TeacherParticipationComponent) },
 ];
 
 export { teacherRoles };

@@ -1,19 +1,10 @@
 <div class="sc-page">
-  <nav class="sc-breadcrumb" aria-label="Breadcrumb">
-    <a routerLink="/dashboard/super">Dashboard</a>
-    <span aria-hidden="true">›</span>
-    <span>Claims</span>
-    <span aria-hidden="true">›</span>
-    <span class="sc-breadcrumb__current">Pending claims</span>
-  </nav>
-
-  <header class="sc-header">
-    <div>
-      <h1>Pending Claims</h1>
-      <p>Review ownership requests in two steps: <strong>Approve</strong> (assign owner → CLAIMED), then <strong>Activate</strong> (go public → ACTIVE).</p>
-    </div>
-    <button type="button" class="sc-btn sc-btn--ghost" (click)="load()" [disabled]="loading()">Refresh</button>
-  </header>
+  <app-super-admin-page-header
+    crumb="Mosque Management"
+    title="Mosque Claims"
+    subtitle="Review ownership requests — approve to assign owner, then activate to go public.">
+    <button actions type="button" class="sc-btn sc-btn--ghost" (click)="load()" [disabled]="loading()">Refresh</button>
+  </app-super-admin-page-header>
 
   <section class="sc-kpis">
     <article class="sc-kpi">

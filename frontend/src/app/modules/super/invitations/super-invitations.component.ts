@@ -4,13 +4,14 @@ import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { PlatformService, MosqueInvitationItem } from '../../../core/services/platform.service';
 import { formatMosqueStatus, statusClass } from '../../../core/utils/mosque-status.util';
+import { SuperAdminPageHeaderComponent } from '../../../shared/ui/super-admin-page-header.component';
 
 type StatusFilter = 'Pending' | 'All';
 
 @Component({
   selector: 'app-super-invitations',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, SuperAdminPageHeaderComponent],
   templateUrl: './super-invitations.component.html',
   styleUrls: ['../claims/super-claims.component.css', './super-invitations.component.css'],
 })

@@ -215,6 +215,10 @@ export class AdminService {
     return this.http.post<Announcement>(`${this.base}/mosques/${mosqueId}/announcements/${id}/publish`, {});
   }
 
+  unpublishAnnouncement(mosqueId: number, id: number): Observable<Announcement> {
+    return this.http.post<Announcement>(`${this.base}/mosques/${mosqueId}/announcements/${id}/unpublish`, {});
+  }
+
   deleteAnnouncement(mosqueId: number, id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/mosques/${mosqueId}/announcements/${id}`);
   }

@@ -6,11 +6,12 @@ import { PlatformService, MosqueListing } from '../../../core/services/platform.
 import { formatMosqueStatus, isMosquePubliclyVisible, statusClass } from '../../../core/utils/mosque-status.util';
 import { slugifyMosqueName } from '../../../core/utils/mosque-slug.util';
 import { AddMosqueDrawerComponent, MosqueCreatedEvent } from './add-mosque-drawer.component';
+import { SuperAdminPageHeaderComponent } from '../../../shared/ui/super-admin-page-header.component';
 
 @Component({
   selector: 'app-super-mosques',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, AddMosqueDrawerComponent],
+  imports: [CommonModule, RouterModule, FormsModule, AddMosqueDrawerComponent, SuperAdminPageHeaderComponent],
   templateUrl: './super-mosques.component.html',
   styleUrls: ['./mosque-profile.shared.css', './super-mosques.component.css'],
 })
@@ -51,9 +52,10 @@ export class SuperMosquesComponent implements OnInit {
   private readStoredViewMode(): 'grid' | 'list' {
     try {
       const stored = localStorage.getItem('super-mosques-view');
-      return stored === 'list' ? 'list' : 'grid';
+      if (stored === 'grid' || stored === 'list') return stored;
+      return 'list';
     } catch {
-      return 'grid';
+      return 'list';
     }
   }
 

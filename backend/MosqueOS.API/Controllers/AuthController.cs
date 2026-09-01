@@ -1,13 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.WebUtilities;
-using Microsoft.EntityFrameworkCore;
 using MosqueOS.API.Models.Auth;
 using MosqueOS.API.Models.Common;
 using MosqueOS.API.Services;
 using MosqueOS.Application.Common.Interfaces;
-using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
 using System.Security.Claims;
@@ -23,30 +22,35 @@ public class AuthController : ControllerBase
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IJwtTokenService _jwt;
     private readonly IPermissionService _permissions;
-    private readonly IUnitOfWork _unitOfWork;
     private readonly EmailOtpService _otp;
     private readonly EmailVerificationService _emailVerification;
     private readonly MosqueInvitationService _invitations;
+    private readonly AuthSessionService _sessions;
+    private readonly PasswordResetService _passwordReset;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
         IJwtTokenService jwt,
         IPermissionService permissions,
-        IUnitOfWork unitOfWork,
         EmailOtpService otp,
         EmailVerificationService emailVerification,
-        MosqueInvitationService invitations)
+        MosqueInvitationService invitations,
+        AuthSessionService sessions,
+        PasswordResetService passwordReset)
     {
         _userManager = userManager;
         _jwt = jwt;
         _permissions = permissions;
-        _unitOfWork = unitOfWork;
         _otp = otp;
         _emailVerification = emailVerification;
         _invitations = invitations;
+        _sessions = sessions;
+        _passwordReset = passwordReset;
     }
 
+    /// <summary>Member-only self-registration. Elevated roles must use invitation.</summary>
     [HttpPost("register")]
+    [EnableRateLimiting(MosqueRateLimitPolicies.AuthRegister)]
     public async Task<IActionResult> Register([FromBody] RegisterRequest model)
     {
         var email = model.Email.Trim().ToLowerInvariant();
@@ -62,9 +66,33 @@ public class AuthController : ControllerBase
         if (passwordErrors.Count > 0)
             return BadRequest(new ApiMessageResponse { Message = string.Join(" ", passwordErrors) });
 
+        // Ignore RegisterAsMosqueOwner — self-register is always Member
+        if (model.RegisterAsMosqueOwner)
+        {
+            // Explicit rejection if client tries to elevate via register
+            // (kept soft: still creates Member, never Owner)
+        }
+
         var existingEmail = await _userManager.FindByEmailAsync(email);
         if (existingEmail != null)
-            return Conflict(new ApiMessageResponse { Message = "Email already registered. Try logging in or use a different email." });
+        {
+            // Same email used again: guide them instead of a dead-end error.
+            if (!existingEmail.EmailConfirmed)
+            {
+                try { await _otp.SendOtpAsync(existingEmail); } catch { /* cache still set / resend available */ }
+                return Ok(new RegisterResponse
+                {
+                    Message = "This email is already registered but not verified. We sent a new verification code.",
+                    Email = email,
+                    RequiresVerification = true
+                });
+            }
+
+            return Conflict(new ApiMessageResponse
+            {
+                Message = "Email already registered. Please log in with this email."
+            });
+        }
 
         var username = string.IsNullOrWhiteSpace(model.Username)
             ? await GenerateUniqueUsernameAsync(email)
@@ -78,7 +106,8 @@ public class AuthController : ControllerBase
         {
             UserName = username,
             Email = email,
-            EmailConfirmed = true,
+            FullName = fullName,
+            EmailConfirmed = false,
             SecurityStamp = Guid.NewGuid().ToString()
         };
 
@@ -86,16 +115,34 @@ public class AuthController : ControllerBase
         if (!result.Succeeded)
             return BadRequest(new ApiErrorResponse { Errors = result.Errors.Select(e => e.Description) });
 
-        if (model.RegisterAsMosqueOwner)
-            await _userManager.AddToRoleAsync(user, Roles.MosqueOwner);
-        else
-            await _userManager.AddToRoleAsync(user, Roles.Member);
+        await _userManager.AddToRoleAsync(user, Roles.Member);
+
+        // Send OTP and link independently so a link-email failure cannot skip the OTP.
+        try
+        {
+            await _otp.SendOtpAsync(user);
+        }
+        catch
+        {
+            // OTP is cached before SMTP; user can resend. Account remains created.
+        }
+
+        try
+        {
+            await _emailVerification.SendVerificationEmailAsync(user);
+        }
+        catch
+        {
+            // Link email is optional when OTP is the primary verify path.
+        }
+
+        await _sessions.RecordLoginEventAsync(user.Id, "Register", true);
 
         return Ok(new RegisterResponse
         {
-            Message = "Account created successfully. You can now log in.",
+            Message = "Account created. Please verify your email with the link or OTP we sent before logging in.",
             Email = email,
-            RequiresVerification = false
+            RequiresVerification = true
         });
     }
 
@@ -130,6 +177,7 @@ public class AuthController : ControllerBase
         if (!result.Succeeded)
             return BadRequest(new ApiMessageResponse { Message = "Invalid or expired verification link." });
 
+        await _sessions.RecordLoginEventAsync(user.Id, "EmailVerified", true);
         return Ok(new ApiMessageResponse { Message = "Email verified successfully. You can log in now." });
     }
 
@@ -139,12 +187,39 @@ public class AuthController : ControllerBase
         VerifyEmail(model.UserId, model.Token);
 
     [HttpPost("resend-verification")]
+    [EnableRateLimiting(MosqueRateLimitPolicies.AuthSensitive)]
     public async Task<IActionResult> ResendVerification([FromBody] ResendVerificationRequest model) =>
         await ResendVerificationCore(model.Email);
 
     [HttpPost("resend-otp")]
-    public async Task<IActionResult> ResendOtp([FromBody] ResendVerificationRequest model) =>
-        await ResendVerificationCore(model.Email);
+    [EnableRateLimiting(MosqueRateLimitPolicies.AuthSensitive)]
+    public async Task<IActionResult> ResendOtp([FromBody] ResendVerificationRequest model)
+    {
+        var email = model.Email.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(email))
+            return BadRequest(new ApiMessageResponse { Message = "Email is required." });
+
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user == null)
+            return Ok(new ApiMessageResponse { Message = "If an account exists, a verification code has been sent." });
+
+        if (user.EmailConfirmed)
+            return BadRequest(new ApiMessageResponse { Message = "This email is already verified. Please log in." });
+
+        try
+        {
+            await _otp.SendOtpAsync(user);
+        }
+        catch
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new ApiMessageResponse
+            {
+                Message = "Could not send verification email. Check SMTP settings or try again shortly."
+            });
+        }
+
+        return Ok(new ApiMessageResponse { Message = "Verification code sent. Please check your inbox (and spam folder)." });
+    }
 
     private async Task<IActionResult> ResendVerificationCore(string rawEmail)
     {
@@ -164,6 +239,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("verify-otp")]
+    [EnableRateLimiting(MosqueRateLimitPolicies.AuthSensitive)]
     public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpRequest model)
     {
         var email = model.Email.Trim().ToLowerInvariant();
@@ -183,34 +259,235 @@ public class AuthController : ControllerBase
             await _userManager.UpdateAsync(user);
         }
 
+        await _sessions.RecordLoginEventAsync(user.Id, "EmailVerifiedOtp", true);
         return Ok(new ApiMessageResponse { Message = "Email verified. You can log in now." });
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting(MosqueRateLimitPolicies.AuthLogin)]
     public async Task<IActionResult> Login([FromBody] LoginRequest model)
     {
         var loginId = model.Username.Trim();
         var user = await _userManager.FindByEmailAsync(loginId.ToLowerInvariant())
             ?? await _userManager.FindByNameAsync(loginId);
 
-        if (user == null || !await _userManager.CheckPasswordAsync(user, model.Password))
+        if (user == null)
+        {
             return Unauthorized(new ApiMessageResponse { Message = "Invalid email or password." });
+        }
 
         if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
-            return Unauthorized(new ApiMessageResponse { Message = "Account is suspended." });
+        {
+            await _sessions.RecordLoginEventAsync(user.Id, "LoginFailed", false, "Account locked or suspended");
+            return Unauthorized(new ApiMessageResponse { Message = "Account is locked. Try again later or contact support." });
+        }
 
+        if (!await _userManager.CheckPasswordAsync(user, model.Password))
+        {
+            await _userManager.AccessFailedAsync(user);
+            await _sessions.RecordLoginEventAsync(user.Id, "LoginFailed", false, "Invalid password");
+            if (await _userManager.IsLockedOutAsync(user))
+                return Unauthorized(new ApiMessageResponse { Message = "Account locked due to too many failed attempts. Try again later." });
+            return Unauthorized(new ApiMessageResponse { Message = "Invalid email or password." });
+        }
 
-        var userRoles = await _userManager.GetRolesAsync(user);
-        var (token, expiration) = _jwt.CreateToken(user, userRoles);
+        if (!user.EmailConfirmed)
+        {
+            await _sessions.RecordLoginEventAsync(user.Id, "LoginFailed", false, "Email not verified");
+            return Unauthorized(new ApiMessageResponse
+            {
+                Message = "Email not verified. Check your inbox for the verification link or OTP."
+            });
+        }
+
+        await _userManager.ResetAccessFailedCountAsync(user);
+
+        var roles = await _userManager.GetRolesAsync(user);
+        if (roles.Count == 0)
+        {
+            await _sessions.RecordLoginEventAsync(user.Id, "LoginFailed", false, "No roles assigned");
+            return Unauthorized(new ApiMessageResponse { Message = "Account has no assigned role. Contact an administrator." });
+        }
+
+        var (access, accessExp, refresh, refreshExp) =
+            await _sessions.IssueSessionAsync(user, model.RememberMe);
+
+        await _sessions.RecordLoginEventAsync(user.Id, "LoginSuccess", true);
 
         return Ok(new LoginResponse
         {
-            Token = token,
-            Expiration = expiration,
+            Token = access,
+            Expiration = accessExp,
+            RefreshToken = refresh,
+            RefreshTokenExpiration = refreshExp,
             Username = user.UserName ?? string.Empty,
             FullName = user.FullName,
-            Roles = userRoles
+            Roles = roles
         });
+    }
+
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    [EnableRateLimiting(MosqueRateLimitPolicies.AuthSensitive)]
+    public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequest model)
+    {
+        if (string.IsNullOrWhiteSpace(model.RefreshToken))
+            return BadRequest(new ApiMessageResponse { Message = "Refresh token is required." });
+
+        var rotated = await _sessions.RotateRefreshTokenAsync(model.RefreshToken.Trim());
+        if (rotated == null)
+            return Unauthorized(new ApiMessageResponse { Message = "Invalid or expired refresh token. Please log in again." });
+
+        var (access, accessExp, refresh, refreshExp) = rotated.Value;
+        // Roles for response — decode from new token user via refresh path already validated user
+        return Ok(new LoginResponse
+        {
+            Token = access,
+            Expiration = accessExp,
+            RefreshToken = refresh,
+            RefreshTokenExpiration = refreshExp,
+            Username = string.Empty,
+            FullName = string.Empty,
+            Roles = Array.Empty<string>()
+        });
+    }
+
+    [Authorize]
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout([FromBody] LogoutRequest? model)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!string.IsNullOrWhiteSpace(model?.RefreshToken))
+            await _sessions.RevokeRefreshTokenAsync(model.RefreshToken.Trim());
+
+        if (!string.IsNullOrEmpty(userId))
+            await _sessions.RecordLoginEventAsync(userId, "Logout", true);
+
+        return Ok(new ApiMessageResponse { Message = "Logged out." });
+    }
+
+    [Authorize]
+    [HttpPost("logout-all")]
+    public async Task<IActionResult> LogoutAll()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
+        await _sessions.RevokeAllForUserAsync(userId);
+        await _sessions.RecordLoginEventAsync(userId, "LogoutAll", true);
+        return Ok(new ApiMessageResponse { Message = "Logged out from all devices." });
+    }
+
+    [Authorize]
+    [HttpGet("sessions")]
+    public async Task<IActionResult> Sessions([FromQuery] string? refreshToken)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
+        var list = await _sessions.ListActiveSessionsAsync(userId, refreshToken);
+        return Ok(list);
+    }
+
+    [Authorize]
+    [HttpDelete("sessions/{id:long}")]
+    public async Task<IActionResult> RevokeSession(long id)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
+        await _sessions.RevokeSessionAsync(userId, id);
+        return Ok(new ApiMessageResponse { Message = "Session revoked." });
+    }
+
+    [Authorize]
+    [HttpGet("login-history")]
+    public async Task<IActionResult> LoginHistory([FromQuery] int take = 50)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
+        return Ok(await _sessions.GetLoginHistoryAsync(userId, take));
+    }
+
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    [EnableRateLimiting(MosqueRateLimitPolicies.AuthSensitive)]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest model)
+    {
+        var email = model.Email.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(email))
+            return BadRequest(new ApiMessageResponse { Message = "Email is required." });
+
+        var user = await _userManager.FindByEmailAsync(email);
+        // Always return success to avoid email enumeration
+        if (user != null)
+        {
+            await _passwordReset.SendResetAsync(user, model.PreferOtp);
+            await _sessions.RecordLoginEventAsync(user.Id, "PasswordResetRequested", true);
+        }
+
+        return Ok(new ApiMessageResponse
+        {
+            Message = model.PreferOtp
+                ? "If an account exists, a password reset code has been sent."
+                : "If an account exists, a password reset link has been sent."
+        });
+    }
+
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    [EnableRateLimiting(MosqueRateLimitPolicies.AuthSensitive)]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest model)
+    {
+        var email = model.Email.Trim().ToLowerInvariant();
+        var passwordErrors = AuthPasswordValidation.Validate(model.Password, model.ConfirmPassword);
+        if (passwordErrors.Count > 0)
+            return BadRequest(new ApiMessageResponse { Message = string.Join(" ", passwordErrors) });
+
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user == null)
+            return BadRequest(new ApiMessageResponse { Message = "Invalid or expired reset request." });
+
+        IdentityResult result;
+        if (!string.IsNullOrWhiteSpace(model.Otp))
+        {
+            if (!_otp.TryValidatePasswordResetOtp(email, model.Otp, out var otpError))
+                return BadRequest(new ApiMessageResponse { Message = otpError! });
+
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+            result = await _userManager.ResetPasswordAsync(user, token, model.Password);
+        }
+        else if (!string.IsNullOrWhiteSpace(model.Token))
+        {
+            string decoded;
+            try
+            {
+                decoded = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(model.Token));
+            }
+            catch
+            {
+                return BadRequest(new ApiMessageResponse { Message = "Invalid or expired reset link." });
+            }
+
+            result = await _userManager.ResetPasswordAsync(user, decoded, model.Password);
+        }
+        else
+        {
+            return BadRequest(new ApiMessageResponse { Message = "Reset token or OTP is required." });
+        }
+
+        if (!result.Succeeded)
+            return BadRequest(new ApiErrorResponse { Errors = result.Errors.Select(e => e.Description) });
+
+        await _sessions.RevokeAllForUserAsync(user.Id);
+        await _sessions.RecordLoginEventAsync(user.Id, "PasswordReset", true);
+
+        return Ok(new ApiMessageResponse { Message = "Password updated. Please log in with your new password." });
     }
 
     [Authorize]
@@ -289,9 +566,10 @@ public class AuthController : ControllerBase
         return Ok(new ApiMessageResponse { Message = message ?? "Invitation accepted." });
     }
 
-    /// <summary>New mosque owner sets password from email invite and accepts in one step.</summary>
+    /// <summary>Invited admin roles set password and accept invite (no self-selected role).</summary>
     [HttpPost("register-from-invite")]
     [AllowAnonymous]
+    [EnableRateLimiting(MosqueRateLimitPolicies.AuthRegister)]
     public async Task<IActionResult> RegisterFromInvite([FromBody] RegisterFromInviteRequest model)
     {
         if (string.IsNullOrWhiteSpace(model.Token))
@@ -323,6 +601,7 @@ public class AuthController : ControllerBase
             UserName = username,
             Email = email,
             FullName = fullName,
+            // Invite email proves mailbox ownership
             EmailConfirmed = true,
             HomeMosqueId = preview.MosqueId,
             SecurityStamp = Guid.NewGuid().ToString()
@@ -339,13 +618,17 @@ public class AuthController : ControllerBase
             return StatusCode(acceptCode, new ApiMessageResponse { Message = acceptError });
         }
 
+        var (access, accessExp, refresh, refreshExp) =
+            await _sessions.IssueSessionAsync(user, rememberMe: false);
         var userRoles = await _userManager.GetRolesAsync(user);
-        var (token, expiration) = _jwt.CreateToken(user, userRoles);
+        await _sessions.RecordLoginEventAsync(user.Id, "InviteAccepted", true);
 
         return Ok(new LoginResponse
         {
-            Token = token,
-            Expiration = expiration,
+            Token = access,
+            Expiration = accessExp,
+            RefreshToken = refresh,
+            RefreshTokenExpiration = refreshExp,
             Username = user.UserName ?? string.Empty,
             FullName = user.FullName,
             Roles = userRoles

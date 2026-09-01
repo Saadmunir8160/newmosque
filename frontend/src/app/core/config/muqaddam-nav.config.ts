@@ -16,6 +16,7 @@ export const MUQADDAM_NAV_SECTIONS: MuqaddamNavSection[] = [
   {
     title: 'Spiritual Circles',
     items: [
+      { section: 'Spiritual Circles', label: 'Awrad builder', route: '/dashboard/content/awrad', icon: 'awrad' },
       { section: 'Spiritual Circles', label: 'Murid Management', route: '/dashboard/muqaddam/murids', icon: 'murids' },
       { section: 'Spiritual Circles', label: 'Communities', route: '/dashboard/muqaddam/communities', icon: 'communities' },
       { section: 'Spiritual Circles', label: 'Guidance Notes', route: '/dashboard/muqaddam/guidance', icon: 'guidance' },
@@ -32,6 +33,7 @@ export function muqaddamNavItems(): NavItem[] {
 
 export const MUQADDAM_NAV_ICONS: Record<string, string> = {
   dashboard: '▦',
+  awrad: '📿',
   murids: '👥',
   communities: '🤝',
   guidance: '📝',

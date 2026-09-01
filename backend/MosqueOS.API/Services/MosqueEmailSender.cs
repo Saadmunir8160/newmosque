@@ -22,9 +22,12 @@ public class MosqueEmailSender : IEmailSender
 
     public async Task SendEmailAsync(string to, string subject, string htmlBody, string? plainTextBody)
     {
+        var smtpUser = (_options.Smtp.Username ?? string.Empty).Trim();
+        // Gmail App Passwords are often copied with spaces — strip them.
+        var smtpPass = (_options.Smtp.Password ?? string.Empty).Replace(" ", string.Empty);
         var smtpReady = !string.IsNullOrWhiteSpace(_options.Smtp.Host)
-            && !string.IsNullOrWhiteSpace(_options.Smtp.Username)
-            && !string.IsNullOrWhiteSpace(_options.Smtp.Password);
+            && !string.IsNullOrWhiteSpace(smtpUser)
+            && !string.IsNullOrWhiteSpace(smtpPass);
 
         if (_options.LogToConsole || !smtpReady)
         {
@@ -35,21 +38,21 @@ public class MosqueEmailSender : IEmailSender
 
         if (!smtpReady)
         {
-            if (!_options.LogToConsole)
-                _logger.LogWarning("Email not sent — configure Email:Smtp in appsettings.Local.json");
+            _logger.LogWarning(
+                "Email not sent via SMTP — set Email:Smtp:Username and Email:Smtp:Password (Gmail App Password) in appsettings.Local.json");
             return;
         }
 
         var fromAddress = !string.IsNullOrWhiteSpace(_options.FromAddress)
-            ? _options.FromAddress
-            : _options.Smtp.Username;
+            ? _options.FromAddress.Trim()
+            : smtpUser;
 
         try
         {
             using var client = new SmtpClient(_options.Smtp.Host, _options.Smtp.Port)
             {
                 EnableSsl = _options.Smtp.EnableSsl,
-                Credentials = new NetworkCredential(_options.Smtp.Username, _options.Smtp.Password)
+                Credentials = new NetworkCredential(smtpUser, smtpPass)
             };
 
             using var message = new MailMessage

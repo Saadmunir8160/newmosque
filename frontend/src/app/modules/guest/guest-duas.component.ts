@@ -10,7 +10,7 @@ import { Dua } from '../../core/models';
   standalone: true,
   imports: [CommonModule, PageHeaderComponent],
   template: `
-    <app-page-header badge="Guest" title="Duas Library"
+    <app-page-header badge="" title="Duas Library"
       subtitle="Public supplications — Arabic, transliteration and meaning." />
 
     <div class="filters">
@@ -29,14 +29,14 @@ import { Dua } from '../../core/models';
   `,
   styles: [`
     .filters { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 1rem; }
-    .chip { font-size: 0.6875rem; padding: 0.3rem 0.55rem; border-radius: 9999px; border: 1px solid rgba(16,185,129,0.3); background: transparent; color: #a7f3d0; cursor: pointer; }
-    .chip--on { background: rgba(212,175,55,0.2); color: #fcd34d; }
-    .card { background: rgba(2,44,34,0.85); border: 1px solid rgba(16,185,129,0.2); border-radius: 0.75rem; padding: 1rem; margin-bottom: 0.75rem; }
-    .cat { font-size: 0.5625rem; text-transform: uppercase; color: #fcd34d; }
-    h2 { margin: 0.25rem 0 0; font-size: 0.9375rem; color: #fff; }
-    .arabic { margin: 0.5rem 0 0; font-size: 1.125rem; line-height: 1.75; color: #fff; }
-    .trans { margin: 0.35rem 0 0; font-size: 0.8125rem; color: rgba(167,243,208,0.85); font-style: italic; }
-    .empty { color: rgba(167,243,208,0.65); }
+    .chip { font-size: 0.6875rem; padding: 0.3rem 0.55rem; border-radius: 9999px; border: 1px solid #d1d5db; background: #ffffff; color: #4b5563; cursor: pointer; }
+    .chip--on { background: #e0e7ff; color: #4338ca; border-color: #c7d2fe; }
+    .card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 1rem; margin-bottom: 0.75rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+    .cat { font-size: 0.5625rem; text-transform: uppercase; color: #b45309; font-weight: 800; }
+    h2 { margin: 0.25rem 0 0; font-size: 0.9375rem; color: #111827; }
+    .arabic { margin: 0.5rem 0 0; font-size: 1.125rem; line-height: 1.75; color: #111827; }
+    .trans { margin: 0.35rem 0 0; font-size: 0.8125rem; color: #4b5563; font-style: italic; }
+    .empty { color: #6b7280; font-size: 0.8125rem; }
   `]
 })
 export class GuestDuasComponent implements OnInit {

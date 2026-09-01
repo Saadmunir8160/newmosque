@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MosqueOS.API.Models.Public;
+using MosqueOS.API.Services;
 using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Entities;
@@ -56,6 +57,15 @@ namespace MosqueOS.API.Controllers
             var prayer = await _unitOfWork.Repository<PrayerTimesDaily>().QueryNoTracking()
                 .FirstOrDefaultAsync(p => p.MosqueId == id && p.Date == today && p.Status == PublishStatus.Published);
 
+            if (prayer != null)
+            {
+                var exceptions = await _unitOfWork.Repository<PrayerException>().QueryNoTracking()
+                    .Where(e => e.MosqueId == id && e.Date == today && !e.IsDeleted)
+                    .ToListAsync();
+                if (exceptions.Count > 0)
+                    prayer = PrayerTimesHelper.CloneWithExceptions(prayer, exceptions);
+            }
+
             return Ok(new PublicHomeResponse
             {
                 Mosque = MapMosque(mosque),
@@ -109,12 +119,20 @@ namespace MosqueOS.API.Controllers
             var row = await _unitOfWork.Repository<PrayerTimesDaily>().QueryNoTracking()
                 .FirstOrDefaultAsync(p => p.MosqueId == mosqueId && p.Date == target && p.Status == PublishStatus.Published);
             if (row == null)
-                return Ok(new { date = target, times = (PrayerTimesDaily?)null, jumuah = Array.Empty<JumuahTime>() });
+                return Ok(new { date = target, times = (PrayerTimesDaily?)null, jumuah = Array.Empty<JumuahTime>(), exceptions = Array.Empty<PrayerException>() });
+
+            var exceptions = await _unitOfWork.Repository<PrayerException>().QueryNoTracking()
+                .Where(e => e.MosqueId == mosqueId && e.Date == target && !e.IsDeleted)
+                .ToListAsync();
+
+            var effective = exceptions.Count == 0
+                ? row
+                : PrayerTimesHelper.CloneWithExceptions(row, exceptions);
 
             var jumuah = await _unitOfWork.Repository<JumuahTime>().QueryNoTracking()
-                .Where(j => j.MosqueId == mosqueId).OrderBy(j => j.SlotNumber).ToListAsync();
+                .Where(j => j.MosqueId == mosqueId && !j.IsDeleted).OrderBy(j => j.SlotNumber).ToListAsync();
 
-            return Ok(new { date = target, times = row, jumuah });
+            return Ok(new { date = target, times = effective, jumuah, exceptions });
         }
 
         [HttpGet("mosques/{mosqueId:int}/prayer-times/monthly")]
@@ -131,6 +149,19 @@ namespace MosqueOS.API.Controllers
                 .OrderBy(p => p.Date)
                 .ToListAsync();
 
+            var exceptions = await _unitOfWork.Repository<PrayerException>().QueryNoTracking()
+                .Where(e => e.MosqueId == mosqueId && !e.IsDeleted && e.Date >= start && e.Date <= end)
+                .ToListAsync();
+
+            if (exceptions.Count > 0)
+            {
+                var byDate = exceptions.GroupBy(e => e.Date).ToDictionary(g => g.Key, g => g.ToList());
+                rows = rows.Select(r =>
+                    byDate.TryGetValue(r.Date, out var exs)
+                        ? PrayerTimesHelper.CloneWithExceptions(r, exs)
+                        : r).ToList();
+            }
+
             return Ok(new { year = y, month = m, days = rows });
         }
 
@@ -146,7 +177,18 @@ namespace MosqueOS.API.Controllers
                 var term = search.Trim();
                 query = query.Where(a => a.Title.Contains(term) || (a.Summary != null && a.Summary.Contains(term)));
             }
-            return Ok(await query.OrderByDescending(a => a.PublishedAt).ToListAsync());
+            return Ok(await query
+                .OrderByDescending(a => a.IsFeatured)
+                .ThenByDescending(a => a.PublishedAt)
+                .ToListAsync());
+        }
+
+        [HttpGet("mosques/{mosqueId:int}/announcements/{id:int}")]
+        public async Task<IActionResult> AnnouncementDetail(int mosqueId, int id)
+        {
+            var item = await _unitOfWork.Repository<Announcement>().QueryNoTracking()
+                .FirstOrDefaultAsync(a => a.Id == id && a.MosqueId == mosqueId && a.Status == PublishStatus.Published);
+            return item == null ? NotFound() : Ok(item);
         }
 
         // ---- Events ----

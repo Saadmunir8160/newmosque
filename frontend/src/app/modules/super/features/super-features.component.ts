@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { AdminService } from '../../../core/services/admin.service';
 import { Mosque, MosqueSetting } from '../../../core/models';
+import { SuperAdminPageHeaderComponent } from '../../../shared/ui/super-admin-page-header.component';
 
 const MODULE_LABELS: Record<string, string> = {
   PrayerTimes: 'Prayer times',
@@ -24,7 +25,7 @@ const MODULE_ORDER = [
 @Component({
   selector: 'app-super-features',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, SuperAdminPageHeaderComponent],
   templateUrl: './super-features.component.html',
   styleUrl: './super-features.component.css',
 })

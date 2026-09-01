@@ -80,6 +80,7 @@ namespace MosqueOS.API.Controllers
                 Location = request.Location?.Trim() ?? string.Empty,
                 BurialLocation = request.BurialLocation?.Trim(),
                 Notes = request.Notes?.Trim(),
+                MosqueSiteUrl = request.MosqueSiteUrl?.Trim(),
                 Status = status,
                 CreatedById = UserId,
                 PublishedAt = status == PublishStatus.Published ? DateTime.UtcNow : null
@@ -87,6 +88,16 @@ namespace MosqueOS.API.Controllers
 
             _unitOfWork.Repository<JanazaAnnouncement>().Add(item);
             await _unitOfWork.SaveChangesAsync();
+
+            // Optional push notification (v1 records intent on notes metadata — no push provider wired)
+            if (request.NotifyFollowers && status == PublishStatus.Published)
+            {
+                item.Notes = string.IsNullOrWhiteSpace(item.Notes)
+                    ? "[notify:followers]"
+                    : item.Notes + "\n[notify:followers]";
+                item.UpdatedAt = DateTime.UtcNow;
+                await _unitOfWork.SaveChangesAsync();
+            }
 
             var users = await LoadUserLookupAsync(new[] { item.CreatedById }.Where(x => x != null)!);
             return CreatedAtAction(nameof(Get), new { mosqueId, id = item.Id }, ToListItem(item, users));
@@ -110,6 +121,7 @@ namespace MosqueOS.API.Controllers
             item.Location = request.Location?.Trim() ?? string.Empty;
             item.BurialLocation = request.BurialLocation?.Trim();
             item.Notes = request.Notes?.Trim();
+            item.MosqueSiteUrl = request.MosqueSiteUrl?.Trim();
             item.UpdatedAt = DateTime.UtcNow;
 
             if (request.Status.HasValue)
@@ -175,11 +187,13 @@ namespace MosqueOS.API.Controllers
                 Location = j.Location,
                 BurialLocation = j.BurialLocation,
                 Notes = j.Notes,
+                MosqueSiteUrl = j.MosqueSiteUrl,
                 Status = j.Status,
                 PostedByName = name,
                 PostedByInitials = initials,
                 CreatedAt = j.CreatedAt,
-                PublishedAt = j.PublishedAt
+                PublishedAt = j.PublishedAt,
+                NotificationRequested = j.Notes != null && j.Notes.Contains("[notify:followers]", StringComparison.Ordinal)
             };
         }
 

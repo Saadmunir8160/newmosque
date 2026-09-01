@@ -10,7 +10,7 @@ import { JanazaAnnouncement } from '../../core/models';
   standalone: true,
   imports: [CommonModule, PageHeaderComponent],
   template: `
-    <app-page-header badge="Guest" title="Janaza Notices"
+    <app-page-header badge="" title="Janaza Notices"
       subtitle="Active funeral prayer announcements — read only." />
 
     <article *ngFor="let j of items()" class="card">

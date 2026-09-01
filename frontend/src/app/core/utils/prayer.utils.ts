@@ -1,9 +1,62 @@
 import { NextPrayer, PrayerTimesDaily } from '../models';
 
+export const DEFAULT_PRAYER_TIMEZONE = 'Europe/London';
+
 export interface PrayerSlot {
   name: string;
   start: string;
   jamaat: string;
+}
+
+export interface ZonedNow {
+  hours: number;
+  minutes: number;
+  seconds: number;
+  /** Seconds since midnight in the target timezone. */
+  totalSeconds: number;
+  /** 0=Sunday … 6=Saturday in the target timezone. */
+  dayOfWeek: number;
+}
+
+const WEEKDAY_TO_INDEX: Record<string, number> = {
+  Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+};
+
+/** Current clock parts in a mosque timezone (default Europe/London). */
+export function nowInTimezone(timeZone: string = DEFAULT_PRAYER_TIMEZONE): ZonedNow {
+  const tz = timeZone?.trim() || DEFAULT_PRAYER_TIMEZONE;
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      weekday: 'short',
+      hourCycle: 'h23',
+    }).formatToParts(new Date());
+
+    const get = (type: string) => parts.find(p => p.type === type)?.value ?? '0';
+    const hours = Number(get('hour'));
+    const minutes = Number(get('minute'));
+    const seconds = Number(get('second'));
+    const dayOfWeek = WEEKDAY_TO_INDEX[get('weekday')] ?? new Date().getDay();
+    return {
+      hours,
+      minutes,
+      seconds,
+      totalSeconds: hours * 3600 + minutes * 60 + seconds,
+      dayOfWeek,
+    };
+  } catch {
+    const now = new Date();
+    return {
+      hours: now.getHours(),
+      minutes: now.getMinutes(),
+      seconds: now.getSeconds(),
+      totalSeconds: now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds(),
+      dayOfWeek: now.getDay(),
+    };
+  }
 }
 
 export function getPrayerSlots(times: PrayerTimesDaily): PrayerSlot[] {
@@ -16,22 +69,25 @@ export function getPrayerSlots(times: PrayerTimesDaily): PrayerSlot[] {
   ];
 }
 
-/** Parse "HH:mm:ss" to total seconds since midnight (Europe/London local). */
+/** Parse "HH:mm:ss" to total seconds since midnight. */
 export function timeToSeconds(t: string): number {
-  const [h, m, s = '0'] = t.split(':');
+  const [h, m, s = '0'] = (t || '0:0:0').split(':');
   return +h * 3600 + +m * 60 + +s;
 }
 
 export function formatTime12(t: string): string {
+  if (!t) return '—';
   const [h, m] = t.split(':').map(Number);
   const period = h >= 12 ? 'PM' : 'AM';
   const hour = h % 12 || 12;
   return `${hour}:${m.toString().padStart(2, '0')} ${period}`;
 }
 
-export function resolveNextPrayer(times: PrayerTimesDaily): NextPrayer {
-  const now = new Date();
-  const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+export function resolveNextPrayer(
+  times: PrayerTimesDaily,
+  timeZone: string = DEFAULT_PRAYER_TIMEZONE,
+): NextPrayer {
+  const nowSec = nowInTimezone(timeZone).totalSeconds;
   const slots = getPrayerSlots(times);
 
   for (const p of slots) {
@@ -42,10 +98,12 @@ export function resolveNextPrayer(times: PrayerTimesDaily): NextPrayer {
   return { name: 'Fajr (tomorrow)', start: times.fajrStart, jamaat: times.fajrJamaat };
 }
 
-export function countdownToJamaat(jamaat: string): string {
-  const now = new Date();
+export function countdownToJamaat(
+  jamaat: string,
+  timeZone: string = DEFAULT_PRAYER_TIMEZONE,
+): string {
   const targetSec = timeToSeconds(jamaat);
-  const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  const nowSec = nowInTimezone(timeZone).totalSeconds;
   let diff = targetSec - nowSec;
   if (diff < 0) diff += 24 * 3600;
 
@@ -62,13 +120,14 @@ export interface JumuahSlotCountdown {
   active: boolean;
 }
 
-/** Next upcoming Jumuah jamaat on Fridays; empty when not Friday or all slots passed. */
+/** Next upcoming Jumuah jamaat on Fridays (in mosque timezone). */
 export function resolveJumuahCountdowns(
-  slots: { slotNumber: number; jamaatTime: string }[]
+  slots: { slotNumber: number; jamaatTime: string }[],
+  timeZone: string = DEFAULT_PRAYER_TIMEZONE,
 ): JumuahSlotCountdown[] {
-  const now = new Date();
-  const isFriday = now.getDay() === 5;
-  const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  const zoned = nowInTimezone(timeZone);
+  const isFriday = zoned.dayOfWeek === 5;
+  const nowSec = zoned.totalSeconds;
   let nextFound = false;
 
   return [...slots]
@@ -79,23 +138,26 @@ export function resolveJumuahCountdowns(
       return {
         slotNumber: slot.slotNumber,
         jamaatTime: slot.jamaatTime,
-        countdown: isFriday ? countdownToJamaat(slot.jamaatTime) : '',
+        countdown: isFriday ? countdownToJamaat(slot.jamaatTime, timeZone) : '',
         active: upcoming,
       };
     });
 }
 
 export function nextJumuahCountdown(
-  slots: { slotNumber: number; jamaatTime: string }[]
+  slots: { slotNumber: number; jamaatTime: string }[],
+  timeZone: string = DEFAULT_PRAYER_TIMEZONE,
 ): { slotNumber: number; jamaatTime: string; countdown: string } | null {
-  const list = resolveJumuahCountdowns(slots);
+  const list = resolveJumuahCountdowns(slots, timeZone);
   return list.find(s => s.active) ?? null;
 }
 
 /** Prayer period currently in effect (by adhān start times). */
-export function getActivePrayerName(times: PrayerTimesDaily): string {
-  const now = new Date();
-  const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+export function getActivePrayerName(
+  times: PrayerTimesDaily,
+  timeZone: string = DEFAULT_PRAYER_TIMEZONE,
+): string {
+  const nowSec = nowInTimezone(timeZone).totalSeconds;
   const slots = getPrayerSlots(times);
   let active = 'Isha';
   for (const p of slots) {

@@ -1,8 +1,14 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
-import { PlatformService, AuditLogEntry, RoleMonitorData } from '../../../core/services/platform.service';
+import { ActivatedRoute, RouterModule } from '@angular/router';
+import {
+  PlatformService,
+  AuditLogEntry,
+  RoleMonitorData,
+  PlatformDashboard,
+} from '../../../core/services/platform.service';
+import { SuperAdminPageHeaderComponent } from '../../../shared/ui/super-admin-page-header.component';
 
 const ACTION_LABELS: Record<string, string> = {
   ASSIGN_ROLE: 'Assign Role',
@@ -19,17 +25,22 @@ const ACTION_LABELS: Record<string, string> = {
   PRAYER_TIME_CHANGE: 'Prayer Update',
 };
 
+type AuditView = 'logs' | 'system';
+
 @Component({
   selector: 'app-super-audit',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, SuperAdminPageHeaderComponent],
   templateUrl: './super-audit.component.html',
   styleUrl: './super-audit.component.css',
 })
 export class SuperAuditComponent implements OnInit {
   private platform = inject(PlatformService);
+  private route = inject(ActivatedRoute);
 
+  view = signal<AuditView>('logs');
   data = signal<RoleMonitorData | null>(null);
+  dashboard = signal<PlatformDashboard | null>(null);
   loading = signal(true);
   roleFilterOnly = signal(false);
   toast = signal('');
@@ -41,18 +52,54 @@ export class SuperAuditComponent implements OnInit {
   dateFrom = '2026-01-01';
   dateTo = new Date().toISOString().slice(0, 10);
 
+  pageTitle = computed(() => this.view() === 'system' ? 'System Activity' : 'Audit Logs');
+  pageSubtitle = computed(() =>
+    this.view() === 'system'
+      ? 'API, database, email, and security health across the MOS platform.'
+      : 'Track role changes, claims, and platform actions across MOS.');
+
   filteredAudit = computed(() => {
     const trail = this.data()?.auditTrail ?? [];
     if (!this.roleFilterOnly()) return trail;
     return trail.filter(l => this.isRoleAction(l.action));
   });
 
+  healthRows = computed(() => {
+    const h = this.dashboard()?.systemHealth;
+    if (!h) return [];
+    return [
+      { label: 'API', value: h.api },
+      { label: 'Database', value: h.database },
+      { label: 'Storage', value: h.storage },
+      { label: 'Email', value: h.email },
+      { label: 'Queue', value: h.queue },
+      { label: 'Backup', value: h.backup },
+    ];
+  });
+
   ngOnInit(): void {
-    this.reload();
+    this.route.data.subscribe(d => {
+      this.view.set((d['auditView'] as AuditView) || 'logs');
+      this.reload();
+    });
   }
 
   reload(): void {
     this.loading.set(true);
+    if (this.view() === 'system') {
+      this.platform.getDashboard().subscribe({
+        next: dash => {
+          this.dashboard.set(dash);
+          this.loading.set(false);
+        },
+        error: () => {
+          this.loading.set(false);
+          this.showToast('Could not load system activity.', false);
+        },
+      });
+      return;
+    }
+
     this.auditLimit.set(30);
     this.canLoadMore.set(true);
     this.platform.getRoleMonitor(this.dateFrom, this.dateTo, this.auditLimit()).subscribe({
@@ -66,7 +113,7 @@ export class SuperAuditComponent implements OnInit {
   }
 
   loadMoreAudit(): void {
-    if (this.loadingMore() || !this.canLoadMore()) return;
+    if (this.loadingMore() || !this.canLoadMore() || this.view() !== 'logs') return;
     this.loadingMore.set(true);
     const nextLimit = this.auditLimit() + 30;
     this.platform.getRoleMonitor(this.dateFrom, this.dateTo, nextLimit).subscribe({

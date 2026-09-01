@@ -7,6 +7,9 @@ public static class MosqueRateLimitPolicies
 {
     public const string ClaimSubmit = "claim-submit";
     public const string RegistrationSubmit = "registration-submit";
+    public const string AuthLogin = "auth-login";
+    public const string AuthRegister = "auth-register";
+    public const string AuthSensitive = "auth-sensitive";
 
     public static IServiceCollection AddMosqueRateLimiting(this IServiceCollection services)
     {
@@ -44,6 +47,39 @@ public static class MosqueRateLimitPolicies
                 {
                     PermitLimit = 5,
                     Window = TimeSpan.FromHours(1),
+                    QueueLimit = 0
+                });
+            });
+
+            options.AddPolicy(AuthLogin, httpContext =>
+            {
+                var key = httpContext.Connection.RemoteIpAddress?.ToString() ?? "anon";
+                return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 20,
+                    Window = TimeSpan.FromMinutes(15),
+                    QueueLimit = 0
+                });
+            });
+
+            options.AddPolicy(AuthRegister, httpContext =>
+            {
+                var key = httpContext.Connection.RemoteIpAddress?.ToString() ?? "anon";
+                return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromHours(1),
+                    QueueLimit = 0
+                });
+            });
+
+            options.AddPolicy(AuthSensitive, httpContext =>
+            {
+                var key = httpContext.Connection.RemoteIpAddress?.ToString() ?? "anon";
+                return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(15),
                     QueueLimit = 0
                 });
             });

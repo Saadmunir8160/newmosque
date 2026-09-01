@@ -1,26 +1,64 @@
 /**
- * MosqueOS — global mobile & responsive utilities
+ * MosqueOS — global mobile & responsive foundation
+ * Breakpoints: phone ≤639 · tablet ≤767 / ≤959 · desktop ≥960+
  */
 
-/* Prevent layout blowout on small screens */
+/* ── Design tokens for responsive layout ── */
+:root {
+  --mos-page-pad-x: max(0.75rem, env(safe-area-inset-left));
+  --mos-page-pad-r: max(0.75rem, env(safe-area-inset-right));
+  --mos-touch-min: 44px;
+}
+
+/* ── Prevent horizontal blowout ── */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 .app-page,
 .app-section,
 .mos-dash,
-[class$="-dash"] {
+.member-dash,
+[class$="-dash"],
+[class*="__grid"],
+main,
+.shell-layout {
   max-width: 100%;
   min-width: 0;
 }
 
-/* Touch-friendly interactive targets */
+img,
+svg,
+video,
+canvas,
+iframe {
+  max-width: 100%;
+}
+
+/* iOS: avoid auto-zoom on focus (inputs need ≥16px) */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* ── Touch-friendly targets ── */
 @media (max-width: 767px) {
   button,
   a.mos-btn,
   .mos-dash-btn,
   .admin-btn,
+  .btn,
+  .btn-primary,
   select,
   input[type="checkbox"],
-  input[type="radio"] {
-    min-height: 44px;
+  input[type="radio"],
+  .shell-mobile-menu-btn {
+    min-height: var(--mos-touch-min);
   }
 
   button.btn-sm,
@@ -32,73 +70,136 @@
   .sidebar-chip {
     min-height: 36px;
   }
+
+  a,
+  button {
+    -webkit-tap-highlight-color: rgba(15, 76, 58, 0.12);
+  }
 }
 
-/* Horizontal scroll for wide tables */
-.mos-table-scroll {
-  width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  border-radius: var(--mos-radius-card);
-  border: 1px solid var(--mos-border);
-  background: var(--mos-surface);
+/* ── Tables: wrap in scroll when not already ── */
+@media (max-width: 959px) {
+  .mos-table-scroll,
+  .table-wrap,
+  .table-responsive,
+  .admin-table-wrap,
+  .data-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--mos-radius-card, 12px);
+  }
+
+  .mos-table-scroll table,
+  .table-wrap table,
+  .table-responsive table,
+  table.mos-table,
+  table.admin-table,
+  .app-shell-main table {
+    width: 100%;
+    min-width: 520px;
+    border-collapse: collapse;
+  }
 }
 
-.mos-table-scroll table {
-  width: 100%;
-  min-width: 560px;
-  border-collapse: collapse;
+/* Auto-wrap bare tables that aren't already in a scroll container */
+@media (max-width: 767px) {
+  .app-shell-main .table:not(.mos-table-scroll table),
+  .app-page > table,
+  .mos-dash table:not(.mos-table-scroll *) {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
-/* Stack dashboard page headers on mobile */
+/* ── Page / section headers stack ── */
 @media (max-width: 639px) {
   .mos-dash-header,
   .ml-header,
-  [class*="__header"] {
-    flex-direction: column;
+  .page-header,
+  .admin-header,
+  [class*="__header"]:not(.shell-sidebar-header):not(.shell-mobile-header) {
+    flex-direction: column !important;
     align-items: stretch !important;
+    gap: 0.75rem !important;
   }
 
   .mos-dash-header .mos-dash-btn,
-  .ml-header__actions {
+  .ml-header__actions,
+  .page-header__actions,
+  .admin-header__actions {
     width: 100%;
   }
 
-  .ml-header__actions {
+  .ml-header__actions,
+  .page-header__actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
   }
 
-  .ml-header__actions .btn-primary {
+  .ml-header__actions .btn-primary,
+  .page-header__actions .btn-primary {
     grid-column: 1 / -1;
+  }
+
+  .heading-page {
+    font-size: 1.25rem !important;
+    line-height: 1.3;
   }
 }
 
-/* Toolbar filters — full width on narrow screens */
+/* ── Toolbars / filters full width ── */
 @media (max-width: 639px) {
-  .toolbar-row {
-    flex-direction: column;
+  .toolbar-row,
+  .toolbar-card,
+  .filters-row,
+  .list-toolbar {
+    flex-direction: column !important;
     align-items: stretch !important;
+    gap: 0.625rem !important;
   }
 
   .toolbar-row .search-field,
   .toolbar-row .filter-select,
   .toolbar-row select,
-  .toolbar-card .search-field__input {
-    width: 100%;
+  .toolbar-card .search-field__input,
+  .search-field {
+    width: 100% !important;
     min-width: 0 !important;
+    max-width: none !important;
     flex: none !important;
   }
 
   .filter-chips,
-  .type-chips {
+  .type-chips,
+  .chip-row {
     width: 100%;
+    flex-wrap: wrap;
   }
 }
 
-/* Card action rows */
-@media (max-width: 480px) {
+/* ── KPI / card grids ── */
+@media (max-width: 479px) {
+  .mos-kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .mos-quick-grid,
+  .owner-quick-grid,
+  .quick-actions,
+  .stat-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 639px) {
+  .mos-kpi__value {
+    font-size: 1.35rem;
+  }
+
   .collection-card__actions,
   .item-card__actions,
   .card-action--compact {
@@ -107,6 +208,7 @@
 
   .item-card__head {
     flex-direction: column;
+    align-items: flex-start !important;
   }
 
   .item-card__actions {
@@ -120,31 +222,176 @@
   }
 }
 
-/* Slide-over drawers — full width on phones */
+/* ── Forms collapse to single column ── */
+@media (max-width: 639px) {
+  .form-row,
+  .form-grid,
+  .form-cols,
+  .fields-grid,
+  .profile-grid,
+  .settings-grid,
+  .two-col,
+  .three-col {
+    grid-template-columns: 1fr !important;
+  }
+
+  .field-row,
+  .leader-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  label + input,
+  label + select,
+  label + textarea {
+    width: 100%;
+  }
+}
+
+/* ── Drawers / modals full-bleed on phones ── */
 @media (max-width: 639px) {
   .drawer,
-  aside.drawer {
+  aside.drawer,
+  .item-drawer,
+  .seed-drawer,
+  .claim-drawer,
+  .modal-panel,
+  .dialog-panel {
     max-width: 100% !important;
     width: 100% !important;
+    border-radius: 16px 16px 0 0 !important;
   }
 
   .drawer__head,
   .drawer__body,
-  .drawer__foot {
+  .drawer__foot,
+  .item-drawer__head,
+  .item-drawer__body,
+  .item-drawer__foot {
     padding-left: max(16px, env(safe-area-inset-left));
     padding-right: max(16px, env(safe-area-inset-right));
   }
+
+  .modal-backdrop .modal,
+  .dialog {
+    margin: 0;
+    max-height: 92dvh;
+  }
 }
 
-/* Form grids collapse */
+/* ── Public mosque page mobile tightening ── */
+@media (max-width: 767px) {
+  .mosque-public-page .app-section {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  .mosque-public-page .mp-section {
+    padding: 2rem 0 !important;
+  }
+
+  .mosque-public-page .mp-section-head {
+    margin-bottom: 1.25rem !important;
+    text-align: left !important;
+  }
+
+  .mosque-public-page .mp-title {
+    font-size: clamp(1.5rem, 7vw, 2rem) !important;
+  }
+}
+
+/* ── Demo / public mosque hero widgets ── */
+@media (max-width: 479px) {
+  .demo-today-widgets {
+    grid-template-columns: 1fr !important;
+  }
+
+  .demo-prayer-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .demo-services-grid,
+  .demo-public-stats {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .demo-section-split,
+  .demo-contact-grid,
+  .demo-info-list,
+  .demo-cta-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .demo-bottom-nav,
+  .demo-claim-bar {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+}
+
+/* ── Auth pages ── */
 @media (max-width: 639px) {
-  .form-row,
-  .form-grid {
+  .auth-page {
+    padding: 0.75rem !important;
+    align-items: flex-start !important;
+    padding-top: max(1rem, env(safe-area-inset-top)) !important;
+  }
+
+  .pattern-right,
+  .float-shape,
+  .brand-seal {
+    display: none !important;
+  }
+
+  .auth-inner {
+    max-width: 100% !important;
+    padding: 1.25rem 1rem !important;
+    border-radius: 14px !important;
+  }
+}
+
+/* ── Shell mobile refinements ── */
+@media (max-width: 767px) {
+  .app-page.app-section {
+    padding-top: 0.75rem !important;
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom)) !important;
+  }
+
+  .shell-mobile-header {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  /* Lock background scroll when mobile nav open */
+  body.mos-nav-open {
+    overflow: hidden;
+    touch-action: none;
+  }
+}
+
+/* ── Member cards ── */
+@media (max-width: 639px) {
+  .member-dash {
+    max-width: 100%;
+    gap: 0.75rem;
+  }
+
+  .member-card {
+    padding: 0.875rem 1rem;
+  }
+}
+
+/* ── Super admin dashboard ── */
+@media (max-width: 640px) {
+  .sa-kpi-grid,
+  .sa-grid,
+  .super-kpi-grid {
     grid-template-columns: 1fr !important;
   }
 }
 
-/* Reduce motion */
+/* ── Reduce motion ── */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -152,5 +399,18 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Landscape phones ── */
+@media (max-height: 480px) and (orientation: landscape) {
+  .shell-mobile-header {
+    height: 48px;
+  }
+
+  .auth-page {
+    align-items: flex-start;
+    overflow-y: auto;
   }
 }

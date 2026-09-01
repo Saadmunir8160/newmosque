@@ -55,6 +55,10 @@ export class GuestService {
     return this.http.get<Announcement[]>(`${this.base}/mosques/${mosqueId}/announcements`, { params });
   }
 
+  getAnnouncement(mosqueId: number, id: number): Observable<Announcement> {
+    return this.http.get<Announcement>(`${this.base}/mosques/${mosqueId}/announcements/${id}`);
+  }
+
   getEvents(mosqueId: number, search?: string, upcomingOnly = true): Observable<MosqueEvent[]> {
     const params: Record<string, string> = { upcomingOnly: String(upcomingOnly) };
     if (search?.trim()) params['search'] = search.trim();

@@ -1,4 +1,5 @@
 using MosqueOS.Domain;
+using MosqueOS.Domain.Entities;
 
 namespace MosqueOS.API.Models.Auth;
 
@@ -7,17 +8,22 @@ public class LoginRequest
     /// <summary>Email address (preferred) or legacy username.</summary>
     public string Username { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
+    public bool RememberMe { get; set; }
 }
 
 public class RegisterRequest
 {
-  public string? Username { get; set; }
-  public string Email { get; set; } = string.Empty;
-  public string FullName { get; set; } = string.Empty;
-  public string Password { get; set; } = string.Empty;
-  public string? ConfirmPassword { get; set; }
-  /// <summary>When true (default for mosque claim flow), user registers as Mosque Owner.</summary>
-  public bool RegisterAsMosqueOwner { get; set; } = true;
+    public string? Username { get; set; }
+    public string Email { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+    public string? ConfirmPassword { get; set; }
+
+    /// <summary>
+    /// Deprecated: self-registration is always Member.
+    /// Kept for API compatibility; ignored by the server.
+    /// </summary>
+    public bool RegisterAsMosqueOwner { get; set; } = false;
 }
 
 public class RegisterResponse
@@ -63,6 +69,36 @@ public class LoginResponse
     public string Username { get; set; } = string.Empty;
     public string FullName { get; set; } = string.Empty;
     public IEnumerable<string> Roles { get; set; } = Array.Empty<string>();
+
+    /// <summary>Opaque refresh token (store securely client-side).</summary>
+    public string? RefreshToken { get; set; }
+    public DateTime? RefreshTokenExpiration { get; set; }
+}
+
+public class RefreshTokenRequest
+{
+    public string RefreshToken { get; set; } = string.Empty;
+}
+
+public class LogoutRequest
+{
+    public string? RefreshToken { get; set; }
+}
+
+public class ForgotPasswordRequest
+{
+    public string Email { get; set; } = string.Empty;
+    /// <summary>When true, send 6-digit OTP instead of email link.</summary>
+    public bool PreferOtp { get; set; }
+}
+
+public class ResetPasswordRequest
+{
+    public string Email { get; set; } = string.Empty;
+    public string? Token { get; set; }
+    public string? Otp { get; set; }
+    public string Password { get; set; } = string.Empty;
+    public string? ConfirmPassword { get; set; }
 }
 
 public class CurrentUserResponse

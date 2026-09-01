@@ -1,0 +1,258 @@
+<div class="dash">
+  <!-- Top header -->
+  <header class="dash-top">
+    <div>
+      <h1 class="dash-top__title">Dashboard</h1>
+      <p class="dash-top__sub">Overview of the platform.</p>
+    </div>
+    <div class="dash-top__meta">
+      <div class="dash-pill">
+        <span class="material-symbols-outlined" aria-hidden="true">public</span>
+        <span>Europe/London</span>
+        <strong>{{ londonTime() }}</strong>
+      </div>
+      <div class="dash-pill">
+        <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
+        <span>{{ londonDate() }}</span>
+      </div>
+      <div class="dash-pill dash-pill--user">
+        <span class="dash-avatar" aria-hidden="true">{{ userInitials() }}</span>
+        <span>{{ userName() }}</span>
+      </div>
+      <button type="button" class="dash-refresh" (click)="refresh()" [disabled]="loading()" title="Refresh">
+        <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="dash-loading" *ngIf="loading() && !dashboard()">
+    <span class="dash-spinner" aria-hidden="true"></span>
+    Loading dashboard…
+  </div>
+
+  <ng-container *ngIf="dashboard() as d">
+    <!-- KPI row -->
+    <section class="dash-kpis" aria-label="Key metrics">
+      <a routerLink="/dashboard/super/mosques" class="kpi">
+        <span class="kpi__icon kpi__icon--green material-symbols-outlined" aria-hidden="true">domain</span>
+        <div>
+          <p class="kpi__label">Total Mosques</p>
+          <p class="kpi__value">{{ d.mosques.total }}</p>
+          <p class="kpi__hint kpi__hint--up">↑ {{ d.analytics?.mosqueGrowth30d ?? 0 }} this month</p>
+        </div>
+      </a>
+      <a routerLink="/dashboard/super/mosques" [queryParams]="{ status: 'Active' }" class="kpi">
+        <span class="kpi__icon kpi__icon--blue material-symbols-outlined" aria-hidden="true">check_circle</span>
+        <div>
+          <p class="kpi__label">Active Mosques</p>
+          <p class="kpi__value">{{ d.mosques.active }}</p>
+          <p class="kpi__hint">{{ d.mosques.total ? ((d.mosques.active / d.mosques.total) * 100 | number:'1.0-0') : 0 }}% of network</p>
+        </div>
+      </a>
+      <a routerLink="/dashboard/super/claims" class="kpi">
+        <span class="kpi__icon kpi__icon--amber material-symbols-outlined" aria-hidden="true">verified_user</span>
+        <div>
+          <p class="kpi__label">Pending Claims</p>
+          <p class="kpi__value">{{ d.needsAttention.pendingClaims }}</p>
+          <p class="kpi__hint" [class.kpi__hint--warn]="d.needsAttention.pendingClaims > 0">Needs review</p>
+        </div>
+      </a>
+      <a routerLink="/dashboard/super/users" class="kpi">
+        <span class="kpi__icon kpi__icon--violet material-symbols-outlined" aria-hidden="true">group</span>
+        <div>
+          <p class="kpi__label">Total Users</p>
+          <p class="kpi__value">{{ d.users.total }}</p>
+          <p class="kpi__hint kpi__hint--up">↑ {{ d.users.newUsers30d }} this month</p>
+        </div>
+      </a>
+    </section>
+
+    <!-- Charts -->
+    <section class="dash-grid-2" aria-label="Analytics">
+      <article class="card">
+        <div class="card__head">
+          <div>
+            <h2 class="card__title">Mosques Overview</h2>
+            <p class="card__sub">Growth trend</p>
+          </div>
+          <a routerLink="/dashboard/super/reports" class="card__link">Reports</a>
+        </div>
+        <div class="chart-line">
+          <svg viewBox="0 0 100 48" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="mosChartFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#0F4C3A" stop-opacity="0.22"/>
+                <stop offset="100%" stop-color="#0F4C3A" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <polygon [attr.points]="chartPoints().area" fill="url(#mosChartFill)" />
+            <polyline [attr.points]="chartPoints().polyline" fill="none" stroke="#0F4C3A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+          </svg>
+          <div class="chart-line__labels" *ngIf="chartPoints().labels as labels">
+            <span *ngFor="let l of labels; let i = index">
+              {{ showChartLabel(i, labels.length) ? l : '' }}
+            </span>
+          </div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card__head">
+          <div>
+            <h2 class="card__title">Mosque Status</h2>
+            <p class="card__sub">Network distribution</p>
+          </div>
+        </div>
+        <div class="chart-donut">
+          <div class="donut" [style.background]="donutBackground()" aria-hidden="true">
+            <div class="donut__hole">
+              <strong>{{ d.mosques.total }}</strong>
+              <span>Total</span>
+            </div>
+          </div>
+          <ul class="donut-legend">
+            <li *ngFor="let s of statusSlices()">
+              <span class="dot" [style.background]="s.color"></span>
+              <span class="name">{{ s.label }}</span>
+              <strong>{{ s.pct | number:'1.0-1' }}%</strong>
+            </li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <!-- Recent claims + registrations -->
+    <section class="dash-grid-2" aria-label="Queues">
+      <article class="card">
+        <div class="card__head">
+          <div>
+            <h2 class="card__title">Recent Mosque Claims</h2>
+            <p class="card__sub">Ownership verification queue</p>
+          </div>
+          <a routerLink="/dashboard/super/claims" class="card__link">View all</a>
+        </div>
+        <ul class="feed" *ngIf="pendingClaims().length; else noClaims">
+          <li *ngFor="let c of pendingClaims()">
+            <div class="feed__icon feed__icon--amber material-symbols-outlined" aria-hidden="true">verified_user</div>
+            <div class="feed__body">
+              <strong>{{ c.mosqueName }}</strong>
+              <span>{{ c.city || '—' }} · {{ c.claimantName }}</span>
+            </div>
+            <div class="feed__meta">
+              <span class="badge badge--pending">Pending</span>
+              <small>{{ relativeTime(c.submittedAt) }}</small>
+            </div>
+          </li>
+        </ul>
+        <ng-template #noClaims>
+          <p class="empty">No pending claims right now.</p>
+        </ng-template>
+      </article>
+
+      <article class="card">
+        <div class="card__head">
+          <div>
+            <h2 class="card__title">Recent Registration Requests</h2>
+            <p class="card__sub">New mosque applications</p>
+          </div>
+          <a routerLink="/dashboard/super/registrations" class="card__link">View all</a>
+        </div>
+        <ul class="feed" *ngIf="registrationItems().length; else noRegs">
+          <li *ngFor="let r of registrationItems()">
+            <div class="feed__icon feed__icon--blue material-symbols-outlined" aria-hidden="true">how_to_reg</div>
+            <div class="feed__body">
+              <strong>{{ r.name }}</strong>
+              <span>{{ r.city || '—' }} · {{ r.submittedByName || 'Applicant' }}</span>
+            </div>
+            <div class="feed__meta">
+              <span class="badge badge--new">New</span>
+              <small>{{ relativeTime(r.createdAt) }}</small>
+            </div>
+          </li>
+        </ul>
+        <ng-template #noRegs>
+          <p class="empty">No pending registration requests.</p>
+        </ng-template>
+      </article>
+    </section>
+
+    <!-- Activity table -->
+    <section class="card" aria-label="Platform activity">
+      <div class="card__head">
+        <div>
+          <h2 class="card__title">Platform Activity</h2>
+          <p class="card__sub">Latest audit events across MOS</p>
+        </div>
+        <a routerLink="/dashboard/super/audit" class="card__link">Audit log</a>
+      </div>
+      <div class="table-wrap" *ngIf="recentActivity().length; else noActivity">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Activity</th>
+              <th>Details</th>
+              <th>By</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let a of recentActivity()">
+              <td>
+                <span class="act">
+                  <span class="act__icon material-symbols-outlined" aria-hidden="true">{{ activityIcon(a.action) }}</span>
+                  {{ a.action || 'Event' }}
+                </span>
+              </td>
+              <td>{{ a.description || '—' }}</td>
+              <td>{{ a.actorName || 'System' }}</td>
+              <td>{{ relativeTime(a.createdAt) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ng-template #noActivity>
+        <p class="empty">No recent activity yet.</p>
+      </ng-template>
+    </section>
+
+    <!-- Modules + health -->
+    <section class="dash-grid-2" aria-label="System status">
+      <article class="card">
+        <div class="card__head">
+          <div>
+            <h2 class="card__title">Module Status</h2>
+            <p class="card__sub">Platform feature modules</p>
+          </div>
+          <a routerLink="/dashboard/super/features" class="card__link">Feature flags</a>
+        </div>
+        <ul class="mod-list">
+          <li *ngFor="let m of modules()">
+            <span>{{ m.name }}</span>
+            <span class="badge" [class.badge--ok]="m.enabled" [class.badge--muted]="!m.enabled">
+              {{ m.enabled ? 'Enabled' : 'Disabled' }}
+            </span>
+          </li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <div class="card__head">
+          <div>
+            <h2 class="card__title">System Health</h2>
+            <p class="card__sub">Infrastructure status</p>
+          </div>
+        </div>
+        <ul class="health-list">
+          <li *ngFor="let h of healthRows()">
+            <span>{{ h.label }}</span>
+            <span class="badge" [class.badge--ok]="h.tone === 'ok'" [class.badge--warn]="h.tone === 'warn'">{{ h.value }}</span>
+          </li>
+        </ul>
+        <p class="health-foot" *ngIf="d.platformStatus === 'Healthy'">
+          <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+          All systems operational
+        </p>
+      </article>
+    </section>
+  </ng-container>
+</div>

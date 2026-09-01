@@ -26,6 +26,27 @@ export interface PrayerException {
   reason?: string;
 }
 
+export interface PrayerAuditLog {
+  id: number;
+  mosqueId: number;
+  date?: string;
+  changedById: string;
+  changeDescription: string;
+  actionType?: string;
+  oldValue?: string | null;
+  newValue?: string | null;
+  createdAt: string;
+}
+
+export interface GenerateFromTemplateResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  preview?: boolean;
+  message: string;
+  rows?: { date: string; action: string; reason?: string }[];
+}
+
 export interface RamadanDayEntry {
   id?: number;
   timetableId?: number;
@@ -55,16 +76,6 @@ export interface PrayerSpecialTiming {
   time: string;
   notes?: string;
   isRamadan: boolean;
-}
-
-export interface PrayerAuditLog {
-  id: number;
-  mosqueId: number;
-  date?: string;
-  changedById: string;
-  changeDescription: string;
-  actionType?: string;
-  createdAt: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -167,5 +178,155 @@ export class PrayerEditorService {
 
   deleteException(mosqueId: number, exceptionId: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/mosques/${mosqueId}/prayer-times/exceptions/${exceptionId}`);
+  }
+
+  getTemplates(mosqueId: number): Observable<JamaahTemplate[]> {
+    return this.http.get<JamaahTemplate[]>(`${this.base}/mosques/${mosqueId}/prayer-times/jamaah-templates`);
+  }
+
+  createTemplate(mosqueId: number, data: JamaahTemplateUpsert): Observable<JamaahTemplateSaveResponse> {
+    return this.http.post<JamaahTemplateSaveResponse>(`${this.base}/mosques/${mosqueId}/prayer-times/jamaah-templates`, data);
+  }
+
+  updateTemplate(mosqueId: number, templateId: number, data: JamaahTemplateUpsert): Observable<JamaahTemplateSaveResponse> {
+    return this.http.put<JamaahTemplateSaveResponse>(
+      `${this.base}/mosques/${mosqueId}/prayer-times/jamaah-templates/${templateId}`,
+      data,
+    );
+  }
+
+  duplicateTemplate(mosqueId: number, templateId: number): Observable<JamaahTemplate> {
+    return this.http.post<JamaahTemplate>(
+      `${this.base}/mosques/${mosqueId}/prayer-times/jamaah-templates/${templateId}/duplicate`,
+      {},
+    );
+  }
+
+  deleteTemplate(mosqueId: number, templateId: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/mosques/${mosqueId}/prayer-times/jamaah-templates/${templateId}`);
+  }
+
+  setTemplateActive(mosqueId: number, templateId: number, isActive: boolean): Observable<JamaahTemplate> {
+    return this.http.patch<JamaahTemplate>(
+      `${this.base}/mosques/${mosqueId}/prayer-times/jamaah-templates/${templateId}/active`,
+      { isActive },
+    );
+  }
+
+  resolveTemplate(mosqueId: number, date?: string): Observable<{ date: string; template: JamaahTemplate | null }> {
+    const params: Record<string, string> = {};
+    if (date) params['date'] = date;
+    return this.http.get<{ date: string; template: JamaahTemplate | null }>(
+      `${this.base}/mosques/${mosqueId}/prayer-times/jamaah-templates/resolve`,
+      { params },
+    );
+  }
+
+  generateFromTemplate(
+    mosqueId: number,
+    templateId: number,
+    body: {
+      from: string;
+      to: string;
+      overwritePublished?: boolean;
+      skipExisting?: boolean;
+      publish?: boolean;
+      preview?: boolean;
+    },
+  ): Observable<GenerateFromTemplateResult> {
+    return this.http.post<GenerateFromTemplateResult>(
+      `${this.base}/mosques/${mosqueId}/prayer-times/jamaah-templates/${templateId}/generate`,
+      body,
+    );
+  }
+}
+
+export type JamaahTemplateType = 'Custom' | 'Winter' | 'Spring' | 'Summer' | 'Autumn' | 'Ramadan' | number;
+
+export interface JamaahTemplatePrayer {
+  prayerName: string;
+  startTime: string;
+  jamaatTime: string;
+  sortOrder: number;
+}
+
+export interface JamaahTemplate {
+  id: number;
+  mosqueId: number;
+  name: string;
+  templateType: JamaahTemplateType;
+  templateTypeName?: string;
+  effectiveFrom?: string | null;
+  effectiveTo?: string | null;
+  priority: number;
+  isActive: boolean;
+  isDefault: boolean;
+  daysOfWeek: number[];
+  specificDates: string[];
+  excludedDates: string[];
+  prayers: JamaahTemplatePrayer[];
+  recurringRulesJson?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface JamaahTemplateUpsert {
+  name: string;
+  templateType: JamaahTemplateType;
+  effectiveFrom?: string | null;
+  effectiveTo?: string | null;
+  priority: number;
+  isActive: boolean;
+  isDefault: boolean;
+  daysOfWeek: number[];
+  specificDates: string[];
+  excludedDates: string[];
+  prayers: JamaahTemplatePrayer[];
+}
+
+export interface JamaahTemplateSaveResponse {
+  template: JamaahTemplate;
+  warnings: string[];
+}
+
+export interface TemplateTimesPayload {
+  fajrStart: string;
+  fajrJamaat: string;
+  dhuhrStart: string;
+  dhuhrJamaat: string;
+  asrStart: string;
+  asrJamaat: string;
+  maghribStart: string;
+  maghribJamaat: string;
+  ishaStart: string;
+  ishaJamaat: string;
+  daysOfWeek: number[];
+}
+
+export function buildTemplateRulesJson(times: TemplateTimesPayload): string {
+  return JSON.stringify(times);
+}
+
+export function parseTemplateRulesJson(json?: string | null): TemplateTimesPayload | null {
+  if (!json?.trim()) return null;
+  try {
+    const o = JSON.parse(json) as Partial<TemplateTimesPayload>;
+    return {
+      fajrStart: (o.fajrStart ?? '05:30:00').toString().slice(0, 8),
+      fajrJamaat: (o.fajrJamaat ?? '05:45:00').toString().slice(0, 8),
+      dhuhrStart: (o.dhuhrStart ?? '12:30:00').toString().slice(0, 8),
+      dhuhrJamaat: (o.dhuhrJamaat ?? '13:00:00').toString().slice(0, 8),
+      asrStart: (o.asrStart ?? '15:30:00').toString().slice(0, 8),
+      asrJamaat: (o.asrJamaat ?? '16:00:00').toString().slice(0, 8),
+      maghribStart: (o.maghribStart ?? '18:00:00').toString().slice(0, 8),
+      maghribJamaat: (o.maghribJamaat ?? '18:10:00').toString().slice(0, 8),
+      ishaStart: (o.ishaStart ?? '19:30:00').toString().slice(0, 8),
+      ishaJamaat: (o.ishaJamaat ?? '20:00:00').toString().slice(0, 8),
+      daysOfWeek: Array.isArray(o.daysOfWeek) && o.daysOfWeek.length
+        ? o.daysOfWeek.map(Number)
+        : [0, 1, 2, 3, 4, 5, 6],
+    };
+  } catch {
+    return null;
   }
 }

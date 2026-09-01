@@ -1,11 +1,12 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { ActivatedRoute, RouterModule } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { ContentService } from '../../../core/services/content.service';
 import { PlatformService } from '../../../core/services/platform.service';
 import { environment } from '../../../../environments/environment';
+import { SuperAdminPageHeaderComponent } from '../../../shared/ui/super-admin-page-header.component';
 
 interface SocialProviders {
   google?: boolean;
@@ -13,10 +14,12 @@ interface SocialProviders {
   devMode?: boolean;
 }
 
+type SettingsTab = 'global' | 'email' | 'system';
+
 @Component({
   selector: 'app-super-settings',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, SuperAdminPageHeaderComponent],
   templateUrl: './super-settings.component.html',
   styleUrl: './super-settings.component.css',
 })
@@ -24,6 +27,7 @@ export class SuperSettingsComponent implements OnInit {
   private http = inject(HttpClient);
   private content = inject(ContentService);
   private platform = inject(PlatformService);
+  private route = inject(ActivatedRoute);
 
   apiUrl = environment.apiUrl;
   defaultMosqueId = environment.defaultMosqueId;
@@ -38,8 +42,14 @@ export class SuperSettingsComponent implements OnInit {
   savingBanner = signal(false);
   toast = signal('');
   toastOk = signal(true);
+  tab = signal<SettingsTab>('global');
 
   ngOnInit(): void {
+    this.route.data.subscribe(data => {
+      const fromData = data['settingsTab'] as SettingsTab | undefined;
+      this.tab.set(fromData === 'email' || fromData === 'system' ? fromData : 'global');
+    });
+
     this.content.getCollections().subscribe({
       next: list => {
         this.baAlawiCollections.set(list.filter(c => c.tariqa === 'BaAlawi'));

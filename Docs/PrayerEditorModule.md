@@ -52,11 +52,16 @@ Script: `backend/scripts/prayer-editor-module.sql`
 
 ## Frontend
 
-- `core/config/prayer-editor-nav.config.ts` — sidebar
-- `core/services/prayer-editor.service.ts` — API client
+- `core/config/prayer-editor-nav.config.ts` — sidebar (Daily, Jumuah, Exceptions, Templates, Ramadan, Monthly, Audit)
+- `core/services/prayer-editor.service.ts` — API client (includes templates + generate)
 - `modules/prayer-editor/prayer-editor.routes.ts` — lazy routes
-- Material forms on daily, jumuah, ramadan, audit pages
+- Material forms on daily, jumuah, exceptions, templates, ramadan, audit pages
+- Countdown utilities: `core/utils/prayer.utils.ts` (mosque timezone, default `Europe/London`)
 
 ## Demo login
 
 `prayereditor` / `Prayer@123` → home mosque: Masjid Al-Noor Bradford
+
+## Verification
+
+See [Module32_Verification.md](./Module32_Verification.md) for Module 3.2 checklist and manual test script.

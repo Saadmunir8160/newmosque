@@ -8,75 +8,162 @@ import { AuthService } from '../../../core/auth/auth.service';
   standalone: true,
   imports: [CommonModule, RouterModule],
   styles: [`
-    :host { display: block; min-height: 100dvh; }
+    :host {
+      display: block;
+      min-height: 100dvh;
+      font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    }
     .splash {
-      min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
       padding: 2rem 1rem;
       padding-top: max(2rem, env(safe-area-inset-top));
       padding-bottom: max(5.5rem, calc(env(safe-area-inset-bottom) + 3rem));
-      background: linear-gradient(165deg, #F8FAFC 0%, #0F172A 45%, #011a14 100%);
-      position: relative; overflow: hidden;
+      background: #0F4C3A;
+      position: relative;
+      overflow: hidden;
     }
     .splash::before {
-      content: ''; position: absolute; width: 320px; height: 320px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(16,185,129,0.15) 0%, transparent 70%);
-      top: -80px; right: -60px; pointer-events: none;
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, #0B3D2E 0%, #0F4C3A 42%, #16624A 100%);
+      pointer-events: none;
     }
     .splash::after {
-      content: ''; position: absolute; width: 280px; height: 280px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(245,158,11,0.1) 0%, transparent 70%);
-      bottom: -40px; left: -80px; pointer-events: none;
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 80% 10%, rgba(200, 162, 74, 0.14), transparent 55%),
+        radial-gradient(ellipse 50% 35% at 10% 90%, rgba(200, 162, 74, 0.08), transparent 50%);
+      pointer-events: none;
     }
-    .content { position: relative; z-index: 1; width: 100%; max-width: 340px; text-align: center; }
-    .logo-wrap { margin-bottom: 1.25rem; }
-    .logo-rings {
-      width: 72px; height: 72px; margin: 0 auto 1rem; position: relative;
+    .content {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 360px;
+      text-align: center;
     }
-    .ring {
-      position: absolute; border-radius: 50%; border: 3px solid rgba(255,255,255,0.85);
+    .logo-wrap { margin-bottom: 1.5rem; }
+    .logo-mark {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 1rem;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: rgba(200, 162, 74, 0.14);
+      border: 1px solid rgba(200, 162, 74, 0.4);
+      color: #C8A24A;
     }
-    .ring-1 { width: 52px; height: 52px; top: 10px; left: 0; }
-    .ring-2 { width: 52px; height: 52px; top: 10px; right: 0; }
-    .logo-m {
-      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-      font-weight: 800; font-size: 1.5rem; color: #fef3c7;
+    .logo-mark .material-symbols-outlined {
+      font-size: 32px;
     }
-    .app-name { color: #fff; font-size: clamp(1.5rem, 6vw, 1.75rem); font-weight: 800; margin: 0 0 0.35rem; letter-spacing: -0.02em; }
-    .app-tag { color: #6ee7b7; font-size: 0.9rem; margin: 0 0 2.5rem; }
-    .btn-stack { display: flex; flex-direction: column; gap: 14px; width: 100%; }
+    .app-name {
+      color: #FFFFFF;
+      font-size: clamp(1.5rem, 6vw, 1.85rem);
+      font-weight: 700;
+      margin: 0 0 0.35rem;
+      letter-spacing: -0.02em;
+    }
+    .app-tag {
+      color: #C9D8D0;
+      font-size: 0.9375rem;
+      margin: 0 0 0.5rem;
+      line-height: 1.45;
+    }
+    .app-role {
+      display: inline-flex;
+      margin: 0 0 2rem;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #C8A24A;
+      background: rgba(200, 162, 74, 0.12);
+      border: 1px solid rgba(200, 162, 74, 0.28);
+    }
+    .btn-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+    }
     .btn-login {
-      width: 100%; padding: 15px; border-radius: 14px; border: none; cursor: pointer;
-      background: #fff; color: #0F172A; font-size: 1rem; font-weight: 700;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.2); transition: transform 0.15s;
+      width: 100%;
+      min-height: 48px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: none;
+      cursor: pointer;
+      background: #C8A24A;
+      color: #0B3D2E;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      transition: background 200ms ease, transform 200ms ease;
     }
-    .btn-login:hover { transform: translateY(-2px); }
+    .btn-login:hover {
+      background: #D4B56A;
+      transform: translateY(-1px);
+    }
     .btn-signup {
-      width: 100%; padding: 15px; border-radius: 14px; cursor: pointer;
-      background: transparent; color: #fff; font-size: 1rem; font-weight: 600;
-      border: 2px solid rgba(255,255,255,0.75); transition: background 0.2s, border-color 0.2s;
+      width: 100%;
+      min-height: 48px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      cursor: pointer;
+      background: transparent;
+      color: #FFFFFF;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 600;
+      border: 1px solid #2B6A55;
+      transition: background 200ms ease, border-color 200ms ease;
     }
-    .btn-signup:hover { background: rgba(255,255,255,0.08); border-color: #fff; }
+    .btn-signup:hover {
+      background: #16624A;
+      border-color: transparent;
+    }
     .guest-bottom {
-      position: absolute; bottom: max(1.5rem, env(safe-area-inset-bottom)); left: 0; right: 0;
-      text-align: center; z-index: 1;
+      position: absolute;
+      bottom: max(1.5rem, env(safe-area-inset-bottom));
+      left: 0;
+      right: 0;
+      text-align: center;
+      z-index: 1;
     }
     .guest-bottom button {
-      background: none; border: none; color: #a7f3d0; font-size: 0.88rem; cursor: pointer;
-      text-decoration: underline; text-underline-offset: 4px; padding: 8px 16px;
+      background: none;
+      border: none;
+      color: #C9D8D0;
+      font-family: inherit;
+      font-size: 0.875rem;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 4px;
+      padding: 8px 16px;
+      transition: color 200ms ease;
     }
-    .guest-bottom button:hover { color: #ecfdf5; }
+    .guest-bottom button:hover { color: #EAF4EF; }
   `],
   template: `
     <div class="splash">
       <div class="content">
         <div class="logo-wrap">
-          <div class="logo-rings">
-            <span class="ring ring-1"></span>
-            <span class="ring ring-2"></span>
-            <span class="logo-m">M</span>
+          <div class="logo-mark" aria-hidden="true">
+            <span class="material-symbols-outlined">mosque</span>
           </div>
-          <h1 class="app-name">MosqueOS</h1>
+          <h1 class="app-name">Mosque Operating System</h1>
           <p class="app-tag">Your mosque community platform</p>
+          <span class="app-role">MOS</span>
         </div>
 
         <div class="btn-stack">

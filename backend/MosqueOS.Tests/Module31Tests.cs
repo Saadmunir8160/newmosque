@@ -10,7 +10,7 @@ public class Module31Tests
     [Theory]
     [InlineData(MosqueStatus.Unclaimed, true)]
     [InlineData(MosqueStatus.Active, true)]
-    [InlineData(MosqueStatus.ClaimPending, false)]
+    [InlineData(MosqueStatus.ClaimPending, true)] // legacy → treated as Unclaimed
     [InlineData(MosqueStatus.Claimed, false)]
     [InlineData(MosqueStatus.PendingReview, false)]
     [InlineData(MosqueStatus.Suspended, false)]
@@ -29,6 +29,13 @@ public class Module31Tests
     public void ProfileEdit_AllowedForClaimedActiveOrSuperAdmin(MosqueStatus status, bool isSuperAdmin, bool expected)
     {
         Assert.Equal(expected, MosquePublicVisibility.CanEditProfile(status, isSuperAdmin));
+    }
+
+    [Fact]
+    public void NormalizeSpecStatus_MapsClaimPendingToUnclaimed()
+    {
+        Assert.Equal(MosqueStatus.Unclaimed, MosquePublicVisibility.NormalizeSpecStatus(MosqueStatus.ClaimPending));
+        Assert.Equal(MosqueStatus.Claimed, MosquePublicVisibility.NormalizeSpecStatus(MosqueStatus.Claimed));
     }
 
     [Fact]

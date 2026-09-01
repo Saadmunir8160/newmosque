@@ -1,21 +1,14 @@
 <div class="sr-page">
-  <nav class="sr-breadcrumb" aria-label="Breadcrumb">
-    <a routerLink="/dashboard/super">Dashboard</a>
-    <span aria-hidden="true">›</span>
-    <span>Registrations</span>
-  </nav>
-
-  <header class="sr-header">
-    <div>
-      <h1>Mosque registrations</h1>
-      <p>Review requests to create a new mosque (separate from ownership claims on existing listings).</p>
-    </div>
-    <div class="sr-filters">
+  <app-super-admin-page-header
+    crumb="Mosque Management"
+    title="Registration Requests"
+    subtitle="Review requests to create a new mosque listing on the platform.">
+    <div actions class="sr-filters">
       <button type="button" class="sr-chip" [class.sr-chip--on]="statusFilter() === 'Pending'" (click)="statusFilter.set('Pending')">Pending</button>
       <button type="button" class="sr-chip" [class.sr-chip--on]="statusFilter() === 'All'" (click)="statusFilter.set('All')">All</button>
       <button type="button" class="sr-btn sr-btn--ghost" (click)="load()" [disabled]="loading()">Refresh</button>
     </div>
-  </header>
+  </app-super-admin-page-header>
 
   <p *ngIf="toast()" class="sr-toast" [class.sr-toast--ok]="toastOk()" role="status">{{ toast() }}</p>
   <p *ngIf="error()" class="sr-error" role="alert">{{ error() }}</p>

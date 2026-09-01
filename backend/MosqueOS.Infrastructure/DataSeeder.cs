@@ -567,25 +567,36 @@ namespace MosqueOS.Infrastructure
             {
                 Title = "Fajr Prayer Guide",
                 Type = RitualGuideType.Salah,
-                Status = ContentPublishStatus.InReview
+                Status = ContentPublishStatus.Approved
             };
             db.RitualGuides.Add(fajrGuide);
 
-            var approvedGuide = new RitualGuide
-            {
-                Title = "How to Perform Wudu",
-                Type = RitualGuideType.Wudu,
-                Status = ContentPublishStatus.Approved
-            };
-            db.RitualGuides.Add(approvedGuide);
+            var duaNiyyah = new Dua { Title = "Niyyah (Intention)", ArabicText = "نَوَيْتُ أَنْ أُصَلِّيَ رَكْعَتَيْنِ ...", Transliteration = "Nawaytu an usalliya rak'atayni...", Translation = "I intend to perform two rak'ahs of Fajr for Allah." };
+            var duaTakbir = new Dua { Title = "Takbir", ArabicText = "اللَّهُ أَكْبَرُ", Transliteration = "Allahu Akbar", Translation = "Allah is the Greatest." };
+            var duaQiyam = new Dua { Title = "Qiyam (Surah Al-Fatiha)", ArabicText = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ...", Transliteration = "Bismillahir-Rahmanir-Raheem...", Translation = "In the name of Allah, the Most Gracious, the Most Merciful..." };
+            var duaRuku = new Dua { Title = "Ruku", ArabicText = "سُبْحَانَ رَبِّيَ الْعَظِيمِ", Transliteration = "Subhana Rabbiyal 'Azim", Translation = "Glory be to my Lord, the Supreme." };
+            var duaQawmah = new Dua { Title = "Qawmah", ArabicText = "سَمِعَ اللَّهُ لِمَنْ حَمِدَهُ", Transliteration = "Sami'Allahu liman hamidah", Translation = "Allah hears those who praise Him." };
+            var duaSajdah = new Dua { Title = "Sajdah", ArabicText = "سُبْحَانَ رَبِّيَ الْأَعْلَى", Transliteration = "Subhana Rabbiyal A'la", Translation = "Glory be to my Lord, the Most High." };
+            var duaTashahhud = new Dua { Title = "Tashahhud", ArabicText = "التَّحِيَّاتُ لِلَّهِ وَالصَّلَوَاتُ وَالطَّيِّبَاتُ ...", Transliteration = "At-tahiyyatu lillahi was-salawatu wat-tayyibat...", Translation = "All greetings, prayers, and good deeds are for Allah..." };
+            var duaDurood = new Dua { Title = "Durood", ArabicText = "اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ ...", Transliteration = "Allahumma salli 'ala Muhammad...", Translation = "O Allah, send blessings upon Muhammad..." };
+            var duaSalam = new Dua { Title = "Salam", ArabicText = "السَّلَامُ عَلَيْكُمْ وَرَحْمَةُ اللَّهِ", Transliteration = "As-salamu 'alaykum wa rahmatullah", Translation = "Peace and mercy of Allah be upon you." };
 
-            var draftGuide = new RitualGuide
-            {
-                Title = "Isha Prayer Guide",
-                Type = RitualGuideType.Salah,
-                Status = ContentPublishStatus.Draft
-            };
-            db.RitualGuides.Add(draftGuide);
+            db.Duas.AddRange(duaNiyyah, duaTakbir, duaQiyam, duaRuku, duaQawmah, duaSajdah, duaTashahhud, duaDurood, duaSalam);
+            await db.SaveChangesAsync();
+
+            db.RitualSteps.AddRange(
+                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 1, Title = "Niyyah", Description = "Make a firm intention in your heart for the specific prayer you are about to perform.", DuaId = duaNiyyah.Id },
+                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 2, Title = "2 Rak'ah Sunnah", Description = "Begin by offering the 2 Rak'ah Sunnah prayer before the Fard (obligatory) prayer." },
+                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 3, Title = "First Rak'ah", Description = "Stand calmly, say the Takbir, and recite Surah Al-Fatiha followed by another portion of the Quran.", DuaId = duaQiyam.Id },
+                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 4, Title = "Ruku", Description = "Bow down, resting your hands on your knees, and recite the praise of Allah.", DuaId = duaRuku.Id },
+                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 5, Title = "Qawmah", Description = "Stand back up from Ruku straight and briefly pause.", DuaId = duaQawmah.Id },
+                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 6, Title = "Two Sajdahs", Description = "Prostrate with your forehead, nose, palms, knees, and toes touching the ground twice.", DuaId = duaSajdah.Id },
+                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 7, Title = "Second Rak'ah", Description = "Stand up and perform the second Rak'ah, consisting of reciting Quran, Ruku, Qawmah, and two Sajdahs again." },
+                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 8, Title = "Tashahhud", Description = "Sit after the second Rak'ah and recite the Tashahhud.", DuaId = duaTashahhud.Id },
+                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 9, Title = "Durood", Description = "Send blessings upon the Prophet Muhammad (Peace Be Upon Him) after the Tashahhud.", DuaId = duaDurood.Id },
+                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 10, Title = "Dua", Description = "Make a personal supplication to Allah before concluding the prayer." },
+                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 11, Title = "Salam", Description = "Turn your head to the right and then to the left, saying the Salam to conclude.", DuaId = duaSalam.Id },
+                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 12, Title = "2 Rak'ah Fard", Description = "After completing the Sunnah, proceed to offer the 2 Rak'ah Fard (obligatory) prayer." });
 
             await db.SaveChangesAsync();
 
@@ -605,12 +616,7 @@ namespace MosqueOS.Infrastructure
                 new RitualStep { GuideId = ghuslGuide.Id, OrderIndex = 4, Title = "Wash Entire Body", Description = "Pour water over the entire body, ensuring no dry spot remains." },
                 new RitualStep { GuideId = ghuslGuide.Id, OrderIndex = 5, Title = "Complete", Description = "Say the shahada and perform wudu if needed for prayer." });
 
-            db.RitualSteps.AddRange(
-                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 1, Title = "Make Wudu", Description = "Perform ablution before prayer." },
-                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 2, Title = "Face Qiblah", Description = "Stand facing the Ka'bah." },
-                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 3, Title = "Two Rak'ahs", Description = "Pray two rak'ahs of Fajr with recitation." },
-                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 4, Title = "Taslim", Description = "End the prayer with salam to the right and left." },
-                new RitualStep { GuideId = fajrGuide.Id, OrderIndex = 5, Title = "Morning Adhkar", Description = "Recite morning remembrances after the prayer." });
+            // Only the detailed Fajr guide is included.
 
             // ---- 3.8 Adhkar library ----
             db.AdhkarItems.AddRange(

@@ -10,7 +10,7 @@ import { AdhkarItem } from '../../core/services/content.service';
   standalone: true,
   imports: [CommonModule, PageHeaderComponent],
   template: `
-    <app-page-header badge="Guest" title="Adhkar Library"
+    <app-page-header badge="" title="Adhkar Library"
       subtitle="Public dhikr and remembrance — read only (no counter)." />
 
     <article *ngFor="let a of items()" class="card">

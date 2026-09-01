@@ -4,11 +4,12 @@ import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { PlatformService, OversightJanazaRow } from '../../../core/services/platform.service';
 import { formatMosqueStatus, statusClass } from '../../../core/utils/mosque-status.util';
+import { SuperAdminPageHeaderComponent } from '../../../shared/ui/super-admin-page-header.component';
 
 @Component({
   selector: 'app-super-oversight-janaza',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, SuperAdminPageHeaderComponent],
   templateUrl: './super-oversight-janaza.component.html',
   styleUrls: ['../claims/super-claims.component.css', './super-oversight.shared.css'],
 })

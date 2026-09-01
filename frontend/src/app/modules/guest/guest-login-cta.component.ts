@@ -20,9 +20,9 @@ import { AuthService } from '../../core/auth/auth.service';
     .cta {
       margin-bottom: 1rem; padding: 0.75rem 1rem;
       background: rgba(212,175,55,0.08); border: 1px solid rgba(212,175,55,0.3);
-      border-radius: 0.625rem; font-size: 0.8125rem; color: rgba(236,253,245,0.9);
+      border-radius: 0.625rem; font-size: 0.8125rem; color: #4b5563;
     }
-    .cta-link { color: #fcd34d; font-weight: 600; margin-left: 0.25rem; }
+    .cta-link { color: #d97706; font-weight: 600; margin-left: 0.25rem; }
   `]
 })
 export class GuestLoginCtaComponent {

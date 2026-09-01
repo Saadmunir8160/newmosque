@@ -1,13 +1,20 @@
 namespace MosqueOS.Domain
 {
+    /// <summary>
+    /// Module 3.1 mosque status (requirements): Unclaimed | Claimed | Active.
+    /// Other values are legacy / adjacent flows (registration, invite) — do not use ClaimPending for new claim submits.
+    /// Pending verification is OwnershipClaimStatus.Pending while mosque stays Unclaimed.
+    /// </summary>
     public enum MosqueStatus
     {
         Unclaimed = 0,
         Claimed = 1,
         Active = 2,
+        /// <summary>Legacy / registration path — not Module 3.1 claim statuses.</summary>
         PendingReview = 3,
         Suspended = 4,
         Archived = 5,
+        /// <summary>Obsolete: was used during claim review. Prefer Unclaimed + claim PENDING.</summary>
         ClaimPending = 6,
         Invited = 7
     }
@@ -97,4 +104,15 @@ namespace MosqueOS.Domain
     public enum StudentProgressType { Quran, Memorization, Exam, TeacherNote }
 
     public enum AssignmentGradeStatus { Pending, Submitted, Graded }
+
+    /// <summary>Season / special period for jamaah timetable templates.</summary>
+    public enum JamaahTemplateType
+    {
+        Custom = 0,
+        Winter = 1,
+        Spring = 2,
+        Summer = 3,
+        Autumn = 4,
+        Ramadan = 5,
+    }
 }

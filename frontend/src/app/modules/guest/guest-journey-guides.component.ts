@@ -10,7 +10,7 @@ import { JourneyGuide, JourneyGuideDetail } from '../../core/services/content.se
   standalone: true,
   imports: [CommonModule, PageHeaderComponent],
   template: `
-    <app-page-header badge="Guest" title="Umrah & Hajj Guides"
+    <app-page-header badge="" title="Umrah & Hajj Guides"
       subtitle="Journey stages for sacred travel — read only." />
 
     <div class="filters">
@@ -37,18 +37,18 @@ import { JourneyGuide, JourneyGuideDetail } from '../../core/services/content.se
   `,
   styles: [`
     .filters { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 1rem; }
-    .chip { font-size: 0.6875rem; padding: 0.3rem 0.55rem; border-radius: 9999px; border: 1px solid rgba(16,185,129,0.3); background: transparent; color: #a7f3d0; cursor: pointer; }
-    .chip--on { background: rgba(212,175,55,0.2); color: #fcd34d; }
-    .card { background: rgba(2,44,34,0.85); border: 1px solid rgba(16,185,129,0.2); border-radius: 0.75rem; padding: 0.75rem 1rem; margin-bottom: 0.75rem; }
+    .chip { font-size: 0.6875rem; padding: 0.3rem 0.55rem; border-radius: 9999px; border: 1px solid #d1d5db; background: #ffffff; color: #4b5563; cursor: pointer; }
+    .chip--on { background: #e0e7ff; color: #4338ca; border-color: #c7d2fe; }
+    .card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 0.75rem 1rem; margin-bottom: 0.75rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
     .card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; width: 100%; background: none; border: none; padding: 0; cursor: pointer; text-align: left; }
-    .type { font-size: 0.5625rem; text-transform: uppercase; color: #fcd34d; }
-    h2 { margin: 0; flex: 1; font-size: 0.9375rem; color: #fff; }
-    .chev { color: #6ee7b7; }
-    .desc { margin: 0.35rem 0 0; font-size: 0.8125rem; color: rgba(167,243,208,0.8); }
-    .stage { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(16,185,129,0.15); }
-    .stage h3 { margin: 0; font-size: 0.8125rem; color: #fff; }
-    .day { margin: 0.15rem 0; font-size: 0.6875rem; color: #fcd34d; }
-    .stage p { margin: 0.25rem 0 0; font-size: 0.8125rem; color: rgba(167,243,208,0.85); line-height: 1.5; }
+    .type { font-size: 0.5625rem; text-transform: uppercase; color: #b45309; font-weight: 800; }
+    h2 { margin: 0; flex: 1; font-size: 0.9375rem; color: #111827; }
+    .chev { color: #6b7280; }
+    .desc { margin: 0.35rem 0 0; font-size: 0.8125rem; color: #4b5563; }
+    .stage { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e5e7eb; }
+    .stage h3 { margin: 0; font-size: 0.8125rem; color: #111827; }
+    .day { margin: 0.15rem 0; font-size: 0.6875rem; color: #d97706; }
+    .stage p { margin: 0.25rem 0 0; font-size: 0.8125rem; color: #4b5563; line-height: 1.5; }
   `]
 })
 export class GuestJourneyGuidesComponent implements OnInit {
@@ -72,7 +72,12 @@ export class GuestJourneyGuidesComponent implements OnInit {
   }
 
   load(): void {
-    this.guest.getJourneyGuides(this.type() || undefined).subscribe(v => this.guides.set(v));
+    this.guest.getJourneyGuides(this.type() || undefined).subscribe(v => {
+      const uniqueGuides = v.filter((guide, index, self) => 
+        index === self.findIndex((t) => t.title === guide.title)
+      );
+      this.guides.set(uniqueGuides);
+    });
   }
 
   toggle(id: number): void {

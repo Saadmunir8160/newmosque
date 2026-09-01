@@ -24,6 +24,10 @@ namespace MosqueOS.Domain.Constants
         public const string PrayerTimesManagers = SuperAdmin + "," + MosqueOwner + "," + MosqueAdmin + "," + PrayerTimesEditor;
         public const string MadrassahManagers = SuperAdmin + "," + MosqueOwner + "," + MosqueAdmin + "," + Teacher;
         public const string ContentManagers = SuperAdmin + "," + MosqueOwner + "," + MosqueAdmin + "," + ContentEditor;
+        /// <summary>Awrad build/assign — Content Editor + Muqaddam (Module 3.7) plus mosque admins.</summary>
+        public const string AwradManagers = SuperAdmin + "," + MosqueOwner + "," + MosqueAdmin + "," + ContentEditor + "," + Muqaddam;
+        /// <summary>View participation registrations (Module 3.14) — includes Teacher.</summary>
+        public const string ParticipationManagers = SuperAdmin + "," + MosqueOwner + "," + MosqueAdmin + "," + Teacher;
         public const string MuridSummaryViewers = SuperAdmin + "," + Muqaddam;
         public const string MosqueManagers = SuperAdmin + "," + MosqueOwner + "," + MosqueAdmin;
     }

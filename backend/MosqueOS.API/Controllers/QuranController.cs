@@ -118,19 +118,52 @@ namespace MosqueOS.API.Controllers
                 CompletedParas = completed,
                 TotalParas = 30,
                 TodaysPara = todaysPara,
-                TodayCompleted = plan.Progress.FirstOrDefault(p => p.ParaNumber == todaysPara)?.Completed ?? false
+                TodayCompleted = plan.Progress.FirstOrDefault(p => p.ParaNumber == todaysPara)?.Completed ?? false,
+                MinDailyParas = plan.MinDailyParas <= 0 ? 1m : plan.MinDailyParas,
+                RemindersEnabled = plan.RemindersEnabled,
+                ProgressLabel = $"{completed}/30"
+            });
+        }
+
+        /// <summary>Today's reading card for home screen (spec 3.10).</summary>
+        [HttpGet("today-card")]
+        public async Task<IActionResult> TodayCard()
+        {
+            var planResult = await MyPlan();
+            if (planResult is not OkObjectResult ok) return planResult;
+            var summary = (QuranPlanSummaryResponse)ok.Value!;
+            return Ok(new
+            {
+                todaysPara = summary.TodaysPara,
+                todayCompleted = summary.TodayCompleted,
+                completedParas = summary.CompletedParas,
+                totalParas = summary.TotalParas,
+                progressLabel = summary.ProgressLabel,
+                minDailyParas = summary.MinDailyParas,
+                remindersEnabled = summary.RemindersEnabled,
+                message = summary.TodayCompleted
+                    ? "Today's reading is complete — jazakAllah khair."
+                    : $"Today: Para {summary.TodaysPara} (target {summary.MinDailyParas} para)"
             });
         }
 
         [HttpPost("start")]
-        public async Task<IActionResult> StartPlan([FromQuery] QuranPlanType type = QuranPlanType.ThirtyDay)
+        public async Task<IActionResult> StartPlan([FromBody] StartQuranPlanRequest? request = null, [FromQuery] QuranPlanType? type = null)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            request ??= new StartQuranPlanRequest();
+            if (type.HasValue) request.Type = type.Value;
+            // Custom reserved for v2 — still create as ThirtyDay skeleton with note
+            var planType = request.Type == QuranPlanType.Custom ? QuranPlanType.ThirtyDay : request.Type;
+            var minDaily = request.MinDailyParas <= 0 ? 1m : Math.Min(request.MinDailyParas, 30m);
+
             var plan = new QuranPlan
             {
                 UserId = userId,
-                Type = type,
-                StartDate = DateOnly.FromDateTime(DateTime.UtcNow)
+                Type = planType,
+                StartDate = DateOnly.FromDateTime(DateTime.UtcNow),
+                MinDailyParas = minDaily,
+                RemindersEnabled = request.RemindersEnabled
             };
 
             for (var i = 1; i <= 30; i++)
@@ -139,6 +172,24 @@ namespace MosqueOS.API.Controllers
             _unitOfWork.Repository<QuranPlan>().Add(plan);
             await _unitOfWork.SaveChangesAsync();
             return Ok(plan);
+        }
+
+        [HttpPut("my-plan/settings")]
+        public async Task<IActionResult> UpdatePlanSettings([FromBody] StartQuranPlanRequest request)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            var plan = await _unitOfWork.Repository<QuranPlan>().Query()
+                .Where(p => p.UserId == userId)
+                .OrderByDescending(p => p.StartDate)
+                .FirstOrDefaultAsync();
+            if (plan == null) return NotFound();
+
+            if (request.MinDailyParas > 0)
+                plan.MinDailyParas = Math.Min(request.MinDailyParas, 30m);
+            plan.RemindersEnabled = request.RemindersEnabled;
+            plan.UpdatedAt = DateTime.UtcNow;
+            await _unitOfWork.SaveChangesAsync();
+            return Ok(new { plan.MinDailyParas, plan.RemindersEnabled });
         }
 
         [HttpPost("paras/{paraNumber:int}/complete")]
@@ -160,11 +211,13 @@ namespace MosqueOS.API.Controllers
             progress.UpdatedAt = DateTime.UtcNow;
 
             await _unitOfWork.SaveChangesAsync();
+            var completed = plan.Progress.Count(p => p.Completed);
             return Ok(new QuranCompleteParaResponse
             {
                 ParaNumber = paraNumber,
-                CompletedParas = plan.Progress.Count(p => p.Completed),
-                TotalParas = 30
+                CompletedParas = completed,
+                TotalParas = 30,
+                ProgressLabel = $"{completed}/30"
             });
         }
     }

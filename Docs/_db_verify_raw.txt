@@ -1,0 +1,116 @@
+﻿=== 1. ROLES & USERS ===
+RoleName|UserCount
+--------|---------
+Content Editor|1
+Guest|0
+Member|13
+Mosque Admin|4
+Mosque Owner|11
+Muqaddam|1
+Parent|1
+Prayer Times Editor|1
+Super Admin|1
+Teacher|1
+UserName|Email|EmailConfirmed|HomeMosqueId|FullName|Roles
+--------|-----|--------------|------------|--------|-----
+admin|admin@mosqueos.uk|1|NULL|Super Admin|Super Admin
+editor|editor@mosqueos.uk|1|NULL|Sr. Fatima|Content Editor
+member|member@mosqueos.uk|1|115|Br. Bilal Hussain|Member
+mosqueadmin|mosqueadmin@mosqueos.uk|1|115|Mosque Admin|Mosque Admin, Mosque Owner
+muqaddam|muqaddam@mosqueos.uk|1|115|Habib Ali|Member, Muqaddam
+owner|owner@mosqueos.uk|1|115|Br. Hamid (Owner)|Mosque Owner
+parent|parent@mosqueos.uk|1|NULL|Br. Ahmed Khan|Member, Parent
+prayereditor|prayer@mosqueos.uk|1|115|Br. Salim|Prayer Times Editor
+teacher|teacher@mosqueos.uk|1|115|Ustadh Yusuf|Teacher
+=== 2. MODULE 3.1 MOSQUES ===
+Id|Name|Slug|Status|City|Timezone|OwnerId|EmailState
+--|----|----|------|----|--------|-------|----------
+128|WF Test Mosque|wf-test-mosque-20260805133930|2|Bradford|Europe/London|936646d4-1825-4c0c-b1f6-9a8f9274cf41|EMPTY
+127|Test Mosque MRTEDRLC|test-mosque-mrtedrlc|2|Bradford|Europe/London|936646d4-1825-4c0c-b1f6-9a8f9274cf41|EMPTY
+125|Reg Test Mosque C1|reg-test-mosque-c1|2|Leeds|Europe/London|936646d4-1825-4c0c-b1f6-9a8f9274cf41|EMPTY
+Id|MosqueId|Status|SubmittedAt
+--|--------|------|-----------
+56|128|1|2026-08-05 20:39:35.8720770
+55|127|1|2026-07-20 15:52:50.0199417
+54|124|1|2026-07-16 15:19:49.7778254
+53|117|2|2026-07-08 04:36:04.8605203
+ModuleKey|EnabledCount|Total
+---------|------------|-----
+Adhkar|1|16
+Announcements|4|16
+Awrad|1|16
+Communities|1|16
+CommunityServices|1|15
+Courses|2|15
+DeathReadings|1|16
+Donations|5|16
+Duas|1|16
+Events|4|16
+Fundraising|1|15
+Janaza|15|16
+JourneyGuides|1|16
+Madrassah|2|16
+Memberships|1|15
+NearbyMosqueDiscovery|15|15
+Participation|2|16
+PrayerTimes|16|16
+Quran|1|16
+RitualGuides|1|16
+VolunteerManagement|2|15
+=== 3. MODULE 3.2 PRAYER ===
+T|C
+-|-
+PrayerTimesDaily|38
+JumuahTimes|6
+PrayerExceptions|4
+JamaahTemplates|1
+JamaahTemplatePrayers|5
+PrayerTimeAuditLogs|39
+=== 4. MODULE 3.3-3.5 CONTENT / MADRASSAH ===
+T|C
+-|-
+Announcements|4
+Events|4
+Students|10
+Guardians|2
+MadrassahClasses|1
+Enrolments|5
+AttendanceSessions|3
+AttendanceRecords|15
+Fees|11
+ProgressNotes|1
+=== 5. MODULE 3.6-3.15 ===
+T|C
+-|-
+Communities|1
+CommunityMembers|3
+CommunityPosts|2
+WirdCollections|9
+WirdSteps|24
+ContentItems|14
+UserWirdSchedules|0
+AdhkarItems|12
+UserAdhkar|3
+Duas|14
+DuaCollections|2
+QuranPlans|3
+RitualGuides|9
+RitualSteps|26
+JanazaAnnouncements|3
+ReadingCampaigns|1
+ReadingAllocations|11
+ParticipationOpportunities|3
+ParticipationRegistrations|0
+JourneyGuides|2
+JourneyStages|12
+=== 6. ROLE HOME MOSQUE LINK ===
+UserName|HomeMosqueId|HomeMosque|Status
+--------|------------|----------|------
+prayereditor|115|Masjid Al-Noor Bradford|2
+parent|NULL|NULL|NULL
+teacher|115|Masjid Al-Noor Bradford|2
+member|115|Masjid Al-Noor Bradford|2
+editor|NULL|NULL|NULL
+mosqueadmin|115|Masjid Al-Noor Bradford|2
+owner|115|Masjid Al-Noor Bradford|2
+muqaddam|115|Masjid Al-Noor Bradford|2

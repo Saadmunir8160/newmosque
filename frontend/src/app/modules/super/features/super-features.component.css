@@ -1,19 +1,23 @@
 :host {
   --mf-primary: #0F4C3A;
-  --mf-secondary: #1D6B57;
-  --mf-bg: #F0F4F8;
+  --mf-primary-hover: #16624A;
+  --mf-secondary: #16624A;
+  --mf-bg: transparent;
   --mf-card: #FFFFFF;
-  --mf-border: #E2E8F0;
-  --mf-text: #1E293B;
+  --mf-border: #E5E7EB;
+  --mf-text: #0F172A;
   --mf-muted: #64748B;
   --mf-radius: 14px;
-  --mf-shadow: 0 2px 8px rgba(15, 76, 58, 0.06), 0 12px 32px rgba(15, 76, 58, 0.05);
+  --mf-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --mf-gold: #C8A24A;
+  --mf-ease: 200ms ease;
   display: block;
   background: var(--mf-bg);
   min-height: 100%;
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
-.mf-page { max-width: 900px; margin: 0 auto; padding: 1.25rem 1.5rem 2.5rem; }
+.mf-page { max-width: 100%; margin: 0; padding: 0 0 2rem; }
 
 .toast {
   position: fixed; top: 1rem; right: 1rem; z-index: 500;
@@ -27,16 +31,16 @@
   display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
   font-size: 0.8125rem; margin-bottom: 1rem;
 }
-.breadcrumb a { color: var(--mf-secondary); text-decoration: none; font-weight: 600; }
-.breadcrumb a:hover { text-decoration: underline; }
+.breadcrumb a { color: var(--mf-primary); text-decoration: none; font-weight: 600; transition: color var(--mf-ease); }
+.breadcrumb a:hover { color: var(--mf-primary-hover); text-decoration: underline; }
 .breadcrumb__sep, .breadcrumb__current { color: var(--mf-muted); }
 
 .mf-badge {
-  margin: 0 0 0.35rem; font-size: 0.6875rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.06em; color: var(--mf-secondary);
+  margin: 0 0 4px; font-size: 13px; font-weight: 500;
+  text-transform: none; letter-spacing: 0; color: #94A3B8;
 }
-.mf-title { margin: 0 0 0.35rem; font-size: 1.625rem; font-weight: 700; color: var(--mf-text); }
-.mf-sub { margin: 0; font-size: 0.9375rem; color: var(--mf-muted); line-height: 1.5; }
+.mf-title { margin: 0 0 8px; font-size: clamp(1.5rem, 2.5vw, 2rem); font-weight: 700; letter-spacing: -0.02em; color: var(--mf-text); }
+.mf-sub { margin: 0; font-size: 16px; color: var(--mf-muted); line-height: 1.55; max-width: 40rem; }
 .mf-header { margin-bottom: 1.25rem; }
 
 .panel {
@@ -70,7 +74,7 @@
   display: flex; align-items: center; gap: 0.5rem; padding: 2rem 0;
   font-size: 0.875rem; color: var(--mf-muted);
 }
-.pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #D4AF37; animation: pulse 1s infinite; }
+.pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #C8A24A; animation: pulse 1s infinite; }
 @keyframes pulse { 50% { opacity: 0.35; } }
 
 .empty-state {
@@ -150,17 +154,16 @@
 .module-row__key { margin: 0.15rem 0 0; font-size: 0.75rem; color: var(--mf-muted); }
 
 .toggle-pill {
-  flex-shrink: 0; min-width: 88px; padding: 0.45rem 1rem; border-radius: 9999px;
-  border: none; font-size: 0.8125rem; font-weight: 700; cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
+  flex-shrink: 0; min-width: 88px; min-height: 36px; padding: 8px 14px; border-radius: 9999px;
+  border: 1px solid transparent; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background 200ms ease, border-color 200ms ease, color 200ms ease;
 }
 .toggle-pill--on {
-  background: linear-gradient(180deg, #1D6B57, var(--mf-primary)); color: #fff;
-  box-shadow: 0 2px 8px rgba(15, 76, 58, 0.22);
+  background: var(--mf-primary); color: #fff; box-shadow: none;
 }
-.toggle-pill--on:hover:not(:disabled) { background: linear-gradient(180deg, var(--mf-primary), #08362A); }
+.toggle-pill--on:hover:not(:disabled) { background: var(--mf-primary-hover); }
 .toggle-pill--off {
-  background: #F1F5F9; color: var(--mf-muted); border: 1px solid var(--mf-border);
+  background: #F8FAFC; color: var(--mf-muted); border: 1px solid var(--mf-border);
 }
-.toggle-pill--off:hover:not(:disabled) { background: #E2E8F0; color: var(--mf-text); }
+.toggle-pill--off:hover:not(:disabled) { background: #F1F5F9; color: var(--mf-text); }
 .toggle-pill:disabled { opacity: 0.65; cursor: not-allowed; }

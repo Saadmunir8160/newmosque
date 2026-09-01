@@ -1,4 +1,4 @@
-import { Component, Injector, Input, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, Injector, Input, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Title } from '@angular/platform-browser';
@@ -8,7 +8,7 @@ import { toObservable } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
 import { MosqueService } from '../../../core/services/mosque.service';
 import { AuthService } from '../../../core/auth/auth.service';
-import { Announcement, Mosque, MosqueEvent, PrayerTimesDaily } from '../../../core/models';
+import { Announcement, Mosque, MosqueEvent, NextPrayer, PrayerTimesDaily, JumuahTime } from '../../../core/models';
 import {
   canShowPublicClaimCta,
   formatMosqueStatus,
@@ -22,6 +22,12 @@ import {
 } from '../../../core/utils/mosque-social.util';
 import { environment } from '../../../../environments/environment';
 import { MosqueClaimDrawerComponent } from '../mosque-claim-drawer/mosque-claim-drawer.component';
+import {
+  countdownToJamaat,
+  formatTime12,
+  resolveNextPrayer,
+  DEFAULT_PRAYER_TIMEZONE,
+} from '../../../core/utils/prayer.utils';
 
 @Component({
   selector: 'app-public-mosque-profile',
@@ -52,13 +58,32 @@ export class PublicMosqueProfileComponent implements OnInit, OnDestroy {
 
   prayerTimes = signal<PrayerTimesDaily | null>(null);
   prayerLoading = signal(false);
+  prayerView = signal<'daily' | 'monthly'>('daily');
+  monthlyDays = signal<PrayerTimesDaily[]>([]);
+  monthlyLoading = signal(false);
+  monthlyYear = new Date().getFullYear();
+  monthlyMonth = new Date().getMonth() + 1;
+  jumuahSlots = signal<JumuahTime[]>([]);
+  nextPrayer = signal<NextPrayer | null>(null);
+  prayerCountdown = signal('');
   announcements = signal<Announcement[]>([]);
   announcementsLoading = signal(false);
   events = signal<MosqueEvent[]>([]);
   eventsLoading = signal(false);
 
+  featuredAnnouncement = computed(() => {
+    const list = this.announcements();
+    return list.find(a => a.isFeatured) ?? list[0] ?? null;
+  });
+
+  otherAnnouncements = computed(() => {
+    const featured = this.featuredAnnouncement();
+    return this.announcements().filter(a => a.id !== featured?.id).slice(0, 4);
+  });
+
   slug = '';
   private apiOrigin = environment.apiUrl.replace(/\/api\/v1\/?$/, '');
+  private prayerTimer?: ReturnType<typeof setInterval>;
 
   readonly formatStatus = formatMosqueStatus;
   readonly publicStatusCard = publicStatusCard;
@@ -70,10 +95,12 @@ export class PublicMosqueProfileComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.slug = this.route.snapshot.paramMap.get('slug') ?? '';
     void this.load();
+    this.prayerTimer = setInterval(() => this.tickPrayerCountdown(), 1000);
   }
 
   ngOnDestroy(): void {
     this.title.setTitle('MosqueOS');
+    if (this.prayerTimer) clearInterval(this.prayerTimer);
   }
 
   mediaUrl(path?: string | null): string | null {
@@ -117,23 +144,84 @@ export class PublicMosqueProfileComponent implements OnInit, OnDestroy {
 
   formatClock(value?: string | null): string {
     if (!value?.trim()) return '—';
-    const raw = value.trim();
-    const match = raw.match(/^(\d{1,2}):(\d{2})/);
-    if (!match) return raw;
-    const hours = Number(match[1]);
-    const minutes = match[2];
-    const suffix = hours >= 12 ? 'PM' : 'AM';
-    const h12 = hours % 12 || 12;
-    return `${h12}:${minutes} ${suffix}`;
+    return formatTime12(value);
+  }
+
+  isNextPrayer(name: string): boolean {
+    const current = this.nextPrayer()?.name?.replace(' (tomorrow)', '') ?? '';
+    return current === name;
+  }
+
+  monthLabel(): string {
+    return new Date(this.monthlyYear, this.monthlyMonth - 1, 1)
+      .toLocaleString('en-GB', { month: 'long', year: 'numeric' });
+  }
+
+  showDailyPrayer(): void {
+    this.prayerView.set('daily');
+  }
+
+  showMonthlyPrayer(): void {
+    this.prayerView.set('monthly');
+    this.loadMonthly();
+  }
+
+  shiftMonth(delta: number): void {
+    this.monthlyMonth += delta;
+    if (this.monthlyMonth > 12) { this.monthlyMonth = 1; this.monthlyYear++; }
+    if (this.monthlyMonth < 1) { this.monthlyMonth = 12; this.monthlyYear--; }
+    this.loadMonthly();
+  }
+
+  private loadMonthly(): void {
+    const m = this.mosque();
+    if (!m) return;
+    this.monthlyLoading.set(true);
+    this.mosqueService.getMonthlyPrayerTimes(m.id, this.monthlyYear, this.monthlyMonth).subscribe({
+      next: rows => {
+        this.monthlyDays.set(rows ?? []);
+        this.monthlyLoading.set(false);
+      },
+      error: () => {
+        this.monthlyDays.set([]);
+        this.monthlyLoading.set(false);
+      },
+    });
+  }
+
+  private prayerTimezone(): string {
+    return this.mosque()?.timezone?.trim() || DEFAULT_PRAYER_TIMEZONE;
+  }
+
+  private tickPrayerCountdown(): void {
+    const pt = this.prayerTimes();
+    if (!pt) {
+      this.nextPrayer.set(null);
+      this.prayerCountdown.set('');
+      return;
+    }
+    const tz = this.prayerTimezone();
+    const next = resolveNextPrayer(pt, tz);
+    this.nextPrayer.set(next);
+    this.prayerCountdown.set(countdownToJamaat(next.jamaat, tz));
   }
 
   canClaimMosque(m: Mosque): boolean {
+    if (!canShowPublicClaimCta(m.status, m.allowClaimRequests !== false)) return false;
     return canShowClaimCta({
-      mosqueStatus: m.status,
+      mosqueStatus: m.status === 'ClaimPending' ? 'Unclaimed' : m.status,
       isSuperAdmin: this.auth.isSuperAdmin(),
       userId: this.auth.user()?.id,
       ownerId: m.ownerId,
     });
+  }
+
+  /** Ensure website / social URLs open correctly even without https:// */
+  externalUrl(url?: string | null): string | null {
+    const raw = url?.trim();
+    if (!raw) return null;
+    if (/^https?:\/\//i.test(raw) || raw.startsWith('mailto:') || raw.startsWith('tel:')) return raw;
+    return `https://${raw}`;
   }
 
   openClaimFlow(): void {
@@ -142,7 +230,7 @@ export class PublicMosqueProfileComponent implements OnInit, OnDestroy {
       return;
     }
     if (!this.auth.isAuthenticated()) {
-      void this.router.navigate(['/auth/login'], {
+      void this.router.navigate(['/login'], {
         queryParams: { returnUrl: `/claim-mosque/${this.slug}` },
       });
       return;
@@ -155,8 +243,8 @@ export class PublicMosqueProfileComponent implements OnInit, OnDestroy {
       return;
     }
     const m = this.mosque();
-    if (!m || !this.canShowClaim(m.status)) {
-      this.showClaimToast('This mosque cannot be claimed.', false);
+    if (!m || !this.canClaimMosque(m)) {
+      this.showClaimToast('This mosque cannot be claimed right now.', false);
       return;
     }
     this.showClaimDrawer.set(true);
@@ -269,6 +357,7 @@ export class PublicMosqueProfileComponent implements OnInit, OnDestroy {
 
   private loadModuleSections(mosque: Mosque): void {
     this.prayerTimes.set(null);
+    this.jumuahSlots.set([]);
     this.announcements.set([]);
     this.events.set([]);
 
@@ -278,11 +367,18 @@ export class PublicMosqueProfileComponent implements OnInit, OnDestroy {
         next: (res) => {
           this.prayerTimes.set(res.times ?? null);
           this.prayerLoading.set(false);
+          this.tickPrayerCountdown();
         },
         error: () => {
           this.prayerTimes.set(null);
           this.prayerLoading.set(false);
+          this.nextPrayer.set(null);
+          this.prayerCountdown.set('');
         },
+      });
+      this.mosqueService.getJumuahTimes(mosque.id).subscribe({
+        next: (slots) => this.jumuahSlots.set(slots ?? []),
+        error: () => this.jumuahSlots.set([]),
       });
     }
 
@@ -290,7 +386,8 @@ export class PublicMosqueProfileComponent implements OnInit, OnDestroy {
       this.announcementsLoading.set(true);
       this.mosqueService.getAnnouncements(mosque.id).subscribe({
         next: (list) => {
-          this.announcements.set((list ?? []).slice(0, 3));
+          const sorted = [...(list ?? [])].sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured));
+          this.announcements.set(sorted.slice(0, 8));
           this.announcementsLoading.set(false);
         },
         error: () => {

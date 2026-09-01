@@ -14,7 +14,7 @@ import { formatTime12, getPrayerSlots } from '../../core/utils/prayer.utils';
   standalone: true,
   imports: [CommonModule, RouterModule, PageHeaderComponent, GuestLoginCtaComponent],
   template: `
-    <app-page-header badge="Guest" title="Home"
+    <app-page-header badge="" title="Home"
       [subtitle]="mosque()?.name ? 'Welcome to ' + mosque()!.name : 'Browse your local mosque'" />
 
     <app-guest-login-cta />

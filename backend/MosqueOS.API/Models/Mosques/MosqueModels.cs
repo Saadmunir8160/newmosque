@@ -178,7 +178,7 @@ public class MosquePublicDto
     public string? LogoUrl { get; set; }
     public string? BannerUrl { get; set; }
     public string Timezone { get; set; } = "Europe/London";
-    /// <summary>Public-safe status token for UI (Unclaimed, Active, ClaimPending).</summary>
+    /// <summary>Public-safe status token for UI (Unclaimed | Claimed | Active).</summary>
     public string Status { get; set; } = string.Empty;
     public string StatusLabel { get; set; } = string.Empty;
     public bool AllowClaimRequests { get; set; } = true;
@@ -239,21 +239,23 @@ public class MosquePublicDto
         Leadership = MosqueProfileJsonHelper.Parse(m.ProfileJson).Leadership
     };
 
-    private static string MapPublicStatus(MosqueStatus status, bool showPendingState) => status switch
-    {
-        MosqueStatus.Unclaimed => nameof(MosqueStatus.Unclaimed),
-        MosqueStatus.Claimed => nameof(MosqueStatus.Claimed),
-        MosqueStatus.Active => nameof(MosqueStatus.Active),
-        _ => status.ToString()
-    };
+    private static string MapPublicStatus(MosqueStatus status, bool showPendingState) =>
+        MosquePublicVisibility.NormalizeSpecStatus(status) switch
+        {
+            MosqueStatus.Unclaimed => nameof(MosqueStatus.Unclaimed),
+            MosqueStatus.Claimed => nameof(MosqueStatus.Claimed),
+            MosqueStatus.Active => nameof(MosqueStatus.Active),
+            _ => nameof(MosqueStatus.Unclaimed)
+        };
 
-    private static string MapStatusLabel(MosqueStatus status, bool showPendingState) => status switch
-    {
-        MosqueStatus.Unclaimed => "Unclaimed listing",
-        MosqueStatus.Claimed => "Claimed — awaiting activation",
-        MosqueStatus.Active => "Active",
-        _ => "Unknown"
-    };
+    private static string MapStatusLabel(MosqueStatus status, bool showPendingState) =>
+        MosquePublicVisibility.NormalizeSpecStatus(status) switch
+        {
+            MosqueStatus.Unclaimed => "Unclaimed listing",
+            MosqueStatus.Claimed => "Claimed — awaiting activation",
+            MosqueStatus.Active => "Active",
+            _ => "Unknown"
+        };
 
     private static List<string> ParseFacilities(string? json) => ParseJsonStringList(json);
 

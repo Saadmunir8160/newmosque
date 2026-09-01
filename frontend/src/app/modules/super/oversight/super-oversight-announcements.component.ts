@@ -4,11 +4,12 @@ import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { PlatformService, OversightAnnouncementRow } from '../../../core/services/platform.service';
 import { formatMosqueStatus } from '../../../core/utils/mosque-status.util';
+import { SuperAdminPageHeaderComponent } from '../../../shared/ui/super-admin-page-header.component';
 
 @Component({
   selector: 'app-super-oversight-announcements',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, SuperAdminPageHeaderComponent],
   templateUrl: './super-oversight-announcements.component.html',
   styleUrls: ['../claims/super-claims.component.css', './super-oversight.shared.css'],
 })

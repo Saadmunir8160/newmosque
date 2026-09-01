@@ -11,7 +11,7 @@ import { Community } from '../../core/services/content.service';
   standalone: true,
   imports: [CommonModule, PageHeaderComponent, GuestLoginCtaComponent],
   template: `
-    <app-page-header badge="Guest" title="Communities"
+    <app-page-header badge="" title="Communities"
       subtitle="Public spiritual circles — login to join." />
     <app-guest-login-cta />
     <article *ngFor="let c of items()" class="card">

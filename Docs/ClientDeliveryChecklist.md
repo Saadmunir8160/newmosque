@@ -17,6 +17,8 @@
 - [x] [MosqueProfileModule.md](./MosqueProfileModule.md) — Module 3.1 status vs implementation
 - [x] [Module31_Verification.md](./Module31_Verification.md) — demo script + credentials
 - [x] [Module31_Architecture.md](./Module31_Architecture.md) — architecture + ERD
+- [x] [Module32_Verification.md](./Module32_Verification.md) — Prayer Times (3.2) checklist + demo
+- [x] [PrayerEditorModule.md](./PrayerEditorModule.md) — Prayer Times Editor module
 - [x] [DatabaseSchema.md](./DatabaseSchema.md) — key tables / columns / rules
 - [ ] `Docs/DatabaseDocumentation.pdf` — generate from schema doc if client requires PDF
 
@@ -39,6 +41,13 @@
 - [x] `IFileStorageService` local storage abstraction (Azure SDK wiring documented)
 - [x] Public SEO meta + canonical on `/mosque/{slug}` (full SSR deferred)
 - [x] Upload static assets `Cache-Control` headers
+
+## Module 3.2 Prayer Times (Milestones 4–8)
+- [x] Exceptions editor UI + public daily applies overrides
+- [x] Jamaah templates UI + generate daily rows (`TEMPLATE_APPLIED` audit)
+- [x] Next-prayer countdown uses mosque timezone (default `Europe/London`)
+- [x] Public profile + dashboard prayer UX (next countdown, monthly tab)
+- [x] Verification doc: [Module32_Verification.md](./Module32_Verification.md)
 
 ## Final Handover
 - [ ] Client has received the GitHub repository link

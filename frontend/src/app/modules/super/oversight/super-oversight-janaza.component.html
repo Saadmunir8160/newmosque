@@ -1,19 +1,13 @@
 <div class="sc-page">
-  <nav class="sc-breadcrumb" aria-label="Breadcrumb">
-    <a routerLink="/dashboard/super">Dashboard</a>
-    <span aria-hidden="true">›</span>
-    <span>Oversight</span>
-    <span aria-hidden="true">›</span>
-    <span class="sc-breadcrumb__current">Janaza</span>
-  </nav>
-
-  <header class="sc-header">
-    <div>
-      <h1>Janaza oversight</h1>
-      <p>Cross-mosque view of janaza notices — monitor published and draft listings platform-wide.</p>
+  <app-super-admin-page-header
+    title="Janaza oversight"
+    subtitle="Cross-mosque view of janaza notices — monitor published and draft listings platform-wide."
+    crumb="Janaza"
+  >
+    <div actions>
+      <button type="button" class="sc-btn sc-btn--ghost" (click)="load()" [disabled]="loading()">Refresh</button>
     </div>
-    <button type="button" class="sc-btn sc-btn--ghost" (click)="load()" [disabled]="loading()">Refresh</button>
-  </header>
+  </app-super-admin-page-header>
 
   <section class="sc-kpis">
     <article class="sc-kpi">

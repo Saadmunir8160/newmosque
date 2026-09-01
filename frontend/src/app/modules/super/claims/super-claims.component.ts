@@ -4,6 +4,7 @@ import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { PlatformService, PendingOwnershipClaim } from '../../../core/services/platform.service';
 import { SuperClaimReviewDrawerComponent } from './super-claim-review-drawer.component';
+import { SuperAdminPageHeaderComponent } from '../../../shared/ui/super-admin-page-header.component';
 
 type StatusFilter = 'Pending' | 'All';
 type SortKey = 'submittedAt' | 'mosqueName' | 'claimantName' | 'claimReference';
@@ -12,7 +13,7 @@ type SortDir = 'asc' | 'desc';
 @Component({
   selector: 'app-super-claims',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, SuperClaimReviewDrawerComponent],
+  imports: [CommonModule, RouterModule, FormsModule, SuperClaimReviewDrawerComponent, SuperAdminPageHeaderComponent],
   templateUrl: './super-claims.component.html',
   styleUrls: ['./super-claims.component.css'],
 })

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.API.Services;
 using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
@@ -16,7 +17,24 @@ namespace MosqueOS.API.Controllers
 
         public DuasController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
 
-        /// <summary>Browse organised by category (morning, wudu, after_prayer, mosque, general, food, sleep, travel).</summary>
+        /// <summary>Browse organised by category — not a flat dump (spec 3.9).</summary>
+        [HttpGet("browse")]
+        public async Task<IActionResult> Browse()
+        {
+            var duas = await _unitOfWork.Repository<Dua>().QueryNoTracking()
+                .Where(d => d.Status == ContentPublishStatus.Published)
+                .OrderBy(d => d.Category).ThenBy(d => d.Title)
+                .ToListAsync();
+
+            var grouped = duas
+                .GroupBy(d => string.IsNullOrWhiteSpace(d.Category) ? "general" : d.Category)
+                .OrderBy(g => CategorySort(g.Key))
+                .Select(g => new { category = g.Key, count = g.Count(), items = g.ToList() });
+
+            return Ok(grouped);
+        }
+
+        /// <summary>Flat list with optional category filter.</summary>
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] string? category)
         {
@@ -27,32 +45,24 @@ namespace MosqueOS.API.Controllers
         }
 
         [HttpGet("categories")]
-        public async Task<IActionResult> GetCategories() =>
-            Ok(await _unitOfWork.Repository<Dua>().QueryNoTracking().Select(d => d.Category).Distinct().OrderBy(c => c).ToListAsync());
+        public async Task<IActionResult> GetCategories()
+        {
+            var known = new[] { "morning", "wudu", "after_prayer", "mosque", "general", "food", "sleep", "travel" };
+            var fromDb = await _unitOfWork.Repository<Dua>().QueryNoTracking()
+                .Where(d => d.Status == ContentPublishStatus.Published)
+                .Select(d => d.Category)
+                .Distinct()
+                .ToListAsync();
+            return Ok(known.Union(fromDb.Where(c => !string.IsNullOrWhiteSpace(c))).Distinct().OrderBy(CategorySort));
+        }
 
-        /// <summary>Single most relevant dua for the current time (home screen, spec 3.9).</summary>
+        /// <summary>Single most relevant dua for the current time (home screen).</summary>
         [HttpGet("recommended-now")]
         public async Task<IActionResult> RecommendedNow()
         {
             var london = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time");
             var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, london);
-
-            var category = now.Hour switch
-            {
-                >= 4 and < 10 => "morning",
-                >= 10 and < 18 => "general",
-                >= 18 and < 22 => "after_prayer",
-                _ => "sleep"
-            };
-
-            var dua = await _unitOfWork.Repository<Dua>().QueryNoTracking()
-                .Where(d => d.Category == category && d.Status == ContentPublishStatus.Published)
-                .OrderBy(d => d.Id)
-                .FirstOrDefaultAsync()
-                ?? await _unitOfWork.Repository<Dua>().QueryNoTracking()
-                    .Where(d => d.Status == ContentPublishStatus.Published)
-                    .OrderBy(d => d.Id).FirstOrDefaultAsync();
-
+            var dua = await DuaRecommendationHelper.ResolveAsync(_unitOfWork, now);
             return Ok(dua);
         }
 
@@ -98,7 +108,20 @@ namespace MosqueOS.API.Controllers
             return Ok(dua);
         }
 
-        // ---- Collections (e.g. Ghazali Supplications, Friday Duas) ----
+        [Authorize(Roles = Roles.ContentManagers)]
+        [HttpPost("{id:int}/publish")]
+        public async Task<IActionResult> Publish(int id)
+        {
+            var dua = await _unitOfWork.Repository<Dua>().FindAsync(id);
+            if (dua == null) return NotFound();
+            dua.Status = ContentPublishStatus.Published;
+            dua.PublishedAt = DateTime.UtcNow;
+            dua.UpdatedAt = DateTime.UtcNow;
+            await _unitOfWork.SaveChangesAsync();
+            return Ok(dua);
+        }
+
+        // ---- Collections ----
 
         [HttpGet("collections")]
         public async Task<IActionResult> GetCollections() =>
@@ -108,10 +131,13 @@ namespace MosqueOS.API.Controllers
         public async Task<IActionResult> GetCollection(int id)
         {
             var collection = await _unitOfWork.Repository<DuaCollection>().QueryNoTracking()
-                .Include(c => c.Items.OrderBy(i => i.OrderIndex))
+                .Include(c => c.Items)
                 .ThenInclude(i => i.Dua)
                 .FirstOrDefaultAsync(c => c.Id == id);
-            return collection == null ? NotFound() : Ok(collection);
+            if (collection == null) return NotFound();
+            if (collection.Items != null)
+                collection.Items = collection.Items.OrderBy(i => i.OrderIndex).ToList();
+            return Ok(collection);
         }
 
         [Authorize(Roles = Roles.ContentManagers)]
@@ -134,5 +160,18 @@ namespace MosqueOS.API.Controllers
             await _unitOfWork.SaveChangesAsync();
             return Ok(item);
         }
+
+        private static int CategorySort(string c) => c switch
+        {
+            "morning" => 0,
+            "wudu" => 1,
+            "after_prayer" => 2,
+            "mosque" => 3,
+            "food" => 4,
+            "sleep" => 5,
+            "travel" => 6,
+            "general" => 7,
+            _ => 8
+        };
     }
 }

@@ -1,20 +1,23 @@
 <div class="rbac-dash">
-  <header class="rbac-header">
-    <div class="rbac-header__text">
-      <p class="rbac-eyebrow">Super Admin</p>
-      <h1 class="rbac-title">Users &amp; Roles</h1>
-      <p class="rbac-sub">Enterprise member management — search, filter, assign roles, and bulk actions.</p>
+  <app-super-admin-page-header
+    crumb="User Management"
+    [title]="mainTab() === 'roles' ? 'Roles & Permissions' : 'Users'"
+    [subtitle]="mainTab() === 'roles'
+      ? 'MOS role definitions and permission groups.'
+      : 'Manage platform accounts, roles, and mosque assignments.'"
+    [showMeta]="true">
+    <div actions class="rbac-header__actions">
+      <button type="button" class="btn-outline" (click)="load()" [disabled]="loading()">Refresh</button>
+      <a *ngIf="mainTab() === 'users'" routerLink="/dashboard/super/invitations" class="btn-outline">Invitations</a>
+      <button *ngIf="mainTab() === 'users'" type="button" class="btn-primary" (click)="goRoles()">Roles &amp; Permissions</button>
+      <button *ngIf="mainTab() === 'roles'" type="button" class="btn-primary" (click)="goUsers()">Back to Users</button>
     </div>
-    <div class="rbac-header__actions">
-      <button type="button" class="btn-outline" (click)="load()">Refresh</button>
-      <button type="button" class="btn-primary" (click)="mainTab.set('roles')">Role definitions</button>
-    </div>
-  </header>
+  </app-super-admin-page-header>
 
-  <div *ngIf="toast()" class="toast" [class.toast--ok]="toastOk()" [class.toast--err]="!toastOk()">{{ toast() }}</div>
+  <div *ngIf="toast()" class="toast" [class.toast--ok]="toastOk()" [class.toast--err]="!toastOk()" role="status">{{ toast() }}</div>
 
-  <!-- Stats -->
-  <div class="rbac-stats">
+  <!-- Users KPIs -->
+  <div class="rbac-stats" *ngIf="mainTab() === 'users'">
     <article class="stat-card">
       <span class="stat-card__icon" aria-hidden="true">👥</span>
       <div class="stat-card__body">
@@ -25,39 +28,68 @@
     <article class="stat-card">
       <span class="stat-card__icon stat-card__icon--success" aria-hidden="true">✓</span>
       <div class="stat-card__body">
-        <p class="stat-card__label">Active users</p>
+        <p class="stat-card__label">Active</p>
         <p class="stat-card__value">{{ activeUsersCount() }}</p>
       </div>
     </article>
     <article class="stat-card">
+      <span class="stat-card__icon stat-card__icon--warn" aria-hidden="true">❔</span>
+      <div class="stat-card__body">
+        <p class="stat-card__label">Unassigned</p>
+        <p class="stat-card__value">{{ unassignedCount() }}</p>
+        <p class="stat-card__hint">No role yet</p>
+      </div>
+    </article>
+    <a class="stat-card stat-card--link" routerLink="/dashboard/super/invitations">
+      <span class="stat-card__icon stat-card__icon--gold" aria-hidden="true">✉</span>
+      <div class="stat-card__body">
+        <p class="stat-card__label">Pending invites</p>
+        <p class="stat-card__value">{{ pendingInvitesCount() }}</p>
+        <p class="stat-card__hint">Open invitations →</p>
+      </div>
+    </a>
+  </div>
+
+  <!-- Roles KPIs -->
+  <div class="rbac-stats" *ngIf="mainTab() === 'roles'">
+    <article class="stat-card">
       <span class="stat-card__icon stat-card__icon--gold" aria-hidden="true">◎</span>
       <div class="stat-card__body">
-        <p class="stat-card__label">Roles</p>
+        <p class="stat-card__label">Defined roles</p>
         <p class="stat-card__value">{{ rolesCount() }}</p>
       </div>
     </article>
     <article class="stat-card">
-      <span class="stat-card__icon stat-card__icon--warn" aria-hidden="true">✉</span>
+      <span class="stat-card__icon" aria-hidden="true">👥</span>
       <div class="stat-card__body">
-        <p class="stat-card__label">Pending invitations</p>
-        <p class="stat-card__value">{{ pendingInvitesCount() }}</p>
-        <p class="stat-card__hint">No role assigned</p>
+        <p class="stat-card__label">Platform users</p>
+        <p class="stat-card__value">{{ users().length }}</p>
+      </div>
+    </article>
+    <article class="stat-card">
+      <span class="stat-card__icon stat-card__icon--success" aria-hidden="true">✓</span>
+      <div class="stat-card__body">
+        <p class="stat-card__label">With a role</p>
+        <p class="stat-card__value">{{ activeUsersCount() }}</p>
+      </div>
+    </article>
+    <article class="stat-card">
+      <span class="stat-card__icon stat-card__icon--warn" aria-hidden="true">❔</span>
+      <div class="stat-card__body">
+        <p class="stat-card__label">Unassigned</p>
+        <p class="stat-card__value">{{ unassignedCount() }}</p>
       </div>
     </article>
   </div>
 
-  <div class="rbac-tabs" role="tablist">
-    <button type="button" class="rbac-tab" [class.rbac-tab--on]="mainTab() === 'users'" (click)="mainTab.set('users')">Users</button>
-    <button type="button" class="rbac-tab" [class.rbac-tab--on]="mainTab() === 'roles'" (click)="mainTab.set('roles')">Role definitions</button>
-  </div>
-
+  <!-- USERS WORKSPACE -->
   <div class="rbac-workspace" *ngIf="mainTab() === 'users'">
-    <aside class="role-nav">
+    <aside class="role-nav" aria-label="Filter by role">
       <h3 class="role-nav__title">Browse by role</h3>
       <nav class="role-nav__list">
         <button type="button" *ngFor="let row of roleNavCounts()" class="role-nav__item"
           [class.role-nav__item--on]="roleNavKey === row.key" (click)="setRoleNav(row.key)">
-          <span class="role-nav__icon">{{ row.icon }}</span>
+          <span class="role-nav__icon" aria-hidden="true">{{ row.icon }}</span>
           <span class="role-nav__label">{{ row.label }}</span>
           <span class="role-nav__count">{{ row.count }}</span>
         </button>
@@ -69,38 +101,37 @@
         <div class="toolbar-grid">
           <div class="search-field">
             <svg class="search-field__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input class="search-field__input" type="search" placeholder="Search name or email…" [(ngModel)]="query" (ngModelChange)="onSearch()">
+            <input class="search-field__input" type="search" placeholder="Search name, username, or email…" [(ngModel)]="query" (ngModelChange)="onSearch()" aria-label="Search users">
           </div>
-          <select class="filter-select" [(ngModel)]="statusFilter" (ngModelChange)="applyFilter()">
+          <select class="filter-select" [(ngModel)]="statusFilter" (ngModelChange)="applyFilter()" aria-label="Status">
             <option value="all">All statuses</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
-            <option value="pending">Pending</option>
+            <option value="pending">Pending (no role)</option>
           </select>
-          <select class="filter-select" [(ngModel)]="mosqueFilter" (ngModelChange)="applyFilter()">
+          <select class="filter-select" [(ngModel)]="mosqueFilter" (ngModelChange)="applyFilter()" aria-label="Mosque">
             <option [ngValue]="null">All mosques</option>
             <option *ngFor="let m of mosques()" [ngValue]="m.id">{{ m.name }}</option>
           </select>
-          <select class="filter-select" [(ngModel)]="sortKey" (ngModelChange)="applyFilter()">
+          <select class="filter-select" [(ngModel)]="sortKey" (ngModelChange)="applyFilter()" aria-label="Sort">
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
             <option value="name">Name A–Z</option>
             <option value="lastLogin">Last login</option>
           </select>
-          <button type="button" class="btn-clear" (click)="clearFilters()">Clear filters</button>
+          <button type="button" class="btn-clear" (click)="clearFilters()">Clear</button>
         </div>
         <p class="toolbar-meta">Showing <strong>{{ filtered().length }}</strong> of {{ users().length }} users</p>
       </section>
 
-      <!-- Bulk bar -->
-      <section *ngIf="selectedCount() > 0" class="bulk-bar">
+      <section *ngIf="selectedCount() > 0" class="bulk-bar" aria-label="Bulk actions">
         <span class="bulk-bar__count">{{ selectedCount() }} selected</span>
-        <select class="filter-select filter-select--sm" [(ngModel)]="bulkRole">
+        <select class="filter-select filter-select--sm" [(ngModel)]="bulkRole" aria-label="Bulk role">
           <option value="">Bulk assign role…</option>
           <option *ngFor="let r of allRoles" [value]="r">{{ r }}</option>
         </select>
         <button type="button" class="bulk-btn" (click)="runBulk('assignRole')" [disabled]="actionBusy() === 'bulk'">Assign role</button>
-        <select class="filter-select filter-select--sm" [(ngModel)]="bulkMosqueId">
+        <select class="filter-select filter-select--sm" [(ngModel)]="bulkMosqueId" aria-label="Bulk mosque">
           <option [ngValue]="null">No mosque</option>
           <option *ngFor="let m of mosques()" [ngValue]="m.id">{{ m.name }}</option>
         </select>
@@ -116,7 +147,7 @@
 
       <div *ngIf="!loading() && !loadError() && !filtered().length" class="state-box state-box--empty">
         <h3>{{ users().length ? 'No matches' : 'No users yet' }}</h3>
-        <p>{{ users().length ? 'Try adjusting filters or search.' : 'Users appear after registration or seed.' }}</p>
+        <p>{{ users().length ? 'Try adjusting filters or search.' : 'Users appear after registration, invite, or seed.' }}</p>
       </div>
 
       <div *ngIf="!loading() && !loadError() && filtered().length" class="table-card">
@@ -129,17 +160,17 @@
                 <th>Role</th>
                 <th>Mosque</th>
                 <th>Status</th>
-                <th>Created</th>
-                <th>Last login</th>
+                <th class="col-joined">Joined</th>
+                <th class="col-login">Last login</th>
                 <th class="th-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let u of paginatedUsers()">
-                <td class="td-check"><input type="checkbox" [checked]="selected().has(u.id)" (change)="toggleSelect(u.id, $any($event.target).checked)" [attr.aria-label]="'Select ' + u.fullName"></td>
+                <td class="td-check"><input type="checkbox" [checked]="selected().has(u.id)" (change)="toggleSelect(u.id, $any($event.target).checked)" [attr.aria-label]="'Select ' + (u.fullName || u.userName)"></td>
                 <td>
                   <div class="user-cell">
-                    <div class="user-avatar" [ngClass]="primaryRoleClass(u)">{{ initials(u) }}</div>
+                    <div class="user-avatar" [ngClass]="primaryRoleClass(u)" aria-hidden="true">{{ initials(u) }}</div>
                     <div>
                       <p class="user-name">{{ u.fullName || u.userName }}</p>
                       <p class="user-email">{{ u.email || 'No email' }}</p>
@@ -148,24 +179,26 @@
                 </td>
                 <td>
                   <div class="role-badges">
-                    <span *ngFor="let r of u.roles" class="role-badge" [ngClass]="roleClass(r)">{{ r }}</span>
+                    <span class="role-badge" [ngClass]="roleClass(primaryRoleLabel(u))" *ngIf="u.roles.length">{{ primaryRoleLabel(u) }}</span>
+                    <span class="role-badge role-badge--extra" *ngIf="u.roles.length > 1">+{{ u.roles.length - 1 }}</span>
                     <span *ngIf="!u.roles.length" class="role-badge role-badge--muted">Unassigned</span>
                   </div>
                 </td>
-                <td><span class="mosque-cell">{{ u.mosqueName || '—' }}</span></td>
+                <td>
+                  <span class="mosque-cell" [class.mosque-cell--empty]="!u.mosqueName">{{ u.mosqueName || '—' }}</span>
+                </td>
                 <td><span class="status-badge" [ngClass]="userStatus(u).cls">{{ userStatus(u).label }}</span></td>
-                <td><time class="date-cell">{{ u.createdAt | date:'mediumDate' }}</time></td>
-                <td><time class="date-cell">{{ formatLastLogin(u) }}</time></td>
+                <td class="col-joined"><time class="date-cell">{{ u.createdAt | date:'mediumDate' }}</time></td>
+                <td class="col-login"><time class="date-cell">{{ formatLastLogin(u) }}</time></td>
                 <td class="td-actions">
                   <div class="menu-wrap">
-                    <button type="button" class="menu-trigger" (click)="toggleMenu(u.id, $event)" [attr.aria-expanded]="openMenuId() === u.id">⋯</button>
-                    <div *ngIf="openMenuId() === u.id" class="menu-panel" (click)="$event.stopPropagation()">
-                      <button type="button" (click)="openEditUser(u)">Edit user</button>
-                      <button type="button" (click)="openEditUser(u)">Change role</button>
-                      <button type="button" (click)="openUserPermissions(u)">Manage permissions</button>
-                      <button type="button" (click)="resetPassword(u)">Reset password</button>
-                      <button type="button" (click)="toggleActive(u)">{{ u.isActive === false ? 'Activate' : 'Deactivate' }}</button>
-                      <button type="button" class="menu-panel__danger" (click)="deleteUser(u)">Delete user</button>
+                    <button type="button" class="menu-trigger" (click)="toggleMenu(u.id, $event)" [attr.aria-expanded]="openMenuId() === u.id" [attr.aria-label]="'Actions for ' + (u.fullName || u.userName)">⋯</button>
+                    <div *ngIf="openMenuId() === u.id" class="menu-panel" (click)="$event.stopPropagation()" role="menu">
+                      <button type="button" role="menuitem" (click)="openEditUser(u)">Edit user / roles</button>
+                      <button type="button" role="menuitem" (click)="openUserPermissions(u)">View permissions</button>
+                      <button type="button" role="menuitem" (click)="resetPassword(u)">Reset password</button>
+                      <button type="button" role="menuitem" (click)="toggleActive(u)">{{ u.isActive === false ? 'Activate' : 'Deactivate' }}</button>
+                      <button type="button" role="menuitem" class="menu-panel__danger" (click)="deleteUser(u)">Delete user</button>
                     </div>
                   </div>
                 </td>
@@ -176,14 +209,12 @@
 
         <footer class="pagination">
           <div class="pagination__left">
-            <label>Rows per page</label>
-            <select class="filter-select filter-select--sm" [ngModel]="pageSize()" (ngModelChange)="setPageSize(+$event)">
+            <label for="rows-per-page">Rows</label>
+            <select id="rows-per-page" class="filter-select filter-select--sm" [ngModel]="pageSize()" (ngModelChange)="setPageSize(+$event)">
               <option *ngFor="let s of PAGE_SIZES" [value]="s">{{ s }}</option>
             </select>
           </div>
-          <div class="pagination__center">
-            Page {{ page() }} of {{ totalPages() }}
-          </div>
+          <div class="pagination__center">Page {{ page() }} of {{ totalPages() }}</div>
           <div class="pagination__right">
             <button type="button" class="page-btn" [disabled]="page() <= 1" (click)="setPage(page() - 1)">Previous</button>
             <button type="button" class="page-btn" [disabled]="page() >= totalPages()" (click)="setPage(page() + 1)">Next</button>
@@ -193,12 +224,13 @@
     </main>
   </div>
 
-  <!-- Roles tab -->
+  <!-- ROLES WORKSPACE -->
   <div class="roles-panel" *ngIf="mainTab() === 'roles'">
+    <p class="roles-intro">Each card is a MOS platform role. Permissions are derived from role — assign roles on the Users page.</p>
     <div class="roles-grid">
       <article *ngFor="let def of roleDefinitions()" class="role-card" (click)="openRolePermissions(def.role)">
         <div class="role-card__head">
-          <span class="role-card__icon">{{ def.icon }}</span>
+          <span class="role-card__icon" aria-hidden="true">{{ def.icon }}</span>
           <h3 class="role-card__title">{{ def.role }}</h3>
         </div>
         <p class="role-card__desc">{{ def.description }}</p>
@@ -214,23 +246,35 @@
 
 <!-- Edit user modal -->
 <div *ngIf="editingUser() as u" class="modal-backdrop" (click)="closeEditUser()" role="presentation">
-  <div class="modal-card" (click)="$event.stopPropagation()" role="dialog">
+  <div class="modal-card" (click)="$event.stopPropagation()" role="dialog" aria-labelledby="edit-user-title">
     <button type="button" class="modal-close" (click)="closeEditUser()" aria-label="Close">×</button>
-    <h2 class="modal-title">Edit user</h2>
-    <p class="modal-sub">{{ u.fullName || u.userName }} · {{ u.email }}</p>
+    <h2 id="edit-user-title" class="modal-title">Edit user</h2>
+    <p class="modal-sub">{{ u.fullName || u.userName }} · {{ u.email || 'No email' }}</p>
+
     <p class="modal-label">Assigned mosque</p>
-    <p class="modal-meta">{{ u.mosqueName || 'No mosque assigned' }}</p>
+    <div class="assign-row" style="margin-bottom: 1rem">
+      <select class="filter-select" [(ngModel)]="editMosqueId" aria-label="Mosque">
+        <option [ngValue]="null">No mosque</option>
+        <option *ngFor="let m of mosques()" [ngValue]="m.id">{{ m.name }} ({{ m.city }})</option>
+      </select>
+      <button type="button" class="btn-outline btn-sm" (click)="saveMosqueAssignment()" [disabled]="actionBusy() === u.id">
+        Save mosque
+      </button>
+    </div>
+
     <p class="modal-label">Current roles</p>
     <div class="role-badges modal-roles">
       <span *ngFor="let r of u.roles" class="role-badge" [ngClass]="roleClass(r)">
         {{ r }}
-        <button *ngIf="r !== ROLES.SuperAdmin" type="button" class="role-badge__x" (click)="removeRole(u.id, r)">×</button>
+        <button *ngIf="r !== ROLES.SuperAdmin" type="button" class="role-badge__x" (click)="removeRole(u.id, r)" [attr.aria-label]="'Remove ' + r">×</button>
       </span>
+      <span *ngIf="!u.roles.length" class="role-badge role-badge--muted">Unassigned</span>
     </div>
+
     <div class="modal-field" *ngIf="availableRoles(u).length">
-      <label class="modal-label">Add role</label>
+      <label class="modal-label" for="add-role">Add role</label>
       <div class="assign-row">
-        <select class="filter-select" [(ngModel)]="rolePick[u.id]">
+        <select id="add-role" class="filter-select" [(ngModel)]="rolePick[u.id]">
           <option value="">Select role…</option>
           <option *ngFor="let r of availableRoles(u)" [value]="r">{{ r }}</option>
         </select>
@@ -244,9 +288,9 @@
 
 <!-- Permissions modal -->
 <div *ngIf="permissionsTarget()" class="modal-backdrop" (click)="closePermissions()" role="presentation">
-  <div class="modal-card modal-card--wide" (click)="$event.stopPropagation()" role="dialog">
+  <div class="modal-card modal-card--wide" (click)="$event.stopPropagation()" role="dialog" aria-labelledby="perm-title">
     <button type="button" class="modal-close" (click)="closePermissions()" aria-label="Close">×</button>
-    <h2 class="modal-title">{{ permissionsTitle() }}</h2>
+    <h2 id="perm-title" class="modal-title">{{ permissionsTitle() }}</h2>
     <p class="modal-sub">{{ permissionsSubtitle() }}</p>
     <div class="perm-groups">
       <details *ngFor="let g of PERMISSION_GROUPS" class="perm-group" open>
@@ -256,11 +300,11 @@
         </summary>
         <ul class="perm-list">
           <li *ngFor="let p of g.permissions" class="perm-item" [class.perm-item--on]="hasPermission(p)">
-            <span class="perm-check">{{ hasPermission(p) ? '☑' : '☐' }}</span> {{ p }}
+            <span class="perm-check" aria-hidden="true">{{ hasPermission(p) ? '☑' : '☐' }}</span> {{ p }}
           </li>
         </ul>
       </details>
     </div>
-    <p class="perm-note">Permissions are derived from assigned roles.</p>
+    <p class="perm-note">Permissions are derived from assigned roles (read-only on this screen).</p>
   </div>
 </div>

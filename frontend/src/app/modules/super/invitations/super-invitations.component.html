@@ -1,17 +1,13 @@
 <div class="sc-page">
-  <nav class="sc-breadcrumb" aria-label="Breadcrumb">
-    <a routerLink="/dashboard/super">Dashboard</a>
-    <span aria-hidden="true">›</span>
-    <span class="sc-breadcrumb__current">Invitations</span>
-  </nav>
-
-  <header class="sc-header">
-    <div>
-      <h1>Mosque invitations</h1>
-      <p>Track owner and admin invitations sent by email. Resend or revoke pending invites.</p>
+  <app-super-admin-page-header
+    title="Mosque invitations"
+    subtitle="Track owner and admin invitations sent by email. Resend or revoke pending invites."
+    crumb="Invitations"
+  >
+    <div actions>
+      <button type="button" class="sc-btn sc-btn--ghost" (click)="load()" [disabled]="loading()">Refresh</button>
     </div>
-    <button type="button" class="sc-btn sc-btn--ghost" (click)="load()" [disabled]="loading()">Refresh</button>
-  </header>
+  </app-super-admin-page-header>
 
   <section class="sc-kpis">
     <article class="sc-kpi">

@@ -72,7 +72,7 @@ namespace MosqueOS.API.Controllers
             return Ok(registration);
         }
 
-        [Authorize(Roles = Roles.Admins)]
+        [Authorize(Roles = Roles.ParticipationManagers)]
         [HttpGet("{opportunityId:int}/registrations")]
         public async Task<IActionResult> GetRegistrations(int mosqueId, int opportunityId) =>
             Ok(await _unitOfWork.Repository<ParticipationRegistration>().QueryNoTracking()

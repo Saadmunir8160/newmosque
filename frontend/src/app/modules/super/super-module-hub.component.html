@@ -1,0 +1,87 @@
+<div class="sc-page" *ngIf="def() as m">
+  <app-super-admin-page-header
+    crumb="Modules"
+    [title]="m.title"
+    [subtitle]="m.subtitle">
+    <div actions>
+      <button type="button" class="sc-btn sc-btn--ghost" (click)="load()" [disabled]="loading()">Refresh</button>
+      <a routerLink="/dashboard/super/features" class="sc-btn">Feature Flags</a>
+    </div>
+  </app-super-admin-page-header>
+
+  <p *ngIf="error()" class="sc-alert sc-alert--error" role="alert">{{ error() }}</p>
+  <div *ngIf="loading()" class="sc-state-loading"><span class="sc-pulse"></span> Loading {{ m.title }}…</div>
+
+  <ng-container *ngIf="!loading() && !error()">
+    <section class="sc-kpis">
+      <article class="sc-kpi">
+        <p class="sc-kpi__label">Active mosques</p>
+        <p class="sc-kpi__value">{{ activeMosques() }}</p>
+      </article>
+      <article class="sc-kpi" *ngIf="enabledMosqueCount() !== null">
+        <p class="sc-kpi__label">Flag enabled</p>
+        <p class="sc-kpi__value">{{ enabledMosqueCount() }}</p>
+      </article>
+      <article class="sc-kpi">
+        <p class="sc-kpi__label">Module usage signal</p>
+        <p class="sc-kpi__value">{{ usageCount() }}</p>
+      </article>
+      <article class="sc-kpi" *ngIf="contentHint() as c">
+        <p class="sc-kpi__label">{{ c.label }}</p>
+        <p class="sc-kpi__value">{{ c.value }}</p>
+      </article>
+      <article class="sc-kpi">
+        <p class="sc-kpi__label">Total listings</p>
+        <p class="sc-kpi__value">{{ mosques().length }}</p>
+      </article>
+    </section>
+
+    <section class="sc-panel">
+      <h2 class="sc-panel__title">What this module covers</h2>
+      <p class="sc-panel__text">{{ m.docHint }}</p>
+      <p class="sc-panel__text" *ngIf="m.featureKeys.length">
+        Related feature flags:
+        <strong *ngFor="let k of m.featureKeys; let last = last">{{ k }}<span *ngIf="!last">, </span></strong>
+      </p>
+      <p class="sc-panel__text" *ngIf="!m.featureKeys.length">
+        Content is managed in Content Editor / mosque admin portals. Use Feature Flags to enable related modules per mosque.
+      </p>
+      <div class="sc-actions-row">
+        <a *ngFor="let link of oversightLinks()" [routerLink]="link.route" class="sc-btn" [class.sc-btn--ghost]="link.route !== '/dashboard/super/features'">
+          {{ link.label }}
+        </a>
+      </div>
+    </section>
+
+    <section class="sc-panel sc-panel--flush">
+      <div class="sc-table-wrap">
+        <table class="sc-table">
+          <thead>
+            <tr>
+              <th>Mosque</th>
+              <th>City</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of mosques().slice(0, 25)">
+              <td>{{ row.name }}</td>
+              <td>{{ row.city }}</td>
+              <td>{{ row.status }}</td>
+              <td>
+                <a [routerLink]="['/dashboard/super/mosques', row.id]" class="sc-link">Open</a>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="sc-panel__text" *ngIf="mosques().length > 25">Showing first 25 of {{ mosques().length }} mosques.</p>
+    </section>
+  </ng-container>
+</div>
+
+<div class="sc-page" *ngIf="!def() && !loading()">
+  <app-super-admin-page-header crumb="Modules" title="Module not found" subtitle="Choose a module from the sidebar." />
+  <p class="sc-alert sc-alert--error" *ngIf="error()">{{ error() }}</p>
+</div>

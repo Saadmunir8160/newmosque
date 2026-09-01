@@ -126,7 +126,9 @@ namespace MosqueOS.API.Controllers
                 GuideId = id,
                 Title = request.Title.Trim(),
                 Description = request.Description?.Trim() ?? string.Empty,
-                OrderIndex = request.OrderIndex > 0 ? request.OrderIndex : 1
+                OrderIndex = request.OrderIndex > 0 ? request.OrderIndex : 1,
+                ImageUrl = request.ImageUrl?.Trim(),
+                DuaId = request.DuaId
             };
             _unitOfWork.Repository<RitualStep>().Add(step);
             guide.UpdatedAt = DateTime.UtcNow;
@@ -146,6 +148,8 @@ namespace MosqueOS.API.Controllers
             step.Title = request.Title.Trim();
             step.Description = request.Description?.Trim() ?? string.Empty;
             step.OrderIndex = request.OrderIndex > 0 ? request.OrderIndex : step.OrderIndex;
+            if (request.ImageUrl != null) step.ImageUrl = request.ImageUrl.Trim();
+            if (request.DuaId.HasValue) step.DuaId = request.DuaId;
             step.UpdatedAt = DateTime.UtcNow;
 
             var guide = await _unitOfWork.Repository<RitualGuide>().FindAsync(guideId);

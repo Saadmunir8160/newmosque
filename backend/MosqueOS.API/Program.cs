@@ -35,6 +35,7 @@ builder.Services.AddScoped<MosqueInvitationService>();
 builder.Services.AddScoped<MosqueAuditService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<MosquePublicProfileCache>();
+builder.Services.AddScoped<JamaahTemplateService>();
 builder.Services.Configure<StorageOptions>(builder.Configuration.GetSection(StorageOptions.SectionName));
 builder.Services.AddSingleton<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddMosqueRateLimiting();
@@ -55,6 +56,8 @@ else
 }
 builder.Services.AddScoped<EmailOtpService>();
 builder.Services.AddScoped<EmailVerificationService>();
+builder.Services.AddScoped<AuthSessionService>();
+builder.Services.AddScoped<PasswordResetService>();
 builder.Services.Configure<MosqueOS.API.Services.EmailOptions>(builder.Configuration.GetSection("Email"));
 builder.Services.AddSingleton<MosqueOS.API.Services.IEmailSender, MosqueOS.API.Services.MosqueEmailSender>();
 
@@ -77,6 +80,9 @@ var authBuilder = builder.Services.AddAuthentication(options =>
     {
         ValidateIssuer = true,
         ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ClockSkew = TimeSpan.FromMinutes(1),
         ValidAudience = builder.Configuration["JWT:ValidAudience"],
         ValidIssuer = builder.Configuration["JWT:ValidIssuer"],
         IssuerSigningKey = new SymmetricSecurityKey(
@@ -147,6 +153,22 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+{
+    var emailOpts = app.Configuration.GetSection("Email").Get<MosqueOS.API.Services.EmailOptions>()
+        ?? new MosqueOS.API.Services.EmailOptions();
+    var smtpUser = emailOpts.Smtp.Username?.Trim() ?? "";
+    var smtpPass = (emailOpts.Smtp.Password ?? "").Replace(" ", "");
+    var smtpReady = !string.IsNullOrWhiteSpace(emailOpts.Smtp.Host)
+        && !string.IsNullOrWhiteSpace(smtpUser)
+        && !string.IsNullOrWhiteSpace(smtpPass);
+    var startupLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+    if (smtpReady)
+        startupLog.LogInformation("Email SMTP ready — OTP emails will send from {From} via {Host}", emailOpts.FromAddress, emailOpts.Smtp.Host);
+    else
+        startupLog.LogWarning("Email SMTP not ready — OTP will only appear in console until Email:Smtp:Password is set in appsettings.Local.json (Gmail App Password for {User})",
+            string.IsNullOrWhiteSpace(smtpUser) ? "saadmunir8160@gmail.com" : smtpUser);
+}
+
 using (var scope = app.Services.CreateScope())
 {
     var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
@@ -195,6 +217,16 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("Frontend");
+
+app.Use(async (ctx, next) =>
+{
+    ctx.Response.Headers.TryAdd("X-Content-Type-Options", "nosniff");
+    ctx.Response.Headers.TryAdd("X-Frame-Options", "DENY");
+    ctx.Response.Headers.TryAdd("Referrer-Policy", "strict-origin-when-cross-origin");
+    ctx.Response.Headers.TryAdd("X-XSS-Protection", "0");
+    ctx.Response.Headers.TryAdd("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+    await next();
+});
 
 var webRoot = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
 Directory.CreateDirectory(webRoot);

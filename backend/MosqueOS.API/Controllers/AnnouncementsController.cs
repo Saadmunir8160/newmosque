@@ -56,11 +56,19 @@ namespace MosqueOS.API.Controllers
         }
 
         [HttpGet("{id:int}")]
+        [AllowAnonymous]
         public async Task<IActionResult> Get(int mosqueId, int id)
         {
             var item = await _unitOfWork.Repository<Announcement>().QueryNoTracking()
                 .FirstOrDefaultAsync(a => a.Id == id && a.MosqueId == mosqueId);
-            return item == null ? NotFound() : Ok(item);
+            if (item == null) return NotFound();
+
+            var isAdmin = User.IsInRole(Roles.SuperAdmin) || User.IsInRole(Roles.MosqueAdmin)
+                || User.IsInRole(Roles.MosqueOwner) || User.IsInRole(Roles.ContentEditor);
+            if (!isAdmin && item.Status != PublishStatus.Published)
+                return NotFound();
+
+            return Ok(item);
         }
 
         [Authorize(Roles = Roles.ContentManagers)]

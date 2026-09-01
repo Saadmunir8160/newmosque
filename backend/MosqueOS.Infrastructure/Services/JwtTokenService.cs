@@ -14,13 +14,19 @@ public class JwtTokenService : IJwtTokenService
 
     public JwtTokenService(IConfiguration configuration) => _configuration = configuration;
 
-    public (string Token, DateTime Expiration) CreateToken(ApplicationUser user, IList<string> roles)
+    public (string Token, DateTime Expiration, string JwtId) CreateToken(
+        ApplicationUser user,
+        IList<string> roles,
+        TimeSpan? lifetime = null)
     {
+        var jwtId = Guid.NewGuid().ToString("N");
         var authClaims = new List<Claim>
         {
             new(ClaimTypes.Name, user.UserName!),
             new(ClaimTypes.NameIdentifier, user.Id),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new(ClaimTypes.Email, user.Email ?? string.Empty),
+            new(JwtRegisteredClaimNames.Jti, jwtId),
+            new(JwtRegisteredClaimNames.Sub, user.Id),
         };
 
         foreach (var role in roles)
@@ -29,14 +35,32 @@ public class JwtTokenService : IJwtTokenService
         var key = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(_configuration["JWT:Secret"] ?? "SuperSecretKeyForDevelopmentOnlyPleaseChange123"));
 
-        var expiration = DateTime.Now.AddHours(3);
+        double minutes;
+        if (lifetime.HasValue)
+        {
+            minutes = lifetime.Value.TotalMinutes;
+        }
+        else if (double.TryParse(_configuration["JWT:AccessTokenMinutes"], out var cfg))
+        {
+            minutes = cfg;
+        }
+        else
+        {
+            minutes = 60;
+        }
+
+        if (minutes < 5) minutes = 5;
+        if (minutes > 24 * 60) minutes = 24 * 60;
+
+        var expiration = DateTime.UtcNow.AddMinutes(minutes);
         var token = new JwtSecurityToken(
             issuer: _configuration["JWT:ValidIssuer"],
             audience: _configuration["JWT:ValidAudience"],
             expires: expiration,
             claims: authClaims,
+            notBefore: DateTime.UtcNow,
             signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
 
-        return (new JwtSecurityTokenHandler().WriteToken(token), expiration);
+        return (new JwtSecurityTokenHandler().WriteToken(token), expiration, jwtId);
     }
 }

@@ -17,6 +17,8 @@ namespace MosqueOS.Infrastructure
         public DbSet<MosqueOwnershipClaim> MosqueOwnershipClaims => Set<MosqueOwnershipClaim>();
         public DbSet<MosqueRegistrationRequest> MosqueRegistrationRequests => Set<MosqueRegistrationRequest>();
         public DbSet<MosqueInvitation> MosqueInvitations => Set<MosqueInvitation>();
+        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+        public DbSet<UserLoginHistory> UserLoginHistories => Set<UserLoginHistory>();
         public DbSet<DonationFund> DonationFunds => Set<DonationFund>();
         public DbSet<PlatformAuditLog> PlatformAuditLogs => Set<PlatformAuditLog>();
         public DbSet<PlatformConfig> PlatformConfigs => Set<PlatformConfig>();
@@ -31,6 +33,7 @@ namespace MosqueOS.Infrastructure
         public DbSet<RamadanDayEntry> RamadanDayEntries => Set<RamadanDayEntry>();
         public DbSet<PrayerSpecialTiming> PrayerSpecialTimings => Set<PrayerSpecialTiming>();
         public DbSet<JamaahTemplate> JamaahTemplates => Set<JamaahTemplate>();
+        public DbSet<JamaahTemplatePrayer> JamaahTemplatePrayers => Set<JamaahTemplatePrayer>();
 
         // 3.3 Announcements
         public DbSet<Announcement> Announcements => Set<Announcement>();
@@ -216,7 +219,24 @@ namespace MosqueOS.Infrastructure
                     .HasForeignKey(s => s.MosqueId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
-            builder.Entity<JamaahTemplate>().HasIndex(t => new { t.MosqueId, t.IsActive });
+            builder.Entity<JamaahTemplate>(entity =>
+            {
+                entity.Property(t => t.Name).HasMaxLength(200).IsRequired();
+                entity.Property(t => t.TemplateType).HasConversion<int>();
+                entity.HasIndex(t => new { t.MosqueId, t.IsActive });
+                entity.HasIndex(t => new { t.MosqueId, t.IsDefault });
+                entity.HasIndex(t => new { t.MosqueId, t.Priority });
+                entity.HasMany(t => t.Prayers)
+                    .WithOne(p => p.Template)
+                    .HasForeignKey(p => p.TemplateId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            builder.Entity<JamaahTemplatePrayer>(entity =>
+            {
+                entity.Property(p => p.PrayerName).HasMaxLength(40).IsRequired();
+                entity.HasIndex(p => new { p.TemplateId, p.PrayerName }).IsUnique();
+            });
 
             builder.Entity<MosqueOwnershipClaim>()
                 .HasOne(c => c.Mosque)
@@ -258,6 +278,30 @@ namespace MosqueOS.Infrastructure
             builder.Entity<MosqueInvitation>().Property(i => i.Role).HasMaxLength(64);
             builder.Entity<MosqueInvitation>().Property(i => i.Token).HasMaxLength(128);
 
+            builder.Entity<RefreshToken>()
+                .HasOne(t => t.User)
+                .WithMany()
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            builder.Entity<RefreshToken>().HasIndex(t => t.TokenHash).IsUnique();
+            builder.Entity<RefreshToken>().HasIndex(t => new { t.UserId, t.RevokedAt });
+            builder.Entity<RefreshToken>().Property(t => t.TokenHash).HasMaxLength(128);
+            builder.Entity<RefreshToken>().Property(t => t.JwtId).HasMaxLength(64);
+            builder.Entity<RefreshToken>().Property(t => t.DeviceName).HasMaxLength(200);
+            builder.Entity<RefreshToken>().Property(t => t.IpAddress).HasMaxLength(64);
+            builder.Entity<RefreshToken>().Property(t => t.UserAgent).HasMaxLength(512);
+
+            builder.Entity<UserLoginHistory>()
+                .HasOne(h => h.User)
+                .WithMany()
+                .HasForeignKey(h => h.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            builder.Entity<UserLoginHistory>().HasIndex(h => new { h.UserId, h.OccurredAt });
+            builder.Entity<UserLoginHistory>().Property(h => h.EventType).HasMaxLength(64);
+            builder.Entity<UserLoginHistory>().Property(h => h.FailureReason).HasMaxLength(500);
+            builder.Entity<UserLoginHistory>().Property(h => h.IpAddress).HasMaxLength(64);
+            builder.Entity<UserLoginHistory>().Property(h => h.UserAgent).HasMaxLength(512);
+
             builder.Entity<DonationFund>().HasIndex(d => d.MosqueId);
 
             builder.Entity<PlatformConfig>().HasIndex(c => c.Key).IsUnique();
@@ -265,6 +309,7 @@ namespace MosqueOS.Infrastructure
             builder.Entity<CommunityMember>().HasIndex(m => new { m.CommunityId, m.UserId }).IsUnique();
             builder.Entity<EventRegistration>().HasIndex(r => new { r.EventId, r.UserId }).IsUnique();
             builder.Entity<Fee>().Property(f => f.Amount).HasPrecision(10, 2);
+            builder.Entity<QuranPlan>().Property(p => p.MinDailyParas).HasPrecision(5, 2);
 
             builder.Entity<Permission>().HasIndex(p => p.Code).IsUnique();
             builder.Entity<RolePermission>().HasIndex(rp => new { rp.RoleId, rp.PermissionId }).IsUnique();

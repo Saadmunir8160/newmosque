@@ -4,11 +4,12 @@ import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { PlatformService, OversightPrayerRow } from '../../../core/services/platform.service';
 import { formatMosqueStatus } from '../../../core/utils/mosque-status.util';
+import { SuperAdminPageHeaderComponent } from '../../../shared/ui/super-admin-page-header.component';
 
 @Component({
   selector: 'app-super-oversight-prayer-times',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, SuperAdminPageHeaderComponent],
   templateUrl: './super-oversight-prayer-times.component.html',
   styleUrls: ['../claims/super-claims.component.css', './super-oversight.shared.css'],
 })

@@ -1251,3 +1251,42 @@
 .mosque-public-page .scroll-mt-16 {
   scroll-margin-top: 4rem;
 }
+
+/* Mobile-first tightening for public mosque marketing layout */
+@media (max-width: 767px) {
+  .mosque-public-page {
+    font-size: 1rem;
+  }
+
+  .mosque-public-page .app-section {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .mosque-public-page .mp-section {
+    padding: 2rem 0;
+  }
+
+  .mosque-public-page .mp-section-head {
+    margin-bottom: 1.25rem;
+    text-align: left;
+    max-width: none;
+  }
+
+  .mosque-public-page .mp-title {
+    font-size: clamp(1.5rem, 7vw, 2rem);
+  }
+
+  .mosque-public-page .mp-grid,
+  .mosque-public-page .mp-cards,
+  .mosque-public-page .mp-prayer-grid,
+  .mosque-public-page .mp-feature-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .mosque-public-page .mp-prayer-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}

@@ -189,8 +189,9 @@ public class MosqueInvitationService
         }
         else
         {
-            if (!await _userManager.IsInRoleAsync(user, Roles.MosqueAdmin))
-                await _userManager.AddToRoleAsync(user, Roles.MosqueAdmin);
+            // Assign exactly the invited role (user cannot change it)
+            if (!await _userManager.IsInRoleAsync(user, invitation.Role))
+                await _userManager.AddToRoleAsync(user, invitation.Role);
 
             if (user.HomeMosqueId == null)
             {
@@ -206,8 +207,7 @@ public class MosqueInvitationService
 
         await _unitOfWork.SaveChangesAsync();
 
-        var roleLabel = invitation.Role == Roles.MosqueOwner ? "owner" : "admin";
-        return ($"Invitation accepted. Complete your mosque profile and submit for review. You are the {roleLabel} for {mosque.Name}.", null, 200);
+        return ($"Invitation accepted. You are now assigned as {invitation.Role} for {mosque.Name}.", null, 200);
     }
 
     public async Task<List<InvitationListItemDto>> ListInvitationsAsync(InvitationStatus? status = null)
@@ -410,13 +410,22 @@ public class MosqueInvitationService
             return Roles.MosqueOwner;
 
         var trimmed = role.Trim();
-        if (trimmed.Equals(Roles.MosqueOwner, StringComparison.OrdinalIgnoreCase)
-            || trimmed.Equals("MosqueOwner", StringComparison.OrdinalIgnoreCase))
-            return Roles.MosqueOwner;
-        if (trimmed.Equals(Roles.MosqueAdmin, StringComparison.OrdinalIgnoreCase)
-            || trimmed.Equals("MosqueAdmin", StringComparison.OrdinalIgnoreCase))
-            return Roles.MosqueAdmin;
-        return null;
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [Roles.MosqueOwner] = Roles.MosqueOwner,
+            ["MosqueOwner"] = Roles.MosqueOwner,
+            [Roles.MosqueAdmin] = Roles.MosqueAdmin,
+            ["MosqueAdmin"] = Roles.MosqueAdmin,
+            [Roles.PrayerTimesEditor] = Roles.PrayerTimesEditor,
+            ["PrayerTimesEditor"] = Roles.PrayerTimesEditor,
+            [Roles.Teacher] = Roles.Teacher,
+            [Roles.Muqaddam] = Roles.Muqaddam,
+            [Roles.ContentEditor] = Roles.ContentEditor,
+            ["ContentEditor"] = Roles.ContentEditor,
+            [Roles.Parent] = Roles.Parent,
+        };
+
+        return map.TryGetValue(trimmed, out var normalized) ? normalized : null;
     }
 
     private static InvitationListItemDto MapListItem(MosqueInvitation i) => new()

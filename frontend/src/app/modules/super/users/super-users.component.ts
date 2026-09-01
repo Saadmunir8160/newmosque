@@ -1,12 +1,14 @@
 import { Component, OnInit, computed, inject, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { AdminService } from '../../../core/services/admin.service';
 import { PlatformService, PlatformUser } from '../../../core/services/platform.service';
 import { ROLES, primaryRole } from '../../../core/constants/roles';
 import { Mosque } from '../../../core/models';
+import { SuperAdminPageHeaderComponent } from '../../../shared/ui/super-admin-page-header.component';
 
+/** Super Admin User Management — Users list + Roles & Permissions. */
 type StatusFilter = 'all' | 'active' | 'inactive' | 'pending';
 type SortKey = 'newest' | 'oldest' | 'name' | 'lastLogin';
 type MainTab = 'users' | 'roles';
@@ -31,14 +33,19 @@ interface RoleDefinition {
   permissionKeys: string[];
 }
 
+/** Browse filters aligned with MOS roles (mock: Super Admin, Mosque Admin, Teacher, Parent…). */
 const ROLE_NAV: RoleNavItem[] = [
   { key: '', label: 'All Users', icon: '👥', roles: [] },
   { key: 'super', label: 'Super Admin', icon: '👑', roles: [ROLES.SuperAdmin] },
-  { key: 'mosque-admin', label: 'Mosque Admin', icon: '🛡️', roles: [ROLES.MosqueAdmin, ROLES.MosqueOwner] },
-  { key: 'imam', label: 'Imam', icon: '📿', roles: [ROLES.Muqaddam] },
+  { key: 'owner', label: 'Mosque Owner', icon: '🕌', roles: [ROLES.MosqueOwner] },
+  { key: 'mosque-admin', label: 'Mosque Admin', icon: '🛡️', roles: [ROLES.MosqueAdmin] },
+  { key: 'prayer', label: 'Prayer Editor', icon: '🕐', roles: [ROLES.PrayerTimesEditor] },
   { key: 'teacher', label: 'Teacher', icon: '📚', roles: [ROLES.Teacher] },
-  { key: 'volunteer', label: 'Volunteer', icon: '🤝', roles: [ROLES.Parent, ROLES.ContentEditor] },
+  { key: 'muqaddam', label: 'Muqaddam', icon: '📿', roles: [ROLES.Muqaddam] },
+  { key: 'content', label: 'Content Editor', icon: '✍️', roles: [ROLES.ContentEditor] },
+  { key: 'parent', label: 'Parent', icon: '👪', roles: [ROLES.Parent] },
   { key: 'member', label: 'Member', icon: '🤲', roles: [ROLES.Member] },
+  { key: 'unassigned', label: 'Unassigned', icon: '❔', roles: ['__none__'] },
 ];
 
 const PERMISSION_GROUPS: PermissionGroup[] = [
@@ -55,10 +62,11 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
   { role: ROLES.SuperAdmin, description: 'Full platform access across all mosques', icon: '👑', permissionKeys: [...ALL_PERMISSION_KEYS] },
   { role: ROLES.MosqueOwner, description: 'Owns mosque listing and delegates admins', icon: '🕌', permissionKeys: ['Edit Mosque', 'Assign Admin', 'Manage Claims', 'Manage Duas', 'Manage Adhkar', 'Manage Events', 'Publish Content', 'Edit Prayer Times', 'Manage Classes', 'Janaza Notices'] },
   { role: ROLES.MosqueAdmin, description: 'Day-to-day mosque administration', icon: '🛡️', permissionKeys: ['Edit Mosque', 'Manage Duas', 'Manage Adhkar', 'Manage Events', 'Publish Content', 'Edit Prayer Times', 'Manage Classes', 'Reading Campaigns', 'Janaza Notices'] },
-  { role: ROLES.Muqaddam, description: 'Imam / spiritual guide — community readings', icon: '📿', permissionKeys: ['Reading Campaigns'] },
+  { role: ROLES.PrayerTimesEditor, description: 'Edit daily prayer times and exceptions', icon: '🕐', permissionKeys: ['Edit Prayer Times'] },
   { role: ROLES.Teacher, description: 'Madrassah classes and attendance', icon: '📚', permissionKeys: ['Manage Classes'] },
-  { role: ROLES.ContentEditor, description: 'Volunteer content publishing', icon: '🤝', permissionKeys: ['Manage Duas', 'Manage Adhkar', 'Manage Events', 'Publish Content', 'Review Content'] },
-  { role: ROLES.Parent, description: 'Parent / volunteer portal', icon: '🤝', permissionKeys: [] },
+  { role: ROLES.Muqaddam, description: 'Imam / spiritual guide — community readings', icon: '📿', permissionKeys: ['Reading Campaigns'] },
+  { role: ROLES.ContentEditor, description: 'Volunteer content publishing', icon: '✍️', permissionKeys: ['Manage Duas', 'Manage Adhkar', 'Manage Events', 'Publish Content', 'Review Content'] },
+  { role: ROLES.Parent, description: 'Parent portal and family links', icon: '👪', permissionKeys: [] },
   { role: ROLES.Member, description: 'Standard member worship experience', icon: '🤲', permissionKeys: [] },
 ];
 
@@ -67,7 +75,7 @@ const PAGE_SIZES = [10, 25, 50];
 @Component({
   selector: 'app-super-users',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule, SuperAdminPageHeaderComponent],
   templateUrl: './super-users.component.html',
   styleUrl: './super-users.component.css',
 })
@@ -75,12 +83,13 @@ export class SuperUsersComponent implements OnInit {
   private platform = inject(PlatformService);
   private admin = inject(AdminService);
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
 
   readonly ROLES = ROLES;
   readonly PERMISSION_GROUPS = PERMISSION_GROUPS;
   readonly ROLE_NAV = ROLE_NAV;
   readonly PAGE_SIZES = PAGE_SIZES;
-  readonly allRoles = Object.values(ROLES);
+  readonly allRoles = Object.values(ROLES).filter(r => r !== ROLES.Guest);
 
   users = signal<PlatformUser[]>([]);
   mosques = signal<Mosque[]>([]);
@@ -93,6 +102,7 @@ export class SuperUsersComponent implements OnInit {
   actionBusy = signal<string | null>(null);
   mainTab = signal<MainTab>('users');
   editingUser = signal<PlatformUser | null>(null);
+  editMosqueId: number | null = null;
   permissionsTarget = signal<{ type: 'user' | 'role'; user?: PlatformUser; role?: string } | null>(null);
   openMenuId = signal<string | null>(null);
   showBulkPanel = signal(false);
@@ -113,16 +123,14 @@ export class SuperUsersComponent implements OnInit {
   roleNavCounts = computed(() =>
     ROLE_NAV.map(nav => ({
       ...nav,
-      count: nav.roles.length
-        ? this.users().filter(u => nav.roles.some(r => u.roles.includes(r))).length
-        : this.users().length,
+      count: this.countForNav(nav),
     }))
   );
 
   activeUsersCount = computed(() => this.users().filter(u => u.isActive !== false && u.roles.length > 0).length);
+  unassignedCount = computed(() => this.users().filter(u => !u.roles.length).length);
   pendingInvitesCount = signal(0);
   rolesCount = computed(() => ROLE_DEFINITIONS.length);
-  deactivatedCount = computed(() => this.users().filter(u => u.isActive === false).length);
 
   totalPages = computed(() => Math.max(1, Math.ceil(this.filtered().length / this.pageSize())));
   paginatedUsers = computed(() => {
@@ -168,6 +176,10 @@ export class SuperUsersComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.route.data.subscribe(d => {
+      const tab = d['mainTab'] as MainTab | undefined;
+      if (tab === 'roles' || tab === 'users') this.mainTab.set(tab);
+    });
     this.route.queryParamMap.subscribe(p => {
       if (p.get('tab') === 'roles') this.mainTab.set('roles');
     });
@@ -192,6 +204,20 @@ export class SuperUsersComponent implements OnInit {
     this.openMenuId.set(null);
   }
 
+  goUsers(): void {
+    void this.router.navigateByUrl('/dashboard/super/users');
+  }
+
+  goRoles(): void {
+    void this.router.navigateByUrl('/dashboard/super/users/roles');
+  }
+
+  private countForNav(nav: RoleNavItem): number {
+    if (!nav.roles.length) return this.users().length;
+    if (nav.roles[0] === '__none__') return this.users().filter(u => !u.roles.length).length;
+    return this.users().filter(u => nav.roles.some(r => u.roles.includes(r))).length;
+  }
+
   load(): void {
     this.loading.set(true);
     this.loadError.set('');
@@ -203,7 +229,11 @@ export class SuperUsersComponent implements OnInit {
         const editing = this.editingUser();
         if (editing) {
           const fresh = u.find(x => x.id === editing.id);
-          if (fresh) this.editingUser.set({ ...fresh, isActive: fresh.isActive ?? true });
+          if (fresh) {
+            const mapped = { ...fresh, isActive: fresh.isActive ?? true };
+            this.editingUser.set(mapped);
+            this.editMosqueId = mapped.homeMosqueId ?? null;
+          }
         }
       },
       error: () => {
@@ -226,7 +256,11 @@ export class SuperUsersComponent implements OnInit {
       );
     }
     if (nav?.roles.length) {
-      list = list.filter(u => nav.roles.some(r => u.roles.includes(r)));
+      if (nav.roles[0] === '__none__') {
+        list = list.filter(u => !u.roles.length);
+      } else {
+        list = list.filter(u => nav.roles.some(r => u.roles.includes(r)));
+      }
     }
     if (this.statusFilter === 'active') list = list.filter(u => u.isActive !== false && u.roles.length > 0);
     if (this.statusFilter === 'inactive') list = list.filter(u => u.isActive === false);
@@ -346,6 +380,8 @@ export class SuperUsersComponent implements OnInit {
     if (u.roles.includes(ROLES.SuperAdmin)) return 'avatar--super';
     if (u.roles.includes(ROLES.MosqueOwner)) return 'avatar--owner';
     if (u.roles.includes(ROLES.MosqueAdmin)) return 'avatar--admin';
+    if (u.roles.includes(ROLES.Teacher)) return 'avatar--teacher';
+    if (u.roles.includes(ROLES.Parent)) return 'avatar--parent';
     return 'avatar--default';
   }
 
@@ -368,8 +404,37 @@ export class SuperUsersComponent implements OnInit {
     return this.allRoles.filter(r => !u.roles.includes(r));
   }
 
-  openEditUser(u: PlatformUser): void { this.editingUser.set(u); this.openMenuId.set(null); }
-  closeEditUser(): void { this.editingUser.set(null); }
+  openEditUser(u: PlatformUser): void {
+    this.editingUser.set(u);
+    this.editMosqueId = u.homeMosqueId ?? null;
+    this.openMenuId.set(null);
+  }
+
+  closeEditUser(): void {
+    this.editingUser.set(null);
+    this.editMosqueId = null;
+  }
+
+  saveMosqueAssignment(): void {
+    const u = this.editingUser();
+    if (!u) return;
+    this.actionBusy.set(u.id);
+    const clearMosque = this.editMosqueId == null;
+    this.platform.updateUser(u.id, {
+      homeMosqueId: clearMosque ? null : this.editMosqueId,
+      clearMosque,
+    }).subscribe({
+      next: () => {
+        this.showToast('Mosque assignment updated.', true);
+        this.actionBusy.set(null);
+        this.load();
+      },
+      error: err => {
+        this.showToast(err?.error?.message || 'Could not update mosque.', false);
+        this.actionBusy.set(null);
+      },
+    });
+  }
 
   openUserPermissions(u: PlatformUser): void {
     this.permissionsTarget.set({ type: 'user', user: u });

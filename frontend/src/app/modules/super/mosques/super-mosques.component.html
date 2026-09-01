@@ -2,26 +2,16 @@
   <div *ngIf="toast()" class="mp-toast" [class.mp-toast--ok]="toastOk()" [class.mp-toast--err]="!toastOk()" role="status">
     {{ toast() }}
   </div>
-  <nav class="mp-breadcrumb" aria-label="Breadcrumb">
-    <a routerLink="/dashboard/super">Dashboard</a>
-    <span class="mp-breadcrumb__sep">›</span>
-    <span class="mp-breadcrumb__current">Mosque listings</span>
-  </nav>
 
-  <header class="mp-header">
-    <div>
-      <h1 class="mp-title">Mosque Listings</h1>
-      <p class="mp-sub">Create and manage mosque listings, public profiles, and ownership claims.</p>
-    </div>
-    <div class="mp-header__actions">
-      <button type="button" class="mp-btn mp-btn--ghost" (click)="load()" [disabled]="loading()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-        Refresh
-      </button>
-      <a routerLink="/dashboard/super/claims" class="mp-btn mp-btn--ghost">Claims queue</a>
+  <app-super-admin-page-header
+    crumb="Mosque Management"
+    title="All Mosques"
+    subtitle="Browse, filter, and manage mosque listings across the platform.">
+    <div actions class="mp-header__actions">
+      <button type="button" class="mp-btn mp-btn--ghost" (click)="load()" [disabled]="loading()">Refresh</button>
       <button type="button" class="mp-btn" (click)="openSeed()">+ Add Mosque</button>
     </div>
-  </header>
+  </app-super-admin-page-header>
 
   <section *ngIf="summary()" class="mp-kpi-row mp-kpi-row--4" aria-label="Listing summary">
     <button type="button" class="mp-kpi" [class.mp-kpi--active]="!statusFilter" (click)="filterByStatus('')">
@@ -157,8 +147,8 @@
             <th scope="col">Mosque</th>
             <th scope="col">Location</th>
             <th scope="col">Status</th>
-            <th scope="col">Owner</th>
-            <th scope="col">Profile</th>
+            <th scope="col">Claimed By</th>
+            <th scope="col">Joined On</th>
             <th scope="col" class="mp-table__actions-col">Actions</th>
           </tr>
         </thead>
@@ -184,16 +174,10 @@
             </td>
             <td>
               <span *ngIf="m.ownerName">{{ m.ownerName }}</span>
-              <span class="mp-table__warn" *ngIf="!m.ownerName">No owner</span>
+              <span class="mp-table__warn" *ngIf="!m.ownerName">—</span>
             </td>
             <td>
-              <div class="mp-table__progress" *ngIf="m.profileCompleteness != null; else noCompleteness">
-                <div class="mp-card__progress-bar">
-                  <div class="mp-card__progress-fill" [style.width.%]="m.profileCompleteness"></div>
-                </div>
-                <span class="mp-table__pct">{{ m.profileCompleteness }}%</span>
-              </div>
-              <ng-template #noCompleteness>—</ng-template>
+              <span class="mp-table__meta">{{ m.createdAt | date: 'mediumDate' }}</span>
             </td>
             <td class="mp-table__actions">
               <a [routerLink]="['/dashboard/super/mosques', m.id]" class="mp-btn mp-btn--sm">Details</a>

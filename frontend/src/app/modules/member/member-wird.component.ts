@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { ContentService } from '../../core/services/content.service';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { WirdCollection } from '../../core/models';
@@ -10,10 +11,18 @@ interface RecommendedWird {
   mode?: string;
 }
 
+interface AdhkarSummary {
+  itemCount: number;
+  completedItemCount: number;
+  todayCompleted: number;
+  todayTarget: number;
+  progressLabel: string;
+}
+
 @Component({
   selector: 'app-member-wird',
   standalone: true,
-  imports: [CommonModule, PageHeaderComponent],
+  imports: [CommonModule, RouterLink, PageHeaderComponent],
   template: `
     <app-page-header badge="Member" title="My Wird"
       subtitle="Recommended reading and guided collections for your tariqa path." />
@@ -29,6 +38,12 @@ interface RecommendedWird {
         {{ busy() ? 'Saving…' : (completedToday(rec.collection.id) ? '✓ Completed today' : 'Mark complete') }}
       </button>
     </section>
+
+    <a *ngIf="adhkarSummary() as sum" class="member-card" routerLink="/dashboard/member/adhkar" style="display:block;text-decoration:none;color:inherit">
+      <span class="member-tag">Daily Adhkar</span>
+      <h3 class="member-title">Today {{ sum.progressLabel }}</h3>
+      <p class="member-meta">{{ sum.completedItemCount }}/{{ sum.itemCount }} counters complete — open Adhkar Dashboard</p>
+    </a>
 
     <h3 class="member-section-title">All collections</h3>
     <div *ngIf="!otherCollections().length" class="member-empty">No other collections in the library yet.</div>
@@ -52,6 +67,7 @@ export class MemberWirdComponent implements OnInit {
   recommended = signal<RecommendedWird | null>(null);
   collections = signal<WirdCollection[]>([]);
   completedIds = signal<Set<number>>(new Set());
+  adhkarSummary = signal<AdhkarSummary | null>(null);
   busy = signal(false);
   msg = signal('');
   msgErr = signal(false);
@@ -75,6 +91,10 @@ export class MemberWirdComponent implements OnInit {
     this.content.getWirdCompletedToday().subscribe({
       next: ids => this.completedIds.set(new Set(ids)),
       error: () => { /* guest */ },
+    });
+    this.content.getAdhkarSummary().subscribe({
+      next: s => this.adhkarSummary.set(s),
+      error: () => this.adhkarSummary.set(null),
     });
   }
 

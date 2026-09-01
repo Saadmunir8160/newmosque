@@ -23,15 +23,17 @@ Core identity of each mosque — public-facing profile with super admin and owne
 ### Status lifecycle
 
 ```
-UNCLAIMED → (claim) → ClaimPending → (approve) → CLAIMED → (activate) → ACTIVE
+UNCLAIMED → (claim PENDING on claim record) → (approve) → CLAIMED → (activate) → ACTIVE
 ```
 
 | Spec status | MosqueOS enum | Notes |
 |-------------|---------------|-------|
-| UNCLAIMED | `Unclaimed` | Public profile live |
-| — | `ClaimPending` | Internal — claim awaiting review; profile hidden |
-| CLAIMED | `Claimed` | Owner assigned; **profile editable**; owner dashboard unlocked; public hidden |
+| UNCLAIMED | `Unclaimed` | Public profile live; claim CTA when `allowClaimRequests` |
+| CLAIMED | `Claimed` | Owner assigned; public hidden until activation |
 | ACTIVE | `Active` | Full public access + staff management + module flag toggles |
+
+**Verification while pending:** mosque stays **UNCLAIMED**; ownership claim status = `PENDING`; Claim CTA off (`allowClaimRequests=false`).  
+Legacy `ClaimPending` mosque status is obsolete and normalized to Unclaimed.
 
 ### Edit vs module-flag policy (Milestone 2)
 
@@ -121,7 +123,7 @@ Extra states (enterprise): `PendingReview`, `Suspended`, `Archived`.
 1. `admin` / `Admin@123` → create mosque → status **Unclaimed**
 2. Open `/mosque/{slug}` → claim form visible
 3. New user: `/register` → OTP on `/verify-otp` → `/login`
-4. Submit claim → status **ClaimPending**
+4. Submit claim → mosque stays **Unclaimed**, claim **PENDING**, Claim CTA off
 5. Super Admin → `/dashboard/super/claims` → **Approve** → **Claimed** (public still 404)
 6. Owner → `/dashboard/owner/profile` → edit details while awaiting activation
 7. Super Admin → **Activate** (claims UI or mosque detail) → **Active**

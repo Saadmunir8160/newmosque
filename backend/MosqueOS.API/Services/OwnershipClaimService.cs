@@ -83,8 +83,9 @@ public class OwnershipClaimService
         if (mosque == null || mosque.IsDeleted)
             return (null, "Mosque not found.", 404);
 
+        // Spec: UNCLAIMED | CLAIMED | ACTIVE — pending review is on the claim record only.
         if (mosque.Status == MosqueStatus.ClaimPending)
-            return (null, "A claim for this mosque is already under review.", 409);
+            mosque.Status = MosqueStatus.Unclaimed;
 
         if (mosque.Status != MosqueStatus.Unclaimed)
             return (null, "This mosque has already been claimed.", 400);
@@ -140,7 +141,8 @@ public class OwnershipClaimService
             SubmittedAt = DateTime.UtcNow
         };
 
-        mosque.Status = MosqueStatus.ClaimPending;
+        mosque.Status = MosqueStatus.Unclaimed;
+        mosque.AllowClaimRequests = false;
         mosque.UpdatedAt = DateTime.UtcNow;
 
         _unitOfWork.Repository<MosqueOwnershipClaim>().Add(claim);
@@ -244,8 +246,9 @@ public class OwnershipClaimService
         if (mosque == null || mosque.IsDeleted)
             return (null, "Mosque not found.", 404);
 
+        // Spec: UNCLAIMED | CLAIMED | ACTIVE — pending review is on the claim record only.
         if (mosque.Status == MosqueStatus.ClaimPending)
-            return (null, "A claim for this mosque is already under review.", 409);
+            mosque.Status = MosqueStatus.Unclaimed;
 
         if (mosque.Status != MosqueStatus.Unclaimed)
             return (null, "This mosque has already been claimed.", 400);
@@ -304,6 +307,7 @@ public class OwnershipClaimService
         };
 
         mosque.Status = MosqueStatus.ClaimPending;
+        mosque.AllowClaimRequests = false;
         mosque.UpdatedAt = DateTime.UtcNow;
 
         _unitOfWork.Repository<MosqueOwnershipClaim>().Add(claim);
@@ -536,6 +540,7 @@ public class OwnershipClaimService
         {
             mosque.Status = MosqueStatus.Unclaimed;
             mosque.OwnerId = null;
+            mosque.AllowClaimRequests = true;
         }
 
         mosque.UpdatedAt = DateTime.UtcNow;

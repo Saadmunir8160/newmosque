@@ -13,6 +13,8 @@ import { LoginResponse, UserProfile } from '../models';
 import { InvitePreview } from '../services/platform.service';
 
 const GUEST_KEY = 'mosque_os_guest';
+const TOKEN_KEY = 'mosque_os_token';
+const REFRESH_KEY = 'mosque_os_refresh';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -28,8 +30,18 @@ export class AuthService {
   readonly loading = signal(true);
   readonly currentUser$ = toObservable(this.user);
 
+  private refreshInFlight: Promise<boolean> | null = null;
+
   constructor() {
     this.restoreSession();
+  }
+
+  getAccessToken(): string | null {
+    return localStorage.getItem(TOKEN_KEY);
+  }
+
+  getRefreshToken(): string | null {
+    return localStorage.getItem(REFRESH_KEY);
   }
 
   private mosqueContext(): MosqueContextService {
@@ -40,7 +52,6 @@ export class AuthService {
     return this.injector.get(AdminService);
   }
 
-  /** Post-login route for authenticated users. */
   async resolveHomeRoute(returnUrl?: string | null): Promise<string> {
     if (returnUrl?.startsWith('/') && !returnUrl.startsWith('//')) return returnUrl;
     return homeRouteForRoles(this.roles());
@@ -55,37 +66,15 @@ export class AuthService {
     this.roles.set(next.length ? next : fallback);
   }
 
-  private async restoreSession(): Promise<void> {
-    const token = localStorage.getItem('mosque_os_token');
-    if (!token) {
-      this.isGuest.set(sessionStorage.getItem(GUEST_KEY) === '1');
-      this.loading.set(false);
-      return;
-    }
-    try {
-      const profile = await firstValueFrom(
-        this.http.get<UserProfile>(`${environment.apiUrl}/auth/me`)
-      );
-      this.user.set(profile);
-      this.applyRoles(profile.roles);
-      this.isAuthenticated.set(true);
-      await this.navigation.load();
-      await this.mosqueContext().resolve(true);
-    } catch {
-      this.clearSession();
-    } finally {
-      this.loading.set(false);
+  private storeTokens(res: LoginResponse): void {
+    localStorage.setItem(TOKEN_KEY, res.token);
+    if (res.refreshToken) {
+      localStorage.setItem(REFRESH_KEY, res.refreshToken);
     }
   }
 
-  async login(emailOrUsername: string, password: string): Promise<void> {
-    const res = await firstValueFrom(
-      this.http.post<LoginResponse>(`${environment.apiUrl}/auth/login`, {
-        username: emailOrUsername.trim(),
-        password,
-      })
-    );
-    localStorage.setItem('mosque_os_token', res.token);
+  private async applyLoginResponse(res: LoginResponse): Promise<void> {
+    this.storeTokens(res);
     this.clearGuestMode();
     const loginRoles = this.normalizeRoles(res.roles);
     this.applyRoles(loginRoles);
@@ -117,13 +106,87 @@ export class AuthService {
     await this.mosqueContext().resolve(true);
   }
 
+  private async restoreSession(): Promise<void> {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) {
+      this.isGuest.set(sessionStorage.getItem(GUEST_KEY) === '1');
+      this.loading.set(false);
+      return;
+    }
+    try {
+      const profile = await firstValueFrom(
+        this.http.get<UserProfile>(`${environment.apiUrl}/auth/me`)
+      );
+      this.user.set(profile);
+      this.applyRoles(profile.roles);
+      this.isAuthenticated.set(true);
+      await this.navigation.load();
+      await this.mosqueContext().resolve(true);
+    } catch {
+      const refreshed = await this.tryRefreshToken();
+      if (!refreshed) this.clearSession();
+      else {
+        try {
+          const profile = await firstValueFrom(
+            this.http.get<UserProfile>(`${environment.apiUrl}/auth/me`)
+          );
+          this.user.set(profile);
+          this.applyRoles(profile.roles);
+          this.isAuthenticated.set(true);
+          await this.navigation.load();
+          await this.mosqueContext().resolve(true);
+        } catch {
+          this.clearSession();
+        }
+      }
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  async login(emailOrUsername: string, password: string, rememberMe = false): Promise<void> {
+    const res = await firstValueFrom(
+      this.http.post<LoginResponse>(`${environment.apiUrl}/auth/login`, {
+        username: emailOrUsername.trim(),
+        password,
+        rememberMe,
+      })
+    );
+    await this.applyLoginResponse(res);
+  }
+
+  async tryRefreshToken(): Promise<boolean> {
+    if (this.refreshInFlight) return this.refreshInFlight;
+
+    const refresh = localStorage.getItem(REFRESH_KEY);
+    if (!refresh) return false;
+
+    this.refreshInFlight = (async () => {
+      try {
+        const res = await firstValueFrom(
+          this.http.post<LoginResponse>(`${environment.apiUrl}/auth/refresh`, {
+            refreshToken: refresh,
+          })
+        );
+        this.storeTokens(res);
+        this.isAuthenticated.set(true);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        this.refreshInFlight = null;
+      }
+    })();
+
+    return this.refreshInFlight;
+  }
+
   async register(data: {
     email: string;
     fullName: string;
     password: string;
     confirmPassword: string;
-    registerAsMosqueOwner?: boolean;
-  }): Promise<{ email: string; message: string }> {
+  }): Promise<{ email: string; message: string; requiresVerification: boolean }> {
     const res = await firstValueFrom(
       this.http.post<{ message: string; email: string; requiresVerification?: boolean }>(
         `${environment.apiUrl}/auth/register`, {
@@ -131,11 +194,50 @@ export class AuthService {
           fullName: data.fullName.trim(),
           password: data.password,
           confirmPassword: data.confirmPassword,
-          registerAsMosqueOwner: data.registerAsMosqueOwner ?? true,
+          registerAsMosqueOwner: false,
         }
       )
     );
-    return { email: res.email || data.email.trim().toLowerCase(), message: res.message };
+    return {
+      email: res.email || data.email.trim().toLowerCase(),
+      message: res.message,
+      requiresVerification: res.requiresVerification !== false,
+    };
+  }
+
+  async forgotPassword(email: string, preferOtp = false): Promise<{ message: string }> {
+    return firstValueFrom(
+      this.http.post<{ message: string }>(`${environment.apiUrl}/auth/forgot-password`, {
+        email: email.trim().toLowerCase(),
+        preferOtp,
+      })
+    );
+  }
+
+  async resetPassword(data: {
+    email: string;
+    password: string;
+    confirmPassword: string;
+    token?: string;
+    otp?: string;
+  }): Promise<{ message: string }> {
+    return firstValueFrom(
+      this.http.post<{ message: string }>(`${environment.apiUrl}/auth/reset-password`, {
+        email: data.email.trim().toLowerCase(),
+        password: data.password,
+        confirmPassword: data.confirmPassword,
+        token: data.token,
+        otp: data.otp,
+      })
+    );
+  }
+
+  async logoutAllDevices(): Promise<void> {
+    try {
+      await firstValueFrom(this.http.post(`${environment.apiUrl}/auth/logout-all`, {}));
+    } catch { /* still clear local */ }
+    this.clearSession();
+    void this.router.navigate(['/auth/login']);
   }
 
   async confirmEmail(userId: string, token: string): Promise<{ message: string }> {
@@ -174,36 +276,7 @@ export class AuthService {
         fullName: data.fullName,
       })
     );
-    localStorage.setItem('mosque_os_token', res.token);
-    this.clearGuestMode();
-    const loginRoles = this.normalizeRoles(res.roles);
-    this.applyRoles(loginRoles);
-    this.isAuthenticated.set(true);
-    this.user.set({
-      id: '',
-      userName: res.username,
-      email: '',
-      fullName: res.fullName,
-      tariqa: '',
-      level: '',
-      displayPreference: '',
-      wirdMode: '',
-      homeMosqueId: null,
-      searchRadiusKm: 0,
-      interests: null,
-      roles: loginRoles,
-    });
-    try {
-      const profile = await firstValueFrom(
-        this.http.get<UserProfile>(`${environment.apiUrl}/auth/me`)
-      );
-      this.user.set(profile);
-      this.applyRoles(profile.roles, loginRoles);
-    } catch {
-      // keep login response profile
-    }
-    await this.navigation.load();
-    await this.mosqueContext().resolve(true);
+    await this.applyLoginResponse(res);
   }
 
   async resendVerification(email: string): Promise<{ message: string }> {
@@ -236,7 +309,7 @@ export class AuthService {
   }
 
   async applyOAuthToken(token: string): Promise<void> {
-    localStorage.setItem('mosque_os_token', token);
+    localStorage.setItem(TOKEN_KEY, token);
     this.clearGuestMode();
     this.isAuthenticated.set(true);
     const profile = await firstValueFrom(
@@ -255,12 +328,19 @@ export class AuthService {
   }
 
   logout(): void {
+    const refresh = localStorage.getItem(REFRESH_KEY);
+    if (this.isAuthenticated()) {
+      void firstValueFrom(
+        this.http.post(`${environment.apiUrl}/auth/logout`, { refreshToken: refresh })
+      ).catch(() => undefined);
+    }
     this.clearSession();
-    this.router.navigate(['/']);
+    void this.router.navigate(['/']);
   }
 
   private clearSession(): void {
-    localStorage.removeItem('mosque_os_token');
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_KEY);
     this.clearGuestMode();
     this.roles.set([]);
     this.user.set(null);

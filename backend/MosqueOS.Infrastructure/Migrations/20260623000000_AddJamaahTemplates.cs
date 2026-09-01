@@ -1,53 +1,49 @@
-using System;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using MosqueOS.Infrastructure;
 
 #nullable disable
 
 namespace MosqueOS.Infrastructure.Migrations
 {
-    /// <inheritdoc />
+    [DbContext(typeof(ApplicationDbContext))]
+    [Migration("20260623000000_AddJamaahTemplates")]
     public partial class AddJamaahTemplates : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateTable(
-                name: "JamaahTemplates",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    MosqueId = table.Column<int>(type: "int", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    RecurringRulesJson = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
-                    DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    DeletedById = table.Column<string>(type: "nvarchar(max)", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_JamaahTemplates", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_JamaahTemplates_Mosques_MosqueId",
-                        column: x => x.MosqueId,
-                        principalTable: "Mosques",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
+            migrationBuilder.Sql(@"
+IF OBJECT_ID(N'dbo.JamaahTemplates', N'U') IS NULL
+BEGIN
+    CREATE TABLE JamaahTemplates (
+        Id int NOT NULL IDENTITY(1,1),
+        MosqueId int NOT NULL,
+        Name nvarchar(max) NOT NULL,
+        RecurringRulesJson nvarchar(max) NULL,
+        IsActive bit NOT NULL,
+        CreatedAt datetime2 NOT NULL,
+        UpdatedAt datetime2 NULL,
+        IsDeleted bit NOT NULL,
+        DeletedAt datetime2 NULL,
+        DeletedById nvarchar(max) NULL,
+        CONSTRAINT PK_JamaahTemplates PRIMARY KEY (Id),
+        CONSTRAINT FK_JamaahTemplates_Mosques_MosqueId
+            FOREIGN KEY (MosqueId) REFERENCES Mosques(Id)
+    );
+END
 
-            migrationBuilder.CreateIndex(
-                name: "IX_JamaahTemplates_MosqueId_IsActive",
-                table: "JamaahTemplates",
-                columns: new[] { "MosqueId", "IsActive" });
+IF OBJECT_ID(N'dbo.JamaahTemplates', N'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_JamaahTemplates_MosqueId_IsActive' AND object_id = OBJECT_ID(N'dbo.JamaahTemplates'))
+    CREATE INDEX IX_JamaahTemplates_MosqueId_IsActive ON JamaahTemplates (MosqueId, IsActive);
+");
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(name: "JamaahTemplates");
+            migrationBuilder.Sql(@"
+IF OBJECT_ID(N'dbo.JamaahTemplates', N'U') IS NOT NULL
+    DROP TABLE JamaahTemplates;
+");
         }
     }
 }

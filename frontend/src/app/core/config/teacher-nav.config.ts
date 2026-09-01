@@ -21,6 +21,7 @@ export const TEACHER_NAV_SECTIONS: TeacherNavSection[] = [
       { section: 'Teaching', label: 'Student Progress', route: '/dashboard/teacher/progress', icon: 'progress' },
       { section: 'Teaching', label: 'Assignments', route: '/dashboard/teacher/assignments', icon: 'assignments' },
       { section: 'Teaching', label: 'Reports', route: '/dashboard/teacher/reports', icon: 'reports' },
+      { section: 'Teaching', label: 'Participation', route: '/dashboard/teacher/participation', icon: 'participation' },
     ],
   },
 ];
@@ -36,4 +37,5 @@ export const TEACHER_NAV_ICONS: Record<string, string> = {
   progress: '📈',
   assignments: '📝',
   reports: '📊',
+  participation: '🤝',
 };

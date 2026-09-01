@@ -9,6 +9,7 @@ const ADMIN_CHILD_ROUTES: Routes = [
   { path: 'mosque', loadComponent: () => import('./mosque-profile/admin-mosque.component').then(m => m.AdminMosqueComponent) },
   { path: 'modules', loadComponent: () => import('./modules/admin-modules.component').then(m => m.AdminModulesComponent) },
   { path: 'prayer-times', loadComponent: () => import('./prayer-times-edit/admin-prayer-times.component').then(m => m.AdminPrayerTimesComponent) },
+  { path: 'prayer-times/templates', loadComponent: () => import('../prayer-editor/prayer-editor-templates.component').then(m => m.PrayerEditorTemplatesComponent) },
   { path: 'announcements', loadComponent: () => import('./announcements-manage/admin-announcements.component').then(m => m.AdminAnnouncementsComponent) },
   { path: 'events', loadComponent: () => import('./events-manage/admin-events.component').then(m => m.AdminEventsComponent) },
   { path: 'janaza', loadComponent: () => import('./janaza/admin-janaza.component').then(m => m.AdminJanazaComponent) },

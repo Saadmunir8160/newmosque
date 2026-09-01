@@ -17,6 +17,11 @@ export const GUEST_ROUTES: Routes = [
     data: { seo: { title: 'Announcements', description: 'Latest mosque announcements and community updates.' } },
   },
   {
+    path: 'announcements/:id',
+    loadComponent: () => import('./guest-announcement-detail.component').then(m => m.GuestAnnouncementDetailComponent),
+    data: { seo: { title: 'Announcement', description: 'Mosque announcement details.' } },
+  },
+  {
     path: 'events',
     loadComponent: () => import('./guest-events.component').then(m => m.GuestEventsComponent),
     data: { seo: { title: 'Events', description: 'Upcoming mosque events and programmes.' } },

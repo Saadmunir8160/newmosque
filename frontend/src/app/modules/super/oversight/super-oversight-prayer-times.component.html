@@ -1,19 +1,10 @@
 <div class="sc-page">
-  <nav class="sc-breadcrumb" aria-label="Breadcrumb">
-    <a routerLink="/dashboard/super">Dashboard</a>
-    <span aria-hidden="true">›</span>
-    <span>Oversight</span>
-    <span aria-hidden="true">›</span>
-    <span class="sc-breadcrumb__current">Prayer times</span>
-  </nav>
-
-  <header class="sc-header">
-    <div>
-      <h1>Prayer times oversight</h1>
-      <p>Daily jamaah coverage across all active mosques — spot missing or unpublished timetables.</p>
-    </div>
-    <button type="button" class="sc-btn sc-btn--ghost" (click)="load()" [disabled]="loading()">Refresh</button>
-  </header>
+  <app-super-admin-page-header
+    crumb="Modules"
+    title="Prayer Times"
+    subtitle="Daily jamaah coverage across active mosques — spot missing or unpublished timetables.">
+    <button actions type="button" class="sc-btn sc-btn--ghost" (click)="load()" [disabled]="loading()">Refresh</button>
+  </app-super-admin-page-header>
 
   <section class="sc-kpis">
     <article class="sc-kpi">

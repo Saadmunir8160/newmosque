@@ -33,9 +33,10 @@ export function statusClass(status: string): string {
   return map[status] || 'status--unclaimed';
 }
 
-/** Public `/mosque/{slug}` is visible for Unclaimed + Active only (ClaimPending/Claimed stay hidden). */
+/** Public `/mosque/{slug}` is visible for Unclaimed + Active (Claimed hidden until activation). */
 export function isMosquePubliclyVisible(status: string): boolean {
-  return status === 'Unclaimed' || status === 'Active';
+  const s = status === 'ClaimPending' ? 'Unclaimed' : status;
+  return s === 'Unclaimed' || s === 'Active';
 }
 
 /** Profile CRUD allowed for Claimed + Active (matches backend MosquePublicVisibility.CanEditProfile). */
@@ -50,16 +51,12 @@ export interface PublicStatusCard {
 }
 
 export function publicStatusCard(status: string): { label: string; description: string; tone: string } {
+  const normalized = status === 'ClaimPending' ? 'Unclaimed' : status;
   const base = {
     Unclaimed: {
       label: 'Unclaimed listing',
       description: 'This mosque profile was generated from a public directory. The mosque administration has not yet claimed it.',
       tone: 'neutral',
-    },
-    ClaimPending: {
-      label: 'Claim under review',
-      description: 'An ownership claim has been submitted and is awaiting Super Admin verification.',
-      tone: 'info',
     },
     Claimed: {
       label: 'Claimed — awaiting activation',
@@ -73,13 +70,15 @@ export function publicStatusCard(status: string): { label: string; description: 
     },
   } as Record<string, { label: string; description: string; tone: string }>;
 
-  return base[status] || {
-    label: formatMosqueStatus(status),
+  return base[normalized] || {
+    label: formatMosqueStatus(normalized),
     description: 'Status unavailable.',
     tone: 'neutral',
   };
 }
 
-export function canShowPublicClaimCta(status: string): boolean {
-  return ['Unclaimed'].includes(status);
+/** Claim CTA only on Unclaimed listings that still accept claims (pending claim sets allowClaimRequests=false). */
+export function canShowPublicClaimCta(status: string, allowClaimRequests = true): boolean {
+  const s = status === 'ClaimPending' ? 'Unclaimed' : status;
+  return s === 'Unclaimed' && allowClaimRequests !== false;
 }

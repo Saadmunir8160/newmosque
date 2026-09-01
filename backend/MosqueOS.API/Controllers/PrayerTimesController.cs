@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MosqueOS.API.Filters;
 using MosqueOS.API.Models.PrayerEditor;
+using MosqueOS.API.Services;
 using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
@@ -17,8 +18,13 @@ namespace MosqueOS.API.Controllers;
 public class PrayerTimesController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly JamaahTemplateService _templates;
 
-    public PrayerTimesController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
+    public PrayerTimesController(IUnitOfWork unitOfWork, JamaahTemplateService templates)
+    {
+        _unitOfWork = unitOfWork;
+        _templates = templates;
+    }
 
     /// <summary>Prayer editor dashboard summary.</summary>
     [Authorize(Roles = Roles.PrayerTimesManagers)]
@@ -39,7 +45,7 @@ public class PrayerTimesController : ControllerBase
             .CountAsync(p => p.MosqueId == mosqueId && p.Status == PublishStatus.Published);
 
         var jumuahCount = await _unitOfWork.Repository<JumuahTime>().QueryNoTracking()
-            .CountAsync(j => j.MosqueId == mosqueId);
+            .CountAsync(j => j.MosqueId == mosqueId && !j.IsDeleted);
 
         var ramadan = await _unitOfWork.Repository<RamadanTimetable>().QueryNoTracking()
             .FirstOrDefaultAsync(r => r.MosqueId == mosqueId && r.Year == today.Year);
@@ -82,10 +88,14 @@ public class PrayerTimesController : ControllerBase
             return Ok(new { times = (PrayerTimesDaily?)null, exceptions = Array.Empty<PrayerException>() });
 
         var exceptions = await _unitOfWork.Repository<PrayerException>().QueryNoTracking()
-            .Where(e => e.MosqueId == mosqueId && e.Date == target)
+            .Where(e => e.MosqueId == mosqueId && e.Date == target && !e.IsDeleted)
             .ToListAsync();
 
-        return Ok(new { times = row, exceptions });
+        var effective = exceptions.Count == 0
+            ? row
+            : PrayerTimesHelper.CloneWithExceptions(row, exceptions);
+
+        return Ok(new { times = effective, exceptions });
     }
 
     [AllowAnonymous] // ✅ FIX: Guest users ke liye allow karo
@@ -106,7 +116,22 @@ public class PrayerTimesController : ControllerBase
             query = query.Where(p => p.Status == PublishStatus.Published);
 
         var rows = await query.OrderBy(p => p.Date).ToListAsync();
-        return Ok(rows);
+
+        var from = new DateOnly(year, month, 1);
+        var to = from.AddMonths(1).AddDays(-1);
+        var exceptions = await _unitOfWork.Repository<PrayerException>().QueryNoTracking()
+            .Where(e => e.MosqueId == mosqueId && !e.IsDeleted && e.Date >= from && e.Date <= to)
+            .ToListAsync();
+
+        if (exceptions.Count == 0)
+            return Ok(rows);
+
+        var byDate = exceptions.GroupBy(e => e.Date).ToDictionary(g => g.Key, g => g.ToList());
+        var effective = rows.Select(r =>
+            byDate.TryGetValue(r.Date, out var exs)
+                ? PrayerTimesHelper.CloneWithExceptions(r, exs)
+                : r).ToList();
+        return Ok(effective);
     }
 
     [Authorize(Roles = Roles.PrayerTimesManagers)]
@@ -116,6 +141,7 @@ public class PrayerTimesController : ControllerBase
         var row = await _unitOfWork.Repository<PrayerTimesDaily>().Query()
             .FirstOrDefaultAsync(p => p.MosqueId == mosqueId && p.Date == input.Date);
 
+        string? oldValue = null;
         if (row == null)
         {
             input.MosqueId = mosqueId;
@@ -131,6 +157,7 @@ public class PrayerTimesController : ControllerBase
         }
         else
         {
+            oldValue = FormatDailyTimes(row);
             row.FajrStart = input.FajrStart; row.FajrJamaat = input.FajrJamaat;
             row.DhuhrStart = input.DhuhrStart; row.DhuhrJamaat = input.DhuhrJamaat;
             row.AsrStart = input.AsrStart; row.AsrJamaat = input.AsrJamaat;
@@ -149,8 +176,10 @@ public class PrayerTimesController : ControllerBase
             }
         }
 
+        var newValue = FormatDailyTimes(row);
         await LogAuditAsync(mosqueId, input.Date, "Daily",
-            publish ? $"Published daily times for {input.Date:yyyy-MM-dd}" : $"Saved draft daily times for {input.Date:yyyy-MM-dd}");
+            publish ? $"Published daily times for {input.Date:yyyy-MM-dd}" : $"Saved draft daily times for {input.Date:yyyy-MM-dd}",
+            oldValue, newValue);
 
         await _unitOfWork.SaveChangesAsync();
         return Ok(row);
@@ -206,7 +235,7 @@ public class PrayerTimesController : ControllerBase
     [HttpGet("jumuah")]
     public async Task<IActionResult> GetJumuah(int mosqueId) =>
         Ok(await _unitOfWork.Repository<JumuahTime>().QueryNoTracking()
-            .Where(j => j.MosqueId == mosqueId)
+            .Where(j => j.MosqueId == mosqueId && !j.IsDeleted)
             .OrderBy(j => j.SlotNumber)
             .ToListAsync());
 
@@ -217,8 +246,9 @@ public class PrayerTimesController : ControllerBase
         if (slot.SlotNumber is < 1 or > 3)
             return BadRequest(new { message = "Jumuah slot must be 1, 2, or 3." });
 
+        // Soft-deleted rows must not block re-adding the same slot number
         if (await _unitOfWork.Repository<JumuahTime>().QueryNoTracking()
-            .AnyAsync(j => j.MosqueId == mosqueId && j.SlotNumber == slot.SlotNumber))
+            .AnyAsync(j => j.MosqueId == mosqueId && j.SlotNumber == slot.SlotNumber && !j.IsDeleted))
             return Conflict(new { message = $"Slot {slot.SlotNumber} already exists." });
 
         slot.MosqueId = mosqueId;
@@ -236,10 +266,9 @@ public class PrayerTimesController : ControllerBase
     public async Task<IActionResult> UpdateJumuah(int mosqueId, int slotId, [FromBody] JumuahTime input)
     {
         var slot = await _unitOfWork.Repository<JumuahTime>().Query()
-            .FirstOrDefaultAsync(j => j.Id == slotId && j.MosqueId == mosqueId);
+            .FirstOrDefaultAsync(j => j.Id == slotId && j.MosqueId == mosqueId && !j.IsDeleted);
         if (slot == null) return NotFound();
 
-        slot.SlotNumber = input.SlotNumber;
         slot.KhutbahTime = input.KhutbahTime;
         slot.JamaatTime = input.JamaatTime;
         slot.UpdatedAt = DateTime.UtcNow;
@@ -254,7 +283,7 @@ public class PrayerTimesController : ControllerBase
     public async Task<IActionResult> DeleteJumuah(int mosqueId, int slotId)
     {
         var slot = await _unitOfWork.Repository<JumuahTime>().Query()
-            .FirstOrDefaultAsync(j => j.Id == slotId && j.MosqueId == mosqueId);
+            .FirstOrDefaultAsync(j => j.Id == slotId && j.MosqueId == mosqueId && !j.IsDeleted);
         if (slot == null) return NotFound();
 
         _unitOfWork.Repository<JumuahTime>().Remove(slot);
@@ -270,7 +299,7 @@ public class PrayerTimesController : ControllerBase
     public async Task<IActionResult> GetExceptions(int mosqueId, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to)
     {
         var query = _unitOfWork.Repository<PrayerException>().QueryNoTracking()
-            .Where(e => e.MosqueId == mosqueId);
+            .Where(e => e.MosqueId == mosqueId && !e.IsDeleted);
         if (from.HasValue) query = query.Where(e => e.Date >= from);
         if (to.HasValue) query = query.Where(e => e.Date <= to);
         return Ok(await query.OrderBy(e => e.Date).ToListAsync());
@@ -284,7 +313,8 @@ public class PrayerTimesController : ControllerBase
         ex.Id = 0;
         _unitOfWork.Repository<PrayerException>().Add(ex);
         await LogAuditAsync(mosqueId, ex.Date, "Exception",
-            $"Added prayer exception: {ex.Prayer} → {ex.OverrideValue} ({ex.Reason})");
+            $"Added prayer exception: {ex.Prayer} → {ex.OverrideValue} ({ex.Reason})",
+            null, $"{ex.Prayer}={ex.OverrideValue:HH\\:mm}");
         await _unitOfWork.SaveChangesAsync();
         return Ok(ex);
     }
@@ -294,7 +324,7 @@ public class PrayerTimesController : ControllerBase
     public async Task<IActionResult> DeleteException(int mosqueId, int exceptionId)
     {
         var ex = await _unitOfWork.Repository<PrayerException>().Query()
-            .FirstOrDefaultAsync(e => e.Id == exceptionId && e.MosqueId == mosqueId);
+            .FirstOrDefaultAsync(e => e.Id == exceptionId && e.MosqueId == mosqueId && !e.IsDeleted);
         if (ex == null) return NotFound();
 
         _unitOfWork.Repository<PrayerException>().Remove(ex);
@@ -441,67 +471,291 @@ public class PrayerTimesController : ControllerBase
             .Take(Math.Clamp(take, 1, 500))
             .ToListAsync());
 
-    // ---- Jamaah Templates (recurring template system, spec 3.2) ----
+    // ---- Jamaah Templates (recurring / seasonal template system, Module 3.2) ----
 
     [HttpGet("jamaah-templates")]
-    [Authorize(Roles = Roles.PrayerTimesManagers)]
+    [Authorize(Roles = Roles.Admins)]
     public async Task<IActionResult> GetTemplates(int mosqueId) =>
-        Ok(await _unitOfWork.Repository<JamaahTemplate>().QueryNoTracking()
-            .Where(t => t.MosqueId == mosqueId)
-            .OrderByDescending(t => t.CreatedAt)
-            .ToListAsync());
+        Ok(await _templates.ListAsync(mosqueId));
+
+    [HttpGet("jamaah-templates/resolve")]
+    [Authorize(Roles = Roles.Admins)]
+    public async Task<IActionResult> ResolveTemplate(int mosqueId, [FromQuery] DateOnly? date)
+    {
+        var d = date ?? TodayLondon();
+        var resolved = await _templates.ResolveForDateAsync(mosqueId, d);
+        return Ok(new { date = d, template = resolved });
+    }
 
     [HttpPost("jamaah-templates")]
-    [Authorize(Roles = Roles.PrayerTimesManagers)]
-    public async Task<IActionResult> CreateTemplate(int mosqueId, [FromBody] JamaahTemplate template)
+    [Authorize(Roles = Roles.Admins)]
+    public async Task<IActionResult> CreateTemplate(int mosqueId, [FromBody] JamaahTemplateUpsertRequest req)
     {
-        template.Id = 0;
-        template.MosqueId = mosqueId;
-        _unitOfWork.Repository<JamaahTemplate>().Add(template);
+        var (result, error) = await _templates.CreateAsync(mosqueId, req);
+        if (error != null) return BadRequest(new { message = error });
+        await LogAuditAsync(mosqueId, null, "Template", $"Created jamaah template '{result!.Template.Name}'");
         await _unitOfWork.SaveChangesAsync();
-        return Ok(template);
+        return Ok(result);
     }
 
     [HttpPut("jamaah-templates/{templateId:int}")]
-    [Authorize(Roles = Roles.PrayerTimesManagers)]
-    public async Task<IActionResult> UpdateTemplate(int mosqueId, int templateId, [FromBody] JamaahTemplate input)
+    [Authorize(Roles = Roles.Admins)]
+    public async Task<IActionResult> UpdateTemplate(int mosqueId, int templateId, [FromBody] JamaahTemplateUpsertRequest req)
     {
-        var template = await _unitOfWork.Repository<JamaahTemplate>().Query()
-            .FirstOrDefaultAsync(t => t.Id == templateId && t.MosqueId == mosqueId);
-        if (template == null) return NotFound();
-
-        template.Name = input.Name;
-        template.RecurringRulesJson = input.RecurringRulesJson;
-        template.IsActive = input.IsActive;
-        template.UpdatedAt = DateTime.UtcNow;
+        var (result, error) = await _templates.UpdateAsync(mosqueId, templateId, req);
+        if (error == "Template not found.") return NotFound(new { message = error });
+        if (error != null) return BadRequest(new { message = error });
+        await LogAuditAsync(mosqueId, null, "Template", $"Updated jamaah template '{result!.Template.Name}'");
         await _unitOfWork.SaveChangesAsync();
-        return Ok(template);
+        return Ok(result);
+    }
+
+    [HttpPost("jamaah-templates/{templateId:int}/duplicate")]
+    [Authorize(Roles = Roles.Admins)]
+    public async Task<IActionResult> DuplicateTemplate(int mosqueId, int templateId)
+    {
+        var (result, error) = await _templates.DuplicateAsync(mosqueId, templateId);
+        if (error != null) return NotFound(new { message = error });
+        await LogAuditAsync(mosqueId, null, "Template", $"Duplicated jamaah template '{result!.Name}'");
+        await _unitOfWork.SaveChangesAsync();
+        return Ok(result);
     }
 
     [HttpDelete("jamaah-templates/{templateId:int}")]
-    [Authorize(Roles = Roles.PrayerTimesManagers)]
+    [Authorize(Roles = Roles.Admins)]
     public async Task<IActionResult> DeleteTemplate(int mosqueId, int templateId)
     {
-        var template = await _unitOfWork.Repository<JamaahTemplate>().Query()
-            .FirstOrDefaultAsync(t => t.Id == templateId && t.MosqueId == mosqueId);
-        if (template == null) return NotFound();
-        _unitOfWork.Repository<JamaahTemplate>().Remove(template);
+        var error = await _templates.DeleteAsync(mosqueId, templateId);
+        if (error != null) return NotFound(new { message = error });
+        await LogAuditAsync(mosqueId, null, "Template", $"Deleted jamaah template #{templateId}");
         await _unitOfWork.SaveChangesAsync();
         return NoContent();
     }
 
-    private async Task LogAuditAsync(int mosqueId, DateOnly? date, string actionType, string description)
+    [HttpPatch("jamaah-templates/{templateId:int}/active")]
+    [Authorize(Roles = Roles.Admins)]
+    public async Task<IActionResult> SetTemplateActive(int mosqueId, int templateId, [FromBody] JamaahTemplateSetActiveRequest req)
     {
+        var (result, error) = await _templates.SetActiveAsync(mosqueId, templateId, req.IsActive);
+        if (error != null) return NotFound(new { message = error });
+        await LogAuditAsync(mosqueId, null, "Template",
+            $"{(req.IsActive ? "Activated" : "Deactivated")} jamaah template '{result!.Name}'");
+        await _unitOfWork.SaveChangesAsync();
+        return Ok(result);
+    }
+
+    /// <summary>Generate daily prayer rows from a jamaah template for a date range (Module 3.2 M5).</summary>
+    [HttpPost("jamaah-templates/{templateId:int}/generate")]
+    [Authorize(Roles = Roles.Admins)]
+    public async Task<IActionResult> GenerateFromTemplate(int mosqueId, int templateId, [FromBody] GenerateFromTemplateRequest req)
+    {
+        if (req.To < req.From)
+            return BadRequest(new { message = "To date must be on or after From date." });
+        if (req.To.DayNumber - req.From.DayNumber > 366)
+            return BadRequest(new { message = "Date range cannot exceed 366 days." });
+
+        var template = await _unitOfWork.Repository<JamaahTemplate>().QueryNoTracking()
+            .Include(t => t.Prayers)
+            .FirstOrDefaultAsync(t => t.Id == templateId && t.MosqueId == mosqueId && !t.IsDeleted);
+        if (template == null) return NotFound();
+        if (!template.IsActive)
+            return BadRequest(new { message = "Template is inactive. Activate it before generating." });
+
+        if (!TryResolveTemplateTimes(template, out var times, out var parseError))
+            return BadRequest(new { message = parseError });
+
+        // Preview uses no-tracking snapshot so we never mutate existing entities accidentally.
+        var existing = req.Preview
+            ? await _unitOfWork.Repository<PrayerTimesDaily>().QueryNoTracking()
+                .Where(p => p.MosqueId == mosqueId && p.Date >= req.From && p.Date <= req.To)
+                .ToListAsync()
+            : await _unitOfWork.Repository<PrayerTimesDaily>().Query()
+                .Where(p => p.MosqueId == mosqueId && p.Date >= req.From && p.Date <= req.To)
+                .ToListAsync();
+        var byDate = existing.ToDictionary(p => p.Date);
+
+        var created = 0;
+        var updated = 0;
+        var skipped = 0;
+        var previewRows = new List<GenerateFromTemplatePreviewRow>();
+        var status = req.Publish ? PublishStatus.Published : PublishStatus.Draft;
+        var userId = UserId();
+        var now = DateTime.UtcNow;
+
+        for (var d = req.From; d <= req.To; d = d.AddDays(1))
+        {
+            if (!JamaahTemplateService.ShouldGenerateOnDate(template, d))
+            {
+                skipped++;
+                if (req.Preview)
+                    previewRows.Add(new GenerateFromTemplatePreviewRow { Date = d, Action = "skip", Reason = "Outside template rules" });
+                continue;
+            }
+
+            if (byDate.TryGetValue(d, out var row))
+            {
+                if (req.SkipExisting)
+                {
+                    skipped++;
+                    if (req.Preview)
+                        previewRows.Add(new GenerateFromTemplatePreviewRow { Date = d, Action = "skip", Reason = "Existing row" });
+                    continue;
+                }
+
+                if (row.Status == PublishStatus.Published && !req.OverwritePublished)
+                {
+                    skipped++;
+                    if (req.Preview)
+                        previewRows.Add(new GenerateFromTemplatePreviewRow { Date = d, Action = "skip", Reason = "Published (overwrite off)" });
+                    continue;
+                }
+
+                if (!req.Preview)
+                {
+                    row.FajrStart = times.FajrStart;
+                    row.FajrJamaat = times.FajrJamaat;
+                    row.DhuhrStart = times.DhuhrStart;
+                    row.DhuhrJamaat = times.DhuhrJamaat;
+                    row.AsrStart = times.AsrStart;
+                    row.AsrJamaat = times.AsrJamaat;
+                    row.MaghribStart = times.MaghribStart;
+                    row.MaghribJamaat = times.MaghribJamaat;
+                    row.IshaStart = times.IshaStart;
+                    row.IshaJamaat = times.IshaJamaat;
+                    row.Status = status;
+                    row.UpdatedAt = now;
+                    if (req.Publish)
+                    {
+                        row.PublishedAt = now;
+                        row.PublishedById = userId;
+                    }
+                }
+
+                updated++;
+                if (req.Preview)
+                    previewRows.Add(new GenerateFromTemplatePreviewRow { Date = d, Action = "update", Reason = row.Status.ToString() });
+            }
+            else
+            {
+                if (!req.Preview)
+                {
+                    _unitOfWork.Repository<PrayerTimesDaily>().Add(new PrayerTimesDaily
+                    {
+                        MosqueId = mosqueId,
+                        Date = d,
+                        FajrStart = times.FajrStart,
+                        FajrJamaat = times.FajrJamaat,
+                        DhuhrStart = times.DhuhrStart,
+                        DhuhrJamaat = times.DhuhrJamaat,
+                        AsrStart = times.AsrStart,
+                        AsrJamaat = times.AsrJamaat,
+                        MaghribStart = times.MaghribStart,
+                        MaghribJamaat = times.MaghribJamaat,
+                        IshaStart = times.IshaStart,
+                        IshaJamaat = times.IshaJamaat,
+                        Status = status,
+                        PublishedAt = req.Publish ? now : null,
+                        PublishedById = req.Publish ? userId : null,
+                    });
+                }
+
+                created++;
+                if (req.Preview)
+                    previewRows.Add(new GenerateFromTemplatePreviewRow { Date = d, Action = "create" });
+            }
+        }
+
+        if (!req.Preview)
+        {
+            await LogAuditAsync(mosqueId, req.From, "TEMPLATE_APPLIED",
+                $"Applied template '{template.Name}' ({req.From:yyyy-MM-dd} → {req.To:yyyy-MM-dd}): created {created}, updated {updated}, skipped {skipped}",
+                null, $"created={created};updated={updated};skipped={skipped}");
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        var verb = req.Preview ? "Preview" : "Template applied";
+        return Ok(new GenerateFromTemplateResponse
+        {
+            Created = created,
+            Updated = updated,
+            Skipped = skipped,
+            Preview = req.Preview,
+            Message = $"{verb}. Create {created}, update {updated}, skip {skipped}.",
+            Rows = req.Preview ? previewRows : [],
+        });
+    }
+
+    private static bool TryResolveTemplateTimes(
+        JamaahTemplate template,
+        out PrayerTimesHelper.TemplateTimes times,
+        out string? error)
+    {
+        if (PrayerTimesHelper.TryParseTemplateTimes(template.RecurringRulesJson, out times, out error))
+            return true;
+
+        var prayers = template.Prayers?
+            .Where(p => !p.IsDeleted)
+            .ToDictionary(p => p.PrayerName, StringComparer.OrdinalIgnoreCase)
+            ?? new Dictionary<string, JamaahTemplatePrayer>(StringComparer.OrdinalIgnoreCase);
+
+        if (prayers.Count == 0)
+        {
+            times = default;
+            error ??= "Template has no prayer times configured.";
+            return false;
+        }
+
+        TimeOnly Get(string name, bool start)
+        {
+            if (!prayers.TryGetValue(name, out var p))
+                return default;
+            return start ? p.StartTime : p.JamaatTime;
+        }
+
+        times = new PrayerTimesHelper.TemplateTimes(
+            Get("Fajr", true),
+            Get("Fajr", false),
+            Get("Dhuhr", true),
+            Get("Dhuhr", false),
+            Get("Asr", true),
+            Get("Asr", false),
+            Get("Maghrib", true),
+            Get("Maghrib", false),
+            Get("Isha", true),
+            Get("Isha", false),
+            Array.Empty<int>());
+        error = null;
+        return true;
+    }
+
+    private async Task LogAuditAsync(
+        int mosqueId,
+        DateOnly? date,
+        string actionType,
+        string description,
+        string? oldValue = null,
+        string? newValue = null)
+    {
+        // PrayerTimeAuditLogs.Date is NOT NULL in SQL; use today when the action is not date-scoped (Jumuah, templates, etc.)
         _unitOfWork.Repository<PrayerTimeAuditLog>().Add(new PrayerTimeAuditLog
         {
             MosqueId = mosqueId,
-            Date = date,
+            Date = date ?? TodayLondon(),
             ChangedById = UserId(),
             ActionType = actionType,
-            ChangeDescription = description
+            ChangeDescription = description,
+            OldValue = oldValue,
+            NewValue = newValue,
         });
         await Task.CompletedTask;
     }
+
+    private static string FormatDailyTimes(PrayerTimesDaily row) =>
+        $"Fajr {row.FajrStart:HH\\:mm}/{row.FajrJamaat:HH\\:mm}; " +
+        $"Dhuhr {row.DhuhrStart:HH\\:mm}/{row.DhuhrJamaat:HH\\:mm}; " +
+        $"Asr {row.AsrStart:HH\\:mm}/{row.AsrJamaat:HH\\:mm}; " +
+        $"Maghrib {row.MaghribStart:HH\\:mm}/{row.MaghribJamaat:HH\\:mm}; " +
+        $"Isha {row.IshaStart:HH\\:mm}/{row.IshaJamaat:HH\\:mm}";
 
     private string UserId() => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "unknown";
 

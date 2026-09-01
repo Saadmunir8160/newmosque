@@ -111,6 +111,12 @@ export class MosqueService {
     );
   }
 
+  getMonthlyPrayerTimes(mosqueId: number, year: number, month: number): Observable<PrayerTimesDaily[]> {
+    return this.http.get<PrayerTimesDaily[]>(`${this.base}/mosques/${mosqueId}/prayer-times/monthly`, {
+      params: { year: String(year), month: String(month) },
+    });
+  }
+
   getJumuahTimes(mosqueId: number): Observable<JumuahTime[]> {
     return this.http.get<JumuahTime[]>(`${this.base}/mosques/${mosqueId}/prayer-times/jumuah`);
   }

@@ -1,11 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatChipsModule } from '@angular/material/chips';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { PrayerEditorService } from '../../core/services/prayer-editor.service';
 import { MosqueContextService } from '../../core/services/mosque-context.service';
@@ -14,68 +9,391 @@ import { PrayerTimesDaily } from '../../core/models';
 @Component({
   selector: 'app-prayer-editor-daily',
   standalone: true,
-  imports: [
-    CommonModule, FormsModule,
-    MatCardModule, MatButtonModule, MatChipsModule,
-    MatFormFieldModule, MatInputModule, MatSnackBarModule,
-  ],
+  imports: [CommonModule, FormsModule, MatSnackBarModule],
   template: `
-    <div class="editor-page">
-      <header class="editor-head">
-        <p class="editor-badge">Prayer Times Editor</p>
-        <h1 class="editor-title">Daily Prayers</h1>
-        <p class="editor-sub">Fajr, Dhuhr, Asr, Maghrib, Isha — start and jamaat times.</p>
+    <div class="ped">
+      <header class="ped-top">
+        <div>
+          <p class="ped-label">Prayer Times Editor</p>
+          <h1 class="ped-title">Daily Prayers</h1>
+          <p class="ped-sub">Fajr, Dhuhr, Asr, Maghrib, Isha — start and jamaat times.</p>
+        </div>
       </header>
 
-      <div class="flex flex-wrap gap-3 items-center mb-4">
-        <mat-form-field appearance="outline" class="pe-field">
-          <mat-label>Date</mat-label>
-          <input matInput type="date" [(ngModel)]="selectedDate" (ngModelChange)="load()" />
-        </mat-form-field>
-        <mat-chip *ngIf="times()?.status" [highlighted]="times()?.status === 'Published'">
-          {{ times()?.status }}
-        </mat-chip>
+      <div class="ped-toolbar">
+        <label class="ped-field">
+          <span class="ped-field__label">Date</span>
+          <input
+            class="ped-input"
+            type="date"
+            [(ngModel)]="selectedDate"
+            (ngModelChange)="load()"
+            aria-label="Select date" />
+        </label>
+        <button type="button" class="ped-btn ped-btn--ghost ped-btn--sm" (click)="goToday()">Today</button>
+        <span
+          *ngIf="times()?.status as st"
+          class="ped-badge"
+          [class.ped-badge--ok]="st === 'Published'"
+          [class.ped-badge--draft]="st === 'Draft'">
+          {{ st }}
+        </span>
+        <p class="ped-toolbar__hint" *ngIf="mosqueName()">{{ mosqueName() }}</p>
       </div>
 
-      <mat-card class="panel" *ngIf="times() as t">
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead>
-              <tr>
-                <th>Prayer</th>
-                <th>Start</th>
-                <th>Jamaat</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let p of prayers">
-                <td>{{ p.label }}</td>
-                <td><input class="time-input" type="time" [ngModel]="toInput(t[p.start])" (ngModelChange)="setTime(t, p.start, $event)" /></td>
-                <td><input class="time-input" type="time" [ngModel]="toInput(t[p.jamaat])" (ngModelChange)="setTime(t, p.jamaat, $event)" /></td>
-              </tr>
-            </tbody>
-          </table>
+      <section class="ped-card" *ngIf="times() as t">
+        <div class="ped-card__head">
+          <div>
+            <h2 class="ped-card__title">Schedule for {{ selectedDate | date:'mediumDate' }}</h2>
+            <p class="ped-card__sub">Edit start and jamaat, then save as draft or publish.</p>
+          </div>
         </div>
-        <div class="actions mt-4">
-          <button mat-stroked-button [disabled]="busy()" (click)="save(false)">Save draft</button>
-          <button mat-flat-button color="primary" [disabled]="busy()" (click)="save(true)">Save & publish</button>
-          <button mat-stroked-button [disabled]="busy()" (click)="publish()">Publish</button>
+
+        <div class="ped-table-head" aria-hidden="true">
+          <span>Prayer</span>
+          <span>Start Time</span>
+          <span>Jamaat Time</span>
         </div>
-      </mat-card>
+
+        <div class="ped-row" *ngFor="let p of prayers">
+          <div class="ped-row__prayer">
+            <span class="ped-icon" [attr.data-prayer]="p.key" aria-hidden="true">{{ p.icon }}</span>
+            <span class="ped-row__name">{{ p.label }}</span>
+          </div>
+          <label class="ped-time">
+            <span class="ped-time__label">Start</span>
+            <input
+              class="ped-input ped-input--time"
+              type="time"
+              [ngModel]="toInput(t[p.start])"
+              (ngModelChange)="setTime(t, p.start, $event)"
+              [attr.aria-label]="p.label + ' start time'" />
+          </label>
+          <label class="ped-time">
+            <span class="ped-time__label">Jamaat</span>
+            <input
+              class="ped-input ped-input--time"
+              type="time"
+              [ngModel]="toInput(t[p.jamaat])"
+              (ngModelChange)="setTime(t, p.jamaat, $event)"
+              [attr.aria-label]="p.label + ' jamaat time'" />
+          </label>
+        </div>
+
+        <footer class="ped-actions">
+          <button type="button" class="ped-btn ped-btn--ghost" [disabled]="busy()" (click)="save(false)">
+            Save draft
+          </button>
+          <button type="button" class="ped-btn" [disabled]="busy()" (click)="save(true)">
+            Save &amp; publish
+          </button>
+          <button type="button" class="ped-btn ped-btn--outline" [disabled]="busy()" (click)="publish()">
+            Publish
+          </button>
+        </footer>
+      </section>
+
+      <p *ngIf="!times()" class="ped-empty">Loading timetable…</p>
     </div>
   `,
   styles: [`
-    .editor-page { display: flex; flex-direction: column; gap: 1rem; }
-    .editor-badge { margin: 0; font-size: 0.7rem; color: #fbbf24; font-weight: 700; text-transform: uppercase; }
-    .editor-title { margin: 0.25rem 0 0; color: #fff; font-size: 1.5rem; }
-    .editor-sub { margin: 0.25rem 0 0; color: #6ee7b7; font-size: 0.85rem; }
-    .panel { background: #FFFFFF !important; border: 1px solid #F8FAFC; color: #ecfdf5; padding: 1rem; }
-    th, td { padding: 0.5rem; text-align: left; color: #d1fae5; border-bottom: 1px solid rgba(6,95,70,0.5); }
-    th { color: #6ee7b7; font-size: 0.75rem; text-transform: uppercase; }
-    .time-input { background: #0F172A; border: 1px solid #F8FAFC; border-radius: 6px; color: #fff; padding: 6px 8px; }
-    .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-    ::ng-deep .pe-field .mat-mdc-text-field-wrapper { background: rgba(2,44,34,0.6); }
-  `]
+    :host {
+      display: block;
+      font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    }
+
+    .ped {
+      --ped-card: #ffffff;
+      --ped-ink: #0f172a;
+      --ped-muted: #64748b;
+      --ped-border: #e2e8f0;
+      --ped-primary: #0f4c3a;
+      --ped-primary-hover: #0a3d2e;
+      --ped-radius: 16px;
+      --ped-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 1.35rem;
+      padding-bottom: 2rem;
+      color: var(--ped-ink);
+    }
+
+    .ped-label {
+      margin: 0;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ped-primary);
+    }
+
+    .ped-title {
+      margin: 0.35rem 0 0;
+      font-size: clamp(1.65rem, 3vw, 2rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--ped-ink);
+      line-height: 1.15;
+    }
+
+    .ped-sub {
+      margin: 0.4rem 0 0;
+      font-size: 0.9rem;
+      color: var(--ped-muted);
+      max-width: 36rem;
+    }
+
+    .ped-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 0.85rem;
+    }
+
+    .ped-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .ped-field__label,
+    .ped-time__label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ped-muted);
+    }
+
+    @media (min-width: 720px) {
+      .ped-time__label { display: none; }
+    }
+
+    .ped-input {
+      min-width: 10.5rem;
+      padding: 0.65rem 0.85rem;
+      border-radius: 12px;
+      border: 1px solid var(--ped-border);
+      background: #fff;
+      color: var(--ped-ink);
+      font-size: 0.9rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.18s, box-shadow 0.18s;
+      box-sizing: border-box;
+    }
+
+    .ped-input:focus {
+      border-color: var(--ped-primary);
+      box-shadow: 0 0 0 3px rgba(15, 76, 58, 0.12);
+    }
+
+    .ped-input--time {
+      min-width: 0;
+      width: 100%;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+    }
+
+    .ped-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.4rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: #f1f5f9;
+      color: #475569;
+      margin-bottom: 0.15rem;
+    }
+
+    .ped-badge--ok {
+      background: rgba(22, 101, 52, 0.12);
+      color: #166534;
+    }
+
+    .ped-badge--draft {
+      background: rgba(180, 83, 9, 0.12);
+      color: #92400e;
+    }
+
+    .ped-toolbar__hint {
+      margin: 0 0 0.35rem auto;
+      font-size: 0.8rem;
+      color: var(--ped-muted);
+      font-weight: 600;
+    }
+
+    .ped-card {
+      background: var(--ped-card);
+      border: 1px solid var(--ped-border);
+      border-radius: var(--ped-radius);
+      box-shadow: var(--ped-shadow);
+      padding: 1.25rem 1.25rem 1.35rem;
+    }
+
+    .ped-card__head { margin-bottom: 1.1rem; }
+
+    .ped-card__title {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--ped-ink);
+      letter-spacing: -0.02em;
+    }
+
+    .ped-card__sub {
+      margin: 0.25rem 0 0;
+      font-size: 0.85rem;
+      color: var(--ped-muted);
+    }
+
+    .ped-table-head {
+      display: none;
+      grid-template-columns: 1.35fr 1fr 1fr;
+      gap: 0.75rem;
+      padding: 0 1rem 0.55rem;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ped-muted);
+    }
+
+    @media (min-width: 720px) {
+      .ped-table-head { display: grid; }
+    }
+
+    .ped-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.55rem;
+      padding: 0.9rem 1rem;
+      margin-bottom: 0.55rem;
+      border-radius: 14px;
+      border: 1px solid var(--ped-border);
+      background: #fff;
+      transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .ped-row:hover {
+      background: #f8fafc;
+      border-color: rgba(15, 76, 58, 0.22);
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+    }
+
+    @media (min-width: 720px) {
+      .ped-row {
+        grid-template-columns: 1.35fr 1fr 1fr;
+        align-items: center;
+        gap: 0.75rem;
+      }
+    }
+
+    .ped-row__prayer {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .ped-icon {
+      width: 2.15rem;
+      height: 2.15rem;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    .ped-icon[data-prayer='fajr'] { background: #e0f2fe; }
+    .ped-icon[data-prayer='dhuhr'] { background: #fef3c7; }
+    .ped-icon[data-prayer='asr'] { background: #ffedd5; }
+    .ped-icon[data-prayer='maghrib'] { background: #fce7f3; }
+    .ped-icon[data-prayer='isha'] { background: #ede9fe; }
+
+    .ped-row__name {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--ped-ink);
+    }
+
+    .ped-time {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .ped-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-top: 1.15rem;
+      padding-top: 1.1rem;
+      border-top: 1px solid var(--ped-border);
+    }
+
+    .ped-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.65rem 1.15rem;
+      border-radius: 999px;
+      background: var(--ped-primary);
+      color: #fff;
+      font-size: 0.8125rem;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.18s ease, transform 0.18s ease, opacity 0.18s;
+    }
+
+    .ped-btn:hover:not(:disabled) {
+      background: var(--ped-primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .ped-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .ped-btn--ghost {
+      background: #fff;
+      color: var(--ped-ink);
+      border: 1px solid var(--ped-border);
+    }
+
+    .ped-btn--ghost:hover:not(:disabled) {
+      background: #f8fafc;
+    }
+
+    .ped-btn--sm {
+      padding: 0.4rem 0.85rem;
+      font-size: 0.75rem;
+    }
+
+    .ped-btn--outline {
+      background: #fff;
+      color: var(--ped-primary);
+      border: 1px solid rgba(15, 76, 58, 0.28);
+    }
+
+    .ped-btn--outline:hover:not(:disabled) {
+      background: rgba(15, 76, 58, 0.06);
+    }
+
+    .ped-empty {
+      margin: 0;
+      padding: 1.5rem 0;
+      color: var(--ped-muted);
+      font-size: 0.9rem;
+    }
+  `],
 })
 export class PrayerEditorDailyComponent implements OnInit {
   private editor = inject(PrayerEditorService);
@@ -88,12 +406,16 @@ export class PrayerEditorDailyComponent implements OnInit {
   private mosqueId = 1;
 
   prayers = [
-    { label: 'Fajr', start: 'fajrStart' as const, jamaat: 'fajrJamaat' as const },
-    { label: 'Dhuhr', start: 'dhuhrStart' as const, jamaat: 'dhuhrJamaat' as const },
-    { label: 'Asr', start: 'asrStart' as const, jamaat: 'asrJamaat' as const },
-    { label: 'Maghrib', start: 'maghribStart' as const, jamaat: 'maghribJamaat' as const },
-    { label: 'Isha', start: 'ishaStart' as const, jamaat: 'ishaJamaat' as const },
+    { key: 'fajr', label: 'Fajr', icon: '🌅', start: 'fajrStart' as const, jamaat: 'fajrJamaat' as const },
+    { key: 'dhuhr', label: 'Dhuhr', icon: '☀️', start: 'dhuhrStart' as const, jamaat: 'dhuhrJamaat' as const },
+    { key: 'asr', label: 'Asr', icon: '🌤', start: 'asrStart' as const, jamaat: 'asrJamaat' as const },
+    { key: 'maghrib', label: 'Maghrib', icon: '🌇', start: 'maghribStart' as const, jamaat: 'maghribJamaat' as const },
+    { key: 'isha', label: 'Isha', icon: '🌙', start: 'ishaStart' as const, jamaat: 'ishaJamaat' as const },
   ];
+
+  mosqueName(): string {
+    return this.mosqueCtx.mosque()?.name ?? '';
+  }
 
   ngOnInit(): void {
     this.mosqueCtx.resolve().then(id => { this.mosqueId = id; this.load(); });
@@ -101,9 +423,14 @@ export class PrayerEditorDailyComponent implements OnInit {
 
   load(): void {
     this.editor.getDaily(this.mosqueId, this.selectedDate).subscribe({
-      next: r => this.times.set(r.times),
+      next: r => this.times.set(r.times ?? this.emptyTimes()),
       error: () => this.times.set(this.emptyTimes()),
     });
+  }
+
+  goToday(): void {
+    this.selectedDate = new Date().toISOString().slice(0, 10);
+    this.load();
   }
 
   toInput(t: string): string { return t?.slice(0, 5) || ''; }

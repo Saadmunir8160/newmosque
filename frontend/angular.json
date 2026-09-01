@@ -25,7 +25,8 @@
               "src/assets"
             ],
             "styles": [
-              "src/styles.css"
+              "src/styles.css",
+              "src/member-dashboard.css"
             ],
             "scripts": []
           },
@@ -55,6 +56,13 @@
         },
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
+          "options": {
+            "headers": {
+              "Cache-Control": "no-store, no-cache, must-revalidate",
+              "Pragma": "no-cache"
+            },
+            "hmr": false
+          },
           "configurations": {
             "production": {
               "buildTarget": "frontend:build:production"

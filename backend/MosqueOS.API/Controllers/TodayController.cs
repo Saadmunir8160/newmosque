@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MosqueOS.API.Services;
 using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Entities;
@@ -32,15 +33,23 @@ namespace MosqueOS.API.Controllers
             var resolvedMosqueId = mosqueId ?? user?.HomeMosqueId
                 ?? await _unitOfWork.Repository<Mosque>().QueryNoTracking().Select(m => (int?)m.Id).FirstOrDefaultAsync();
 
-            // 2-3. Prayer times + next prayer
+            // 2-3. Prayer times + next prayer (exceptions applied)
             PrayerTimesDaily? prayerTimes = null;
             object? nextPrayer = null;
             if (resolvedMosqueId.HasValue)
             {
                 prayerTimes = await _unitOfWork.Repository<PrayerTimesDaily>().QueryNoTracking()
-                    .FirstOrDefaultAsync(p => p.MosqueId == resolvedMosqueId && p.Date == today);
+                    .FirstOrDefaultAsync(p => p.MosqueId == resolvedMosqueId && p.Date == today
+                        && p.Status == PublishStatus.Published);
                 if (prayerTimes != null)
+                {
+                    var exceptions = await _unitOfWork.Repository<PrayerException>().QueryNoTracking()
+                        .Where(e => e.MosqueId == resolvedMosqueId && e.Date == today && !e.IsDeleted)
+                        .ToListAsync();
+                    if (exceptions.Count > 0)
+                        prayerTimes = MosqueOS.API.Services.PrayerTimesHelper.CloneWithExceptions(prayerTimes, exceptions);
                     nextPrayer = ResolveNextPrayer(prayerTimes, TimeOnly.FromDateTime(now));
+                }
             }
 
             // 7. Special event tonight (Mawlid etc.)
@@ -81,7 +90,7 @@ namespace MosqueOS.API.Controllers
                     .FirstOrDefaultAsync()
                 : null;
 
-            // 6. Today's Qur'an reading card (only for logged-in users with a plan)
+            // 6. Today's Qur'an reading card (logged-in users with a plan)
             object? quranCard = null;
             if (userId != null)
             {
@@ -94,27 +103,22 @@ namespace MosqueOS.API.Controllers
                 {
                     var daysIn = today.DayNumber - plan.StartDate.DayNumber + 1;
                     var todaysPara = Math.Clamp(daysIn, 1, 30);
+                    var completed = plan.Progress.Count(p => p.Completed);
                     quranCard = new
                     {
                         todaysPara,
-                        completedParas = plan.Progress.Count(p => p.Completed),
-                        totalParas = 30
+                        completedParas = completed,
+                        totalParas = 30,
+                        progressLabel = $"{completed}/30",
+                        minDailyParas = plan.MinDailyParas <= 0 ? 1m : plan.MinDailyParas,
+                        remindersEnabled = plan.RemindersEnabled,
+                        todayCompleted = plan.Progress.FirstOrDefault(p => p.ParaNumber == todaysPara)?.Completed ?? false
                     };
                 }
             }
 
-            // Most relevant dua right now
-            var duaCategory = now.Hour switch
-            {
-                >= 4 and < 10 => "morning",
-                >= 10 and < 18 => "general",
-                >= 18 and < 22 => "after_prayer",
-                _ => "sleep"
-            };
-            var recommendedDua = await _unitOfWork.Repository<Dua>().QueryNoTracking()
-                .Where(d => d.Category == duaCategory)
-                .OrderBy(d => d.Id)
-                .FirstOrDefaultAsync();
+            // Most relevant dua right now (single — not a list)
+            var recommendedDua = await DuaRecommendationHelper.ResolveAsync(_unitOfWork, now);
 
             return Ok(new
             {

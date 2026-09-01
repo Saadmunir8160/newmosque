@@ -4,6 +4,8 @@ export interface LoginResponse {
   username: string;
   fullName: string;
   roles: string[];
+  refreshToken?: string;
+  refreshTokenExpiration?: string;
 }
 
 export interface UserProfile {

@@ -58,12 +58,12 @@
   --mos-success: #16A34A;
   --mos-warning: #F59E0B;
   --mos-danger: #DC2626;
-  --mos-info: #0284C7;
+  --mos-info: #2563EB;
 
   /* Surfaces */
-  --mos-bg: #F8FAF9;
+  --mos-bg: #F7F9F8;
   --mos-surface: #FFFFFF;
-  --mos-border: #E2E8F0;
+  --mos-border: #E5E7EB;
   --mos-border-input: #CBD5E1;
 
   /* Text */
@@ -72,24 +72,30 @@
   --mos-text-muted: #94A3B8;
   --mos-text-inverse: #FFFFFF;
 
-  /* Sidebar */
+  /* Sidebar — MOS Super Admin enterprise */
   --mos-sidebar-bg: #0F4C3A;
-  --mos-sidebar-active: #08362A;
-  --mos-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --mos-sidebar-header: #0B3D2E;
+  --mos-sidebar-active: #1E5E49;
+  --mos-sidebar-hover: #16624A;
   --mos-sidebar-text: #FFFFFF;
-  --mos-sidebar-section: #D4AF37;
-  --mos-sidebar-border: rgba(255, 255, 255, 0.12);
+  --mos-sidebar-text-secondary: #C9D8D0;
+  --mos-sidebar-icon: #EAF4EF;
+  --mos-sidebar-section: #C8A24A;
+  --mos-sidebar-divider: #2B6A55;
+  --mos-sidebar-border: #2B6A55;
+  --mos-sidebar-indicator: #C8A24A;
 
   /* Header */
   --mos-header-bg: #FFFFFF;
   --mos-header-border: #E2E8F0;
 
-  /* Cards */
-  --mos-radius-card: 16px;
+  /* Cards — 8px rhythm, 14px radius, soft shadow */
+  --mos-radius-card: 14px;
   --mos-radius-btn: 10px;
   --mos-radius-input: 10px;
-  --mos-shadow-card: 0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 16px rgba(15, 23, 42, 0.04);
-  --mos-shadow-card-hover: 0 4px 12px rgba(15, 23, 42, 0.08), 0 8px 24px rgba(15, 23, 42, 0.06);
+  --mos-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --mos-shadow-card-hover: 0 2px 8px rgba(15, 23, 42, 0.06);
+  --mos-ease: 200ms ease;
 
   /* Forms */
   --mos-focus-ring: 0 0 0 4px rgba(15, 76, 58, 0.15);

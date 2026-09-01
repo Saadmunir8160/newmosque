@@ -1,114 +1,72 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatChipsModule } from '@angular/material/chips';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../core/auth/auth.service';
 import { MosqueService } from '../../core/services/mosque.service';
 import { MosqueContextService } from '../../core/services/mosque-context.service';
 import { MosqueEvent } from '../../core/models';
 import { formatTime12 } from '../../core/utils/prayer.utils';
+import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 
 @Component({
   selector: 'app-events',
   standalone: true,
-  imports: [
-    CommonModule, FormsModule,
-    MatButtonModule, MatCardModule, MatChipsModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatSnackBarModule, MatProgressSpinnerModule,
-  ],
+  imports: [CommonModule, FormsModule, PageHeaderComponent],
   template: `
-    <div class="w-full max-w-4xl mx-auto">
-      <h2 class="heading-page mb-4 sm:mb-6">Events</h2>
+    <app-page-header badge="Member" title="Events" subtitle="Mosque gatherings and programmes" />
 
-      <div class="flex flex-wrap gap-3 mb-6 items-end">
-        <mat-form-field appearance="outline" class="flex-1 min-w-[200px] events-field">
-          <mat-label>Search events</mat-label>
-          <input matInput [(ngModel)]="search" (ngModelChange)="onFilterChange()" placeholder="Title, location…" />
-        </mat-form-field>
-        <mat-form-field appearance="outline" class="w-40 events-field">
-          <mat-label>Type</mat-label>
-          <mat-select [(ngModel)]="eventType" (ngModelChange)="onFilterChange()">
-            <mat-option value="">All types</mat-option>
-            <mat-option *ngFor="let t of eventTypes" [value]="t">{{ t }}</mat-option>
-          </mat-select>
-        </mat-form-field>
-        <mat-chip-set>
-          <mat-chip [highlighted]="upcomingOnly()" (click)="toggleUpcoming()">
-            {{ upcomingOnly() ? 'Upcoming only' : 'All events' }}
-          </mat-chip>
-        </mat-chip-set>
-      </div>
-
-      <div *ngIf="loading()" class="flex justify-center py-12">
-        <mat-spinner diameter="40" />
-      </div>
-
-      <p *ngIf="!loading() && !items().length" class="text-mos-muted/80 text-center py-8">
-        No events match your filters.
-      </p>
-
-      <div class="space-y-4" *ngIf="!loading()">
-        <mat-card *ngFor="let e of items()" class="events-card">
-          <div class="flex gap-3 sm:gap-4 flex-col sm:flex-row">
-            <div class="bg-slate-100 rounded-xl p-3 sm:p-4 text-center min-w-[64px] sm:min-w-[80px] h-fit shrink-0 self-start">
-              <p class="text-mos-accent text-xs sm:text-sm font-bold">{{ e.date | date:'MMM' }}</p>
-              <p class="text-2xl sm:text-4xl font-bold text-white">{{ e.date | date:'d' }}</p>
-            </div>
-            <div class="flex-1 min-w-0">
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="text-sm bg-amber-400/20 text-mos-accent px-2 py-0.5 rounded uppercase">{{ e.eventType }}</span>
-                <mat-chip *ngIf="isRegistered(e.id)" class="!text-xs">Registered</mat-chip>
-              </div>
-              <h3 class="text-xl sm:text-2xl font-bold text-white mt-2">{{ e.title }}</h3>
-              <p class="text-mos-muted text-base">{{ formatTime(e.startTime) }} · {{ e.location }}</p>
-              <p class="text-mos-text mt-3 text-base">{{ e.description }}</p>
-              <div class="mt-4" *ngIf="auth.isAuthenticated()">
-                <button *ngIf="!isRegistered(e.id)" mat-flat-button color="primary"
-                  [disabled]="busyId() === e.id" (click)="register(e.id)">
-                  Register
-                </button>
-                <button *ngIf="isRegistered(e.id)" mat-stroked-button
-                  [disabled]="busyId() === e.id" (click)="cancel(e.id)">
-                  Cancel registration
-                </button>
-              </div>
-              <p *ngIf="!auth.isAuthenticated()" class="text-mos-muted/70 text-sm mt-3">
-                Log in to register for this event.
-              </p>
-            </div>
-          </div>
-        </mat-card>
-      </div>
+    <div class="member-events-toolbar">
+      <input class="member-events-search" type="search" [(ngModel)]="search"
+        (ngModelChange)="onFilterChange()" placeholder="Search events…" />
+      <select class="member-events-select" [(ngModel)]="eventType" (ngModelChange)="onFilterChange()">
+        <option value="">All types</option>
+        <option *ngFor="let t of eventTypes" [value]="t">{{ t }}</option>
+      </select>
+      <button type="button" class="member-chip" [class.member-chip--on]="upcomingOnly()"
+        (click)="toggleUpcoming()">
+        {{ upcomingOnly() ? 'Upcoming only' : 'All events' }}
+      </button>
     </div>
+
+    <div *ngIf="loading()" class="member-loading">Loading events…</div>
+
+    <p *ngIf="!loading() && !items().length" class="member-events-empty">
+      No events match your filters.
+    </p>
+
+    <article *ngFor="let e of items()" class="member-events-card">
+      <div class="member-events-date">
+        <p class="member-events-date__mon">{{ e.date | date:'MMM' }}</p>
+        <p class="member-events-date__day">{{ e.date | date:'d' }}</p>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="member-chips" style="margin-bottom: 0.35rem;">
+          <span class="member-tag">{{ e.eventType }}</span>
+          <span *ngIf="isRegistered(e.id)" class="member-chip member-chip--on" style="cursor: default;">Registered</span>
+        </div>
+        <h3 class="member-title">{{ e.title }}</h3>
+        <p class="member-meta">{{ formatTime(e.startTime) }} · {{ e.location }}</p>
+        <p class="member-desc" style="margin-top: 0.5rem;">{{ e.description }}</p>
+        <div class="member-actions" style="margin-top: 0.75rem;" *ngIf="auth.isAuthenticated()">
+          <button *ngIf="!isRegistered(e.id)" type="button" class="member-btn-primary"
+            [disabled]="busyId() === e.id" (click)="register(e.id)">
+            {{ busyId() === e.id ? 'Saving…' : 'Register' }}
+          </button>
+          <button *ngIf="isRegistered(e.id)" type="button" class="member-btn-secondary"
+            [disabled]="busyId() === e.id" (click)="cancel(e.id)">
+            Cancel registration
+          </button>
+        </div>
+        <p *ngIf="!auth.isAuthenticated()" class="member-hint" style="margin-top: 0.5rem;">
+          Log in to register for this event.
+        </p>
+      </div>
+    </article>
   `,
-  styles: [`
-    :host { display: block; }
-    .events-card {
-      background: #FFFFFF !important;
-      border: 1px solid rgba(16, 185, 129, 0.25);
-      color: #ecfdf5;
-    }
-    ::ng-deep .events-field .mat-mdc-text-field-wrapper {
-      background: rgba(6, 78, 59, 0.5);
-    }
-    ::ng-deep .events-field .mdc-floating-label,
-    ::ng-deep .events-field .mat-mdc-input-element {
-      color: #ecfdf5 !important;
-    }
-  `]
 })
 export class EventsComponent implements OnInit {
   private mosqueService = inject(MosqueService);
   private mosqueContext = inject(MosqueContextService);
-  private snack = inject(MatSnackBar);
   auth = inject(AuthService);
 
   items = signal<MosqueEvent[]>([]);
@@ -148,12 +106,8 @@ export class EventsComponent implements OnInit {
       next: () => {
         this.busyId.set(null);
         this.registeredIds.update(s => new Set([...s, eventId]));
-        this.snack.open('Registered successfully', 'OK', { duration: 3000 });
       },
-      error: () => {
-        this.busyId.set(null);
-        this.snack.open('Could not register — you may already be registered', 'OK', { duration: 4000 });
-      },
+      error: () => this.busyId.set(null),
     });
   }
 
@@ -167,12 +121,8 @@ export class EventsComponent implements OnInit {
           next.delete(eventId);
           return next;
         });
-        this.snack.open('Registration cancelled', 'OK', { duration: 3000 });
       },
-      error: () => {
-        this.busyId.set(null);
-        this.snack.open('Could not cancel registration', 'OK', { duration: 4000 });
-      },
+      error: () => this.busyId.set(null),
     });
   }
 
