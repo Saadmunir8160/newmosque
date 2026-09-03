@@ -1,11 +1,14 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.API.Models.Common;
 using MosqueOS.API.Models.Mosques;
 using MosqueOS.API.Models.Platform;
 using MosqueOS.API.Services;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
+using MosqueOS.Domain.Entities;
 using System.Security.Claims;
 
 namespace MosqueOS.API.Controllers;
@@ -16,8 +19,13 @@ namespace MosqueOS.API.Controllers;
 public class AdminClaimsController : ControllerBase
 {
     private readonly OwnershipClaimService _claims;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public AdminClaimsController(OwnershipClaimService claims) => _claims = claims;
+    public AdminClaimsController(OwnershipClaimService claims, IUnitOfWork unitOfWork)
+    {
+        _claims = claims;
+        _unitOfWork = unitOfWork;
+    }
 
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] string? status = "Pending")
@@ -41,7 +49,7 @@ public class AdminClaimsController : ControllerBase
                 Pending = all.Count(c => c.Status == nameof(OwnershipClaimStatus.Pending)),
                 Rejected = all.Count(c => c.Status == nameof(OwnershipClaimStatus.Rejected)),
                 ClaimPendingListings = 0, // Legacy
-                PendingReviewListings = all.Count(c => c.MosqueStatus == nameof(MosqueStatus.PendingVerification))
+                PendingReviewListings = await _unitOfWork.Repository<Mosque>().QueryNoTracking().CountAsync(m => m.Status == MosqueStatus.Claimed && !m.IsDraft && MosqueProfileCompleteness.Calculate(m).completeness >= 40)
             },
             items = items.Select(i => new
             {

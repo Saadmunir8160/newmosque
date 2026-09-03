@@ -8,7 +8,6 @@ namespace MosqueOS.Domain
     public enum MosqueStatus
     {
         Unclaimed = 0,
-        PendingVerification = 1,
         Claimed = 2,
         Active = 3,
         Rejected = 4

@@ -939,7 +939,7 @@ namespace MosqueOS.API.Controllers
                     Message = "Complete more of your mosque profile (contact details, description) before submitting."
                 });
 
-            mosque.Status = MosqueStatus.PendingVerification;
+            mosque.IsDraft = false;
             mosque.UpdatedAt = DateTime.UtcNow;
             await _unitOfWork.SaveChangesAsync();
 

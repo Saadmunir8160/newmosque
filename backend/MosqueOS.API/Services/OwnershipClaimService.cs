@@ -83,12 +83,8 @@ public class OwnershipClaimService
         if (mosque == null || mosque.IsDeleted)
             return (null, "Mosque not found.", 404);
 
-        // Spec: UNCLAIMED | CLAIMED | ACTIVE — pending review is on the claim record only.
-        if (mosque.Status == MosqueStatus.PendingVerification)
-            mosque.Status = MosqueStatus.Unclaimed;
-
         if (mosque.Status != MosqueStatus.Unclaimed)
-            return (null, "This mosque has already been claimed.", 400);
+            return (null, "Only unclaimed mosques can be claimed.", 400);
 
         if (!mosque.AllowClaimRequests)
             return (null, "This mosque is not accepting claim requests.", 400);
@@ -273,7 +269,7 @@ public class OwnershipClaimService
             Email = dto.Email,
             Website = dto.Website,
             Description = dto.Description,
-            Status = MosqueStatus.PendingVerification,
+            Status = MosqueStatus.Unclaimed,
             Timezone = string.IsNullOrWhiteSpace(dto.Timezone) ? "Europe/London" : dto.Timezone.Trim()
         };
 
@@ -433,17 +429,21 @@ public class OwnershipClaimService
         claim.RejectionReason = reason.Trim();
         claim.ReviewedAt = DateTime.UtcNow;
         claim.ReviewedById = reviewerId;
-
-        if (mosque.Status == MosqueStatus.PendingVerification)
+        if (mosque.Status == MosqueStatus.Unclaimed && mosque.OwnerId == null)
         {
-            mosque.Status = MosqueStatus.Rejected;
-            mosque.IsDeleted = true;
-            mosque.DeletedAt = DateTime.UtcNow;
-            mosque.DeletedById = reviewerId;
+            var hasOtherPending = await _unitOfWork.Repository<MosqueOwnershipClaim>().QueryNoTracking()
+                .AnyAsync(c => c.MosqueId == claim.MosqueId && c.Id != claimId && c.Status == OwnershipClaimStatus.Pending && !c.IsDeleted);
+            
+            if (!hasOtherPending)
+            {
+                mosque.Status = MosqueStatus.Rejected;
+                mosque.IsDeleted = true;
+                mosque.DeletedAt = DateTime.UtcNow;
+                mosque.DeletedById = reviewerId;
+            }
         }
         else
         {
-            mosque.Status = MosqueStatus.Unclaimed;
             mosque.OwnerId = null;
             mosque.AllowClaimRequests = true;
         }

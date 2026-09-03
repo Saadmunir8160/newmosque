@@ -161,7 +161,7 @@ namespace MosqueOS.API.Controllers
             var duplicateFlags = ComputeDuplicateFlags(mosques);
             var duplicateListings = duplicateFlags.Count;
             var suspended = 0; // Legacy
-            var pendingReview = mosques.Count(m => m.Status == MosqueStatus.PendingVerification);
+            var pendingReview = mosques.Count(m => m.Status == MosqueStatus.Claimed && !m.IsDraft && MosqueProfileCompleteness.Calculate(m).completeness >= 40);
             var claimPending = 0; // Legacy
             var completenessScores = mosques.Select(m => MosqueProfileCompleteness.Calculate(m).completeness).ToList();
             var avgProfileCompleteness = completenessScores.Count > 0
@@ -819,7 +819,7 @@ namespace MosqueOS.API.Controllers
                     claimPending = 0, // Legacy
                     claimed = mosques.Count(m => m.Status == MosqueStatus.Claimed),
                     active = mosques.Count(m => m.Status == MosqueStatus.Active),
-                    pendingReview = mosques.Count(m => m.Status == MosqueStatus.PendingVerification)
+                    pendingReview = mosques.Count(m => m.Status == MosqueStatus.Claimed && !m.IsDraft && MosqueProfileCompleteness.Calculate(m).completeness >= 40)
                 }
             });
         }

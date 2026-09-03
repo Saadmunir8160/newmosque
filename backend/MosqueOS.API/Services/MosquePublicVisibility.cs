@@ -6,8 +6,7 @@ namespace MosqueOS.API.Services;
 public static class MosquePublicVisibility
 {
     /// <summary>Normalize legacy ClaimPending → Unclaimed (pending lives on ownership claim).</summary>
-    public static MosqueStatus NormalizeSpecStatus(MosqueStatus status) =>
-        status == MosqueStatus.PendingVerification ? MosqueStatus.Unclaimed : status;
+    public static MosqueStatus NormalizeSpecStatus(MosqueStatus status) => status;
 
     public static bool IsPubliclyVisible(MosqueStatus status)
     {
