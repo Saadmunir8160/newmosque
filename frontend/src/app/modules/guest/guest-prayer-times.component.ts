@@ -128,12 +128,30 @@ export class GuestPrayerTimesComponent implements OnInit, OnDestroy {
   month = new Date().getMonth() + 1;
   formatTime = formatTime12;
   slots = getPrayerSlots;
+  tomorrowDaily: PrayerTimesDaily | null = null;
 
   ngOnInit(): void {
     this.seo.setPage('Prayer Times', 'View daily and monthly mosque prayer timetables.');
     this.guest.getDailyPrayer(this.mosqueId).subscribe(r => {
       this.daily.set(r.times);
       this.jumuah.set(r.jumuah || []);
+      
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      let tomorrowStr: string;
+      try {
+        tomorrowStr = new Intl.DateTimeFormat('en-CA', { timeZone: DEFAULT_PRAYER_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(tomorrow);
+      } catch {
+        tomorrowStr = tomorrow.toISOString().split('T')[0];
+      }
+
+      this.guest.getDailyPrayer(this.mosqueId, tomorrowStr).subscribe(rTom => {
+        this.tomorrowDaily = rTom.times;
+        this.tick();
+      });
+      
       this.tick();
     });
     this.timer = setInterval(() => this.tick(), 1000);
@@ -171,7 +189,7 @@ export class GuestPrayerTimesComponent implements OnInit, OnDestroy {
       this.countdown.set('');
       return;
     }
-    const next = resolveNextPrayer(t, DEFAULT_PRAYER_TIMEZONE);
+    const next = resolveNextPrayer(t, DEFAULT_PRAYER_TIMEZONE, this.tomorrowDaily);
     this.nextPrayer.set(next);
     this.countdown.set(countdownToJamaat(next.jamaat, DEFAULT_PRAYER_TIMEZONE));
   }

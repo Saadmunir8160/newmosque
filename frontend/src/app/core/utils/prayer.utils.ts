@@ -86,6 +86,7 @@ export function formatTime12(t: string): string {
 export function resolveNextPrayer(
   times: PrayerTimesDaily,
   timeZone: string = DEFAULT_PRAYER_TIMEZONE,
+  tomorrowTimes?: PrayerTimesDaily | null
 ): NextPrayer {
   const nowSec = nowInTimezone(timeZone).totalSeconds;
   const slots = getPrayerSlots(times);
@@ -95,7 +96,11 @@ export function resolveNextPrayer(
       return { name: p.name, start: p.start, jamaat: p.jamaat };
     }
   }
-  return { name: 'Fajr (tomorrow)', start: times.fajrStart, jamaat: times.fajrJamaat };
+  return { 
+    name: 'Fajr (tomorrow)', 
+    start: tomorrowTimes?.fajrStart ?? times.fajrStart, 
+    jamaat: tomorrowTimes?.fajrJamaat ?? times.fajrJamaat 
+  };
 }
 
 export function countdownToJamaat(

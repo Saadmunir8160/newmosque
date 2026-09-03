@@ -35,7 +35,7 @@ public class NavigationServiceTests
     var nav = await svc.GetMenuForRolesAsync(
       [Roles.MosqueOwner],
       [],
-      [MosqueStatus.ClaimPending]);
+      [MosqueStatus.Claimed]);
 
     var routes = nav.SelectMany(s => s.Items).Select(i => i.Route).ToList();
     Assert.Contains("/dashboard/owner", routes);
