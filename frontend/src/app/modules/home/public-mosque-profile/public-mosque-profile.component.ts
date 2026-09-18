@@ -98,6 +98,23 @@ export class PublicMosqueProfileComponent implements OnInit, OnDestroy {
     this.prayerTimer = setInterval(() => this.tickPrayerCountdown(), 1000);
   }
 
+  todayDateStr(): string {
+    return new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  }
+
+  getPrayerList(): { name: string; adhan: string; salah: string }[] {
+    const pt = this.prayerTimes();
+    if (!pt) return [];
+    return [
+      { name: 'Fajr', adhan: this.formatClock(pt.fajrStart), salah: this.formatClock(pt.fajrJamaat) },
+      { name: 'Dhuhr', adhan: this.formatClock(pt.dhuhrStart), salah: this.formatClock(pt.dhuhrJamaat) },
+      { name: 'Asr', adhan: this.formatClock(pt.asrStart), salah: this.formatClock(pt.asrJamaat) },
+      { name: 'Maghrib', adhan: this.formatClock(pt.maghribStart), salah: this.formatClock(pt.maghribJamaat) },
+      { name: 'Isha', adhan: this.formatClock(pt.ishaStart), salah: this.formatClock(pt.ishaJamaat) },
+      { name: 'Jumuah', adhan: '12:30 pm', salah: '1:30 pm' }
+    ];
+  }
+
   ngOnDestroy(): void {
     this.title.setTitle('MosqueOS');
     if (this.prayerTimer) clearInterval(this.prayerTimer);

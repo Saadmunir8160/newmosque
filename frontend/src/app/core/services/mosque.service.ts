@@ -104,17 +104,19 @@ export class MosqueService {
     return this.http.get<MosqueSetting[]>(`${this.base}/mosques/${mosqueId}/features`);
   }
 
-  getDailyPrayerTimes(mosqueId: number, date?: string): Observable<{ times: PrayerTimesDaily | null; exceptions: unknown[] }> {
-    const params = date ? { date } : undefined;
+  getDailyPrayerTimes(mosqueId: number, date?: string, includeDraft = false): Observable<{ times: PrayerTimesDaily | null; exceptions: unknown[] }> {
+    const params: Record<string, string> = {};
+    if (date) params['date'] = date;
+    if (includeDraft) params['includeDraft'] = 'true';
     return this.http.get<{ times: PrayerTimesDaily | null; exceptions: unknown[] }>(
       `${this.base}/mosques/${mosqueId}/prayer-times/daily`, { params }
     );
   }
 
   getMonthlyPrayerTimes(mosqueId: number, year: number, month: number): Observable<PrayerTimesDaily[]> {
-    return this.http.get<PrayerTimesDaily[]>(`${this.base}/mosques/${mosqueId}/prayer-times/monthly`, {
+    return this.http.get<{ days: PrayerTimesDaily[] }>(`${this.base}/mosques/${mosqueId}/prayer-times/monthly`, {
       params: { year: String(year), month: String(month) },
-    });
+    }).pipe(map(r => r.days));
   }
 
   getJumuahTimes(mosqueId: number): Observable<JumuahTime[]> {
@@ -150,13 +152,17 @@ export class MosqueService {
     return this.http.delete(`${this.base}/mosques/${mosqueId}/events/${eventId}/register`);
   }
 
-  getJanaza(mosqueId: number, search?: string): Observable<JanazaAnnouncement[]> {
-    const params = search?.trim() ? { search: search.trim() } : undefined;
+  getJanaza(mosqueId: number, all = false, search?: string): Observable<JanazaAnnouncement[]> {
+    const params: Record<string, string> = {};
+    if (all) params['all'] = 'true';
+    if (search?.trim()) params['search'] = search.trim();
     return this.http.get<JanazaAnnouncement[]>(`${this.base}/mosques/${mosqueId}/janaza`, { params });
   }
 
-  getParticipation(mosqueId: number): Observable<ParticipationOpportunity[]> {
-    return this.http.get<ParticipationOpportunity[]>(`${this.base}/mosques/${mosqueId}/participation`);
+  getParticipation(mosqueId: number, all = false): Observable<ParticipationOpportunity[]> {
+    const params: Record<string, string> = {};
+    if (all) params['all'] = 'true';
+    return this.http.get<ParticipationOpportunity[]>(`${this.base}/mosques/${mosqueId}/participation`, { params });
   }
 
   getMyParticipationIds(mosqueId: number): Observable<number[]> {

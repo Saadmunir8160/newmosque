@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterModule } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { ContentService, Community } from '../../core/services/content.service';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
@@ -8,7 +9,7 @@ import { environment } from '../../../environments/environment';
 @Component({
   selector: 'app-member-communities',
   standalone: true,
-  imports: [CommonModule, PageHeaderComponent],
+  imports: [CommonModule, PageHeaderComponent, RouterModule],
   template: `
     <app-page-header badge="Member" title="Communities"
       subtitle="Join tariqa circles and study groups at your mosque." />
@@ -26,6 +27,7 @@ import { environment } from '../../../environments/environment';
           <p class="member-desc">{{ c.description || 'No description yet.' }}</p>
         </div>
         <span *ngIf="isJoined(c.id)" class="member-badge">Member</span>
+        <a *ngIf="isJoined(c.id)" [routerLink]="['/dashboard/member/communities', c.id]" class="ml-2 text-blue-600 hover:underline">View Feed</a>
         <button *ngIf="!isJoined(c.id)" type="button" class="member-btn-primary"
           [disabled]="busyId() === c.id" (click)="join(c)">
           {{ busyId() === c.id ? 'Joining...' : 'Join' }}

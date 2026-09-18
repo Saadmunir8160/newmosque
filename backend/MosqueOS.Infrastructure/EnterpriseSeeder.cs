@@ -182,7 +182,6 @@ public static class EnterpriseSeeder
         Add("Overview", "Dashboard", "/dashboard/super", "dashboard", Roles.SuperAdmin);
         Add("Mosques", "Mosque listings", "/dashboard/super/mosques", "mosque", Roles.SuperAdmin);
         Add("Mosques", "Verify claims", "/dashboard/super/claims", "stamp", Roles.SuperAdmin);
-        Add("Mosques", "Invitations", "/dashboard/super/invitations", "mail", Roles.SuperAdmin);
         Add("Mosques", "Mosque data", "/dashboard/super/mosque-data", "database", Roles.SuperAdmin);
         Add("Access", "Users & roles", "/dashboard/super/users", "users", Roles.SuperAdmin);
         Add("Content", "Awrad library", "/dashboard/content/awrad", "awrad", Roles.SuperAdmin);
@@ -273,7 +272,6 @@ public static class EnterpriseSeeder
         Add("Overview", "Dashboard", "/dashboard/super", "dashboard");
         Add("Mosques", "Mosque listings", "/dashboard/super/mosques", "mosque");
         Add("Mosques", "Verify claims", "/dashboard/super/claims", "stamp");
-        Add("Mosques", "Invitations", "/dashboard/super/invitations", "mail");
         Add("Mosques", "Mosque data", "/dashboard/super/mosque-data", "database");
         Add("Access", "Users & roles", "/dashboard/super/users", "users");
         Add("Content", "Awrad library", "/dashboard/content/awrad", "awrad");
@@ -576,9 +574,14 @@ public static class EnterpriseSeeder
             });
         }
 
-        Ensure("Mosques", "Invitations", "/dashboard/super/invitations", "mail");
         Ensure("Oversight", "Prayer times oversight", "/dashboard/super/oversight/prayer-times", "clock");
         Ensure("Oversight", "Announcements oversight", "/dashboard/super/oversight/announcements", "speaker");
+
+        var invitationsItem = await db.NavigationMenuItems.FirstOrDefaultAsync(n => n.Route == "/dashboard/super/invitations");
+        if (invitationsItem != null)
+        {
+            db.NavigationMenuItems.Remove(invitationsItem);
+        }
 
         await db.SaveChangesAsync();
     }

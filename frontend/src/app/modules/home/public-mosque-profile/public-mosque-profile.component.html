@@ -1,11 +1,4 @@
 <div class="pub-page">
-  <div class="pub-back-bar app-section">
-    <a routerLink="/mosques" class="pub-back-link">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-      Back to Directory
-    </a>
-  </div>
-
   <div *ngIf="loading()" class="pub-state" role="status">
     <span class="pub-state__pulse" aria-hidden="true"></span>
     <p>Loading mosque profile…</p>
@@ -25,334 +18,282 @@
   </div>
 
   <ng-container *ngIf="!loading() && mosque() as m">
-    <header class="pub-hero">
-      <div
-        class="pub-hero__banner"
-        [style.background-image]="mediaUrl(m.bannerUrl) ? 'url(' + mediaUrl(m.bannerUrl) + ')' : null">
-        <div class="pub-hero__overlay"></div>
+    <!-- Top Announcement Bar -->
+    <div class="top-announcement-bar">
+      <span>Ramadhan Iftar program | Paybill number: 180770 | Account No. IFTAR 2023 | </span>
+      <a href="#" class="top-announcement-link">Learn More</a>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="public-navbar">
+      <div class="navbar-container">
+        <div class="navbar-logo">
+          <img *ngIf="mediaUrl(m.logoUrl); else logoFallback" [src]="mediaUrl(m.logoUrl)!" [alt]="m.name + ' logo'">
+          <ng-template #logoFallback>
+            <div class="fallback-logo-circle">
+              <span class="material-symbols-outlined">mosque</span>
+            </div>
+          </ng-template>
+        </div>
+        <div class="navbar-links">
+          <a href="#" class="nav-link active">Home</a>
+          <a href="#" class="nav-link">About Us</a>
+          <a href="#" class="nav-link">News</a>
+          <a href="#" class="nav-link">Programs</a>
+          <a href="#" class="nav-link">Events</a>
+          <a href="#" class="nav-link">Contacts</a>
+          <button class="nav-donate-btn">Donate Now</button>
+        </div>
       </div>
+    </nav>
 
-      <div class="pub-hero__content app-section">
-        <div class="pub-hero__identity">
-          <div class="pub-hero__logo-wrap">
-            <img
-              *ngIf="mediaUrl(m.logoUrl); else logoFallback"
-              [src]="mediaUrl(m.logoUrl)!"
-              [alt]="m.name + ' logo'"
-              class="pub-hero__logo">
-            <ng-template #logoFallback>
-              <div class="pub-hero__logo pub-hero__logo--fallback" aria-hidden="true">{{ m.name.charAt(0) }}</div>
-            </ng-template>
+    <!-- Hero Section -->
+    <header class="pub-hero-section">
+      <div class="hero-container">
+        <div class="hero-content">
+          <div class="hero-subtitle">
+            <span class="material-symbols-outlined" style="font-size: 16px; margin-right: 4px;">mosque</span>
+            {{ m.name }}, {{ locationLine(m) }}
           </div>
-
-          <div class="pub-hero__copy">
-            <h1 class="pub-hero__name">{{ m.name }}</h1>
-            <p class="pub-hero__location">{{ locationLine(m) }}</p>
-            <span class="pub-hero__badge pub-hero__badge--{{ publicStatusCard(m.status).tone }}">
-              {{ formatStatus(m.status) }}
-            </span>
-          </div>
+          <h1 class="hero-title">In The Name of Allah,<br>The Creator Of The<br>Universe</h1>
+          <p class="hero-desc">
+            In publishing and graphic design, Lorem ipsum is a placeholder text commonly used to demonstrate the visual form of a document or a typeface without relying on meaningful content. Lorem ipsum may be used as a placeholder before final copy is available.
+          </p>
+          <button class="hero-cta-btn">Join Our Community</button>
+        </div>
+        <div class="hero-image-wrapper">
+          <img *ngIf="mediaUrl(m.bannerUrl); else defaultHeroImg" [src]="mediaUrl(m.bannerUrl)!" alt="Mosque Banner" class="hero-image">
+          <ng-template #defaultHeroImg>
+            <img src="/assets/images/mosque-bg.jpg" alt="Mosque" class="hero-image">
+          </ng-template>
         </div>
       </div>
     </header>
 
-    <div class="pub-layout app-section">
-      <main class="pub-main">
-        <section class="pub-card pub-status-card pub-status-card--{{ publicStatusCard(m.status).tone }}">
-          <h2 class="pub-card__title">{{ publicStatusCard(m.status).label }}</h2>
-          <p class="pub-card__text">{{ publicStatusCard(m.status).description }}</p>
-          <ng-container *ngIf="canClaimMosque(m)">
-            <button type="button" class="pub-btn pub-btn--claim" style="margin-top:1rem" (click)="openClaimFlow()">Claim This Mosque</button>
-          </ng-container>
-        </section>
+    <div class="pub-layout-container">
+      <!-- Daily Prayer Times -->
+      <section class="pub-section">
+        <div class="section-header">
+          <h2 class="section-title">{{ m.name }}'s Daily Prayer Times</h2>
+          <p class="section-subtitle">{{ todayDateStr() }}</p>
+        </div>
+        
+        <div class="prayer-table-wrapper">
+          <table class="prayer-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Adhan</th>
+                <th>Salah</th>
+              </tr>
+            </thead>
+            <tbody *ngIf="prayerTimes(); else noPrayers">
+              <tr *ngFor="let p of getPrayerList()">
+                <td>{{ p.name }}</td>
+                <td>{{ p.adhan }}</td>
+                <td>{{ p.salah }}</td>
+              </tr>
+            </tbody>
+            <ng-template #noPrayers>
+              <tbody>
+                <tr>
+                  <td colspan="3" class="text-center" style="padding: 20px;">Prayer times not configured.</td>
+                </tr>
+              </tbody>
+            </ng-template>
+          </table>
+        </div>
+      </section>
 
-        <section *ngIf="m.description?.trim()" class="pub-card">
-          <h2 class="pub-card__title">About</h2>
-          <p class="pub-card__text pub-card__text--pre">{{ m.description }}</p>
-        </section>
-
-        <!-- Stats -->
-        <section *ngIf="stats() || m.establishedYear || m.capacity" class="pub-card">
-          <h2 class="pub-card__title">Mosque overview</h2>
-          <div class="pub-stats">
-            <div *ngIf="stats()?.members" class="pub-stat">
-              <span class="pub-stat__value">{{ stats()!.members | number }}</span>
-              <span class="pub-stat__label">Members</span>
-            </div>
-            <div *ngIf="(stats()?.establishedYear) || m.establishedYear" class="pub-stat">
-              <span class="pub-stat__value">{{ stats()?.establishedYear || m.establishedYear }}</span>
-              <span class="pub-stat__label">Established</span>
-            </div>
-            <div *ngIf="(stats()?.capacity) || m.capacity" class="pub-stat">
-              <span class="pub-stat__value">{{ stats()?.capacity || m.capacity | number }}</span>
-              <span class="pub-stat__label">Capacity</span>
-            </div>
+      <!-- Different Programs -->
+      <section class="pub-section">
+        <div class="section-header">
+          <h2 class="section-title">Different Programs of {{ m.name }}<br>& Islamic Research Center</h2>
+        </div>
+        <div class="programs-grid">
+          <div class="program-card bg-green">
+            <div class="program-icon">📰</div>
+            <p>Friday Bulletin</p>
           </div>
-        </section>
-
-        <!-- Prayer times widget (module-gated, live data) -->
-        <section *ngIf="isModuleEnabled(m, 'PrayerTimes')" class="pub-card pub-module-section">
-          <div class="pub-prayer-head">
-            <h2 class="pub-card__title">Prayer Times</h2>
-            <div class="pub-prayer-tabs">
-              <button type="button" class="pub-prayer-tab" [class.pub-prayer-tab--on]="prayerView() === 'daily'" (click)="showDailyPrayer()">Today</button>
-              <button type="button" class="pub-prayer-tab" [class.pub-prayer-tab--on]="prayerView() === 'monthly'" (click)="showMonthlyPrayer()">Monthly</button>
-            </div>
+          <div class="program-card bg-light">
+            <div class="program-icon">🎓</div>
+            <p>Education</p>
           </div>
+          <div class="program-card bg-light">
+            <div class="program-icon">📅</div>
+            <p>Events</p>
+          </div>
+          <div class="program-card bg-light">
+            <div class="program-icon">🤝</div>
+            <p>Donation</p>
+          </div>
+          <div class="program-card bg-light">
+            <div class="program-icon">📚</div>
+            <p>{{ m.name }} Library</p>
+          </div>
+          <div class="program-card bg-light">
+            <div class="program-icon">🤗</div>
+            <p>Volunteer</p>
+          </div>
+          <div class="program-card bg-light">
+            <div class="program-icon">✍️</div>
+            <p>Blog</p>
+          </div>
+          <div class="program-card bg-light">
+            <div class="program-icon">🕌</div>
+            <p>Da'awah</p>
+          </div>
+        </div>
+      </section>
 
-          <ng-container *ngIf="prayerView() === 'daily'">
-            <p *ngIf="prayerLoading()" class="pub-card__text pub-card__text--muted">Loading today's timetable…</p>
-            <ng-container *ngIf="!prayerLoading() && prayerTimes() as pt">
-              <div *ngIf="nextPrayer() as np" class="pub-prayer-next">
-                <div>
-                  <p class="pub-prayer-next__label">Next prayer</p>
-                  <p class="pub-prayer-next__name">{{ np.name }} · {{ formatClock(np.jamaat) }}</p>
-                </div>
-                <div class="pub-prayer-next__count" aria-live="polite">{{ prayerCountdown() }}</div>
+      <!-- Upcoming Events -->
+      <section class="pub-section flex-row-events">
+        <div class="events-main">
+          <div class="section-header-flex">
+            <h2 class="section-title" style="margin-bottom:0;">Upcoming Events</h2>
+            <button class="btn-yellow">Show All</button>
+          </div>
+          
+          <div class="event-cards-list">
+            <div class="event-card-horizontal" *ngFor="let e of events()">
+              <div class="event-img-box">
+                <img src="/assets/images/mosque-bg.jpg" alt="Event">
               </div>
-              <p class="pub-card__text pub-card__text--muted" style="margin-bottom:0.75rem">
-                Today · {{ pt.date | date:'mediumDate' }}
-                <span *ngIf="m.timezone"> · {{ m.timezone }}</span>
-              </p>
-              <div class="pub-prayer-grid">
-                <div class="pub-prayer" [class.pub-prayer--next]="isNextPrayer('Fajr')">
-                  <span>Fajr</span><strong>{{ formatClock(pt.fajrJamaat || pt.fajrStart) }}</strong>
-                </div>
-                <div class="pub-prayer" [class.pub-prayer--next]="isNextPrayer('Dhuhr')">
-                  <span>Dhuhr</span><strong>{{ formatClock(pt.dhuhrJamaat || pt.dhuhrStart) }}</strong>
-                </div>
-                <div class="pub-prayer" [class.pub-prayer--next]="isNextPrayer('Asr')">
-                  <span>Asr</span><strong>{{ formatClock(pt.asrJamaat || pt.asrStart) }}</strong>
-                </div>
-                <div class="pub-prayer" [class.pub-prayer--next]="isNextPrayer('Maghrib')">
-                  <span>Maghrib</span><strong>{{ formatClock(pt.maghribJamaat || pt.maghribStart) }}</strong>
-                </div>
-                <div class="pub-prayer" [class.pub-prayer--next]="isNextPrayer('Isha')">
-                  <span>Isha</span><strong>{{ formatClock(pt.ishaJamaat || pt.ishaStart) }}</strong>
-                </div>
+              <div class="event-details">
+                <h3>{{ e.title }}</h3>
+                <p class="event-time">{{ e.date | date:'longDate' }} | {{ formatClock(e.startTime) }} - {{ formatClock(e.endTime) }}</p>
+                <p class="event-desc">{{ e.description || 'Join us for this beneficial gathering.' }}</p>
+                <button class="btn-yellow" style="margin-top:10px;">Register Now</button>
               </div>
-              <div class="pub-jumuah" *ngIf="jumuahSlots().length">
-                <p class="pub-jumuah__title">Friday · Jumuah</p>
-                <div class="pub-jumuah__grid">
-                  <div class="pub-jumuah__slot" *ngFor="let s of jumuahSlots()">
-                    <span>Slot {{ s.slotNumber }}</span>
-                    <strong>Khutbah {{ formatClock(s.khutbahTime) }} · Jamaah {{ formatClock(s.jamaatTime) }}</strong>
-                  </div>
-                </div>
-              </div>
-            </ng-container>
-            <p *ngIf="!prayerLoading() && !prayerTimes()" class="pub-card__text pub-card__text--muted">
-              Today's prayer times have not been published yet.
-            </p>
-          </ng-container>
-
-          <ng-container *ngIf="prayerView() === 'monthly'">
-            <div class="pub-month-nav">
-              <button type="button" (click)="shiftMonth(-1)">←</button>
-              <span>{{ monthLabel() }}</span>
-              <button type="button" (click)="shiftMonth(1)">→</button>
             </div>
-            <p *ngIf="monthlyLoading()" class="pub-card__text pub-card__text--muted">Loading monthly timetable…</p>
-            <div *ngIf="!monthlyLoading() && monthlyDays().length" class="pub-month-table-wrap">
-              <table class="pub-month-table">
-                <thead>
-                  <tr><th>Date</th><th>Fajr</th><th>Dhuhr</th><th>Asr</th><th>Maghrib</th><th>Isha</th></tr>
-                </thead>
-                <tbody>
-                  <tr *ngFor="let d of monthlyDays()">
-                    <td>{{ d.date | date:'d MMM' }}</td>
-                    <td>{{ formatClock(d.fajrJamaat) }}</td>
-                    <td>{{ formatClock(d.dhuhrJamaat) }}</td>
-                    <td>{{ formatClock(d.asrJamaat) }}</td>
-                    <td>{{ formatClock(d.maghribJamaat) }}</td>
-                    <td>{{ formatClock(d.ishaJamaat) }}</td>
-                  </tr>
-                </tbody>
-              </table>
+            <div *ngIf="!events().length" class="empty-state">
+              <p style="color:#666; font-style:italic;">No upcoming events found.</p>
             </div>
-            <p *ngIf="!monthlyLoading() && !monthlyDays().length" class="pub-card__text pub-card__text--muted">
-              No monthly timetable published for this month.
-            </p>
-          </ng-container>
-        </section>
-
-        <!-- Announcements (Module 3.3) -->
-        <section *ngIf="isModuleEnabled(m, 'Announcements')" class="pub-card pub-module-section">
-          <h2 class="pub-card__title">Announcements</h2>
-          <p *ngIf="announcementsLoading()" class="pub-card__text pub-card__text--muted">Loading announcements…</p>
-
-          <div *ngIf="!announcementsLoading() && featuredAnnouncement() as fa" class="pub-announce-featured">
-            <span class="pub-announce-featured__pill">Featured</span>
-            <img *ngIf="fa.imageUrl" [src]="fa.imageUrl" [alt]="fa.title" />
-            <strong>{{ fa.title }}</strong>
-            <p *ngIf="fa.summary?.trim()">{{ fa.summary }}</p>
-            <time *ngIf="fa.publishedAt">{{ fa.publishedAt | date:'mediumDate' }}</time>
           </div>
-
-          <ul *ngIf="!announcementsLoading() && otherAnnouncements().length" class="pub-feed">
-            <li *ngFor="let a of otherAnnouncements()" class="pub-feed__item">
-              <strong>{{ a.title }}</strong>
-              <p *ngIf="a.summary?.trim()">{{ a.summary }}</p>
-              <time *ngIf="a.publishedAt">{{ a.publishedAt | date:'mediumDate' }}</time>
-            </li>
-          </ul>
-          <p *ngIf="!announcementsLoading() && !announcements().length" class="pub-card__text pub-card__text--muted">
-            No published announcements yet.
-          </p>
-        </section>
-
-        <!-- Events teaser (module-gated, live data) -->
-        <section *ngIf="isModuleEnabled(m, 'Events')" class="pub-card pub-module-section">
-          <h2 class="pub-card__title">Upcoming events</h2>
-          <p *ngIf="eventsLoading()" class="pub-card__text pub-card__text--muted">Loading events…</p>
-          <ul *ngIf="!eventsLoading() && events().length" class="pub-feed">
-            <li *ngFor="let e of events()" class="pub-feed__item">
-              <strong>{{ e.title }}</strong>
-              <p>
-                {{ e.date | date:'mediumDate' }}
-                <span *ngIf="e.startTime"> · {{ formatClock(e.startTime) }}</span>
-                <span *ngIf="e.location?.trim()"> · {{ e.location }}</span>
-              </p>
-            </li>
-          </ul>
-          <p *ngIf="!eventsLoading() && !events().length" class="pub-card__text pub-card__text--muted">
-            No upcoming events scheduled.
-          </p>
-        </section>
-
-        <!-- Vision -->
-        <section *ngIf="m.vision?.trim()" class="pub-card">
-          <h2 class="pub-card__title">Our vision</h2>
-          <p class="pub-card__text pub-card__text--pre">{{ m.vision }}</p>
-        </section>
-
-        <!-- History -->
-        <section *ngIf="m.history?.trim()" class="pub-card">
-          <h2 class="pub-card__title">History</h2>
-          <p class="pub-card__text pub-card__text--pre">{{ m.history }}</p>
-        </section>
-
-        <!-- Leadership -->
-        <section *ngIf="leadership().length" class="pub-card">
-          <h2 class="pub-card__title">Leadership team</h2>
-          <ul class="pub-leadership">
-            <li *ngFor="let person of leadership()" class="pub-leader">
-              <div class="pub-leader__avatar">
-                <img *ngIf="person.photoUrl && mediaUrl(person.photoUrl); else leaderInitial"
-                  [src]="mediaUrl(person.photoUrl)!"
-                  [alt]="person.name"
-                  class="pub-leader__photo">
-                <ng-template #leaderInitial>
-                  <span class="pub-leader__initial">{{ person.name.charAt(0) }}</span>
-                </ng-template>
-              </div>
-              <div class="pub-leader__info">
-                <p class="pub-leader__name">{{ person.name }}</p>
-                <p class="pub-leader__role">{{ person.role }}</p>
-                <p *ngIf="person.bio?.trim()" class="pub-leader__bio">{{ person.bio }}</p>
-              </div>
-            </li>
-          </ul>
-        </section>
-
-        <!-- Gallery -->
-        <section *ngIf="m.gallery?.length" class="pub-card">
-          <h2 class="pub-card__title">Gallery</h2>
-          <div class="pub-gallery">
-            <a *ngFor="let img of m.gallery"
-              [href]="mediaUrl(img) || img"
-              target="_blank"
-              rel="noopener"
-              class="pub-gallery__item">
-              <img [src]="mediaUrl(img) || img" [alt]="m.name + ' photo'" class="pub-gallery__img" loading="lazy">
-            </a>
-          </div>
-        </section>
-
-        <section class="pub-card" *ngIf="m.address || m.phone || m.email || m.website || resolveSocialLinks(m).length">
-          <h2 class="pub-card__title">Contact information</h2>
-          <dl class="pub-contact">
-            <div *ngIf="fullAddress(m)">
-              <dt>Address</dt>
-              <dd>
-                {{ fullAddress(m) }}
-                <a *ngIf="mapsUrl(m)" [href]="mapsUrl(m)" target="_blank" rel="noopener" class="pub-map-link">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                  Get directions
-                </a>
-              </dd>
-            </div>
-            <div *ngIf="m.phone?.trim()">
-              <dt>Phone</dt>
-              <dd><a [href]="'tel:' + m.phone">{{ m.phone }}</a></dd>
-            </div>
-            <div *ngIf="m.email?.trim()">
-              <dt>Email</dt>
-              <dd><a [href]="'mailto:' + m.email">{{ m.email }}</a></dd>
-            </div>
-            <div *ngIf="m.website?.trim()">
-              <dt>Website</dt>
-              <dd><a [href]="externalUrl(m.website)" target="_blank" rel="noopener noreferrer">{{ m.website }}</a></dd>
-            </div>
-          </dl>
-
-          <!-- Social links (socialLinks JSON preferred; legacy URLs as fallback) -->
-          <div *ngIf="resolveSocialLinks(m).length" class="pub-social">
-            <a *ngFor="let link of resolveSocialLinks(m)"
-               [href]="externalUrl(link.url) || link.url"
-               target="_blank"
-               rel="noopener noreferrer"
-               class="pub-social__link"
-               [ngClass]="socialLinkCssClass(link.platform)"
-               [attr.aria-label]="socialLinkLabel(link)">
-              {{ socialLinkLabel(link) }}
-            </a>
-          </div>
-        </section>
-
-        <!-- Facilities -->
-        <section *ngIf="m.facilities?.length" class="pub-card">
-          <h2 class="pub-card__title">Facilities</h2>
-          <div class="pub-chips">
-            <span *ngFor="let f of m.facilities" class="pub-chip">{{ f }}</span>
-          </div>
-          <p *ngIf="m.parkingInfo?.trim()" class="pub-card__text" style="margin-top:0.75rem">
-            <strong>Parking:</strong> {{ m.parkingInfo }}
-          </p>
-        </section>
-      </main>
-
-      <aside class="pub-aside">
-        <section class="pub-card pub-card--sticky">
-          <h2 class="pub-card__title">Mosque information</h2>
-          <dl class="pub-info">
-            <div><dt>City</dt><dd>{{ m.city }}</dd></div>
-            <div><dt>Country</dt><dd>{{ m.country }}</dd></div>
-            <div><dt>Timezone</dt><dd>{{ m.timezone }}</dd></div>
-            <div *ngIf="m.website?.trim()"><dt>Website</dt><dd><a [href]="externalUrl(m.website)" target="_blank" rel="noopener noreferrer">{{ m.website }}</a></dd></div>
-            <div><dt>Public status</dt><dd>{{ publicStatusLabel(m) }}</dd></div>
-          </dl>
-        </section>
-
-        <section *ngIf="canClaimMosque(m)" class="pub-card pub-claim-card">
-          <h2 class="pub-card__title">Represent this mosque?</h2>
-          <p class="pub-card__text">{{ claimHint() }}</p>
-          <button type="button" class="pub-btn pub-btn--claim" (click)="openClaimFlow()">Claim This Mosque</button>
-        </section>
-      </aside>
+        </div>
+        
+        <div class="events-sidebar">
+           <!-- Placeholder static right side events from screenshot -->
+           <div class="sidebar-event">
+             <div class="sidebar-date"><span class="sb-month">March, 20</span><span class="sb-day">Mon</span></div>
+             <div class="sidebar-info">
+               <h4>Ramadhan Preparation</h4>
+               <p>Sh. Juma Amir | 4:00pm</p>
+             </div>
+           </div>
+           <div class="sidebar-event bg-light-green">
+             <div class="sidebar-date"><span class="sb-month">March, 31</span><span class="sb-day">Fri</span></div>
+             <div class="sidebar-info">
+               <h4>Zakatul Fitr</h4>
+               <p>Sh. Juma Amir | 4:00pm</p>
+               <a href="#" class="yellow-link">Show Details</a>
+             </div>
+           </div>
+           <div class="sidebar-event">
+             <div class="sidebar-date"><span class="sb-month">April, 11</span><span class="sb-day">Tues</span></div>
+             <div class="sidebar-info">
+               <h4>Sacrificing for Allah</h4>
+               <p>Imran Khalila | 4:00pm</p>
+             </div>
+           </div>
+        </div>
+      </section>
     </div>
 
-    <div *ngIf="canClaimMosque(m)" class="pub-claim-bar" aria-hidden="true">
-      <button type="button" class="pub-btn pub-btn--claim pub-btn--block" (click)="openClaimFlow()">Claim This Mosque</button>
+    <!-- Donation Banner -->
+    <section class="donation-banner">
+      <h2>Become a Monthly Donation<br>Member of Our Community</h2>
+      <p>Join our community by becoming a member today! Our monthly donation starts from Ksh 200.</p>
+      <button class="btn-yellow-outline">Membership Registration</button>
+    </section>
+
+    <!-- Recent News -->
+    <div class="pub-layout-container">
+      <section class="pub-section text-center">
+        <h2 class="section-title">Recent News & Updates</h2>
+        <p class="section-desc max-w-lg mx-auto">In publishing and graphic design, Lorem ipsum is a placeholder text commonly used to demonstrate the visual form of a document or a typeface without relying on meaningful content.</p>
+        
+        <div class="news-grid">
+          <div class="news-card featured-news" *ngIf="featuredAnnouncement() as fn">
+            <img [src]="mediaUrl(fn.imageUrl) || '/assets/images/mosque-bg.jpg'" alt="News">
+            <div class="news-content text-left">
+              <h3>{{ fn.title }}</h3>
+              <p>{{ fn.summary || 'In publishing and graphic design, Lorem ipsum is a placeholder text commonly used to demonstrate the visual form of a document or a typeface without relying on meaningful content.' }}</p>
+              <a href="#" class="yellow-link inline-block mt-3">Read More</a>
+            </div>
+          </div>
+          
+          <div class="news-list">
+            <div class="small-news-item text-left" *ngFor="let an of otherAnnouncements()">
+              <img [src]="mediaUrl(an.imageUrl) || '/assets/images/mosque-bg.jpg'" alt="News">
+              <div class="sn-info">
+                <span class="sn-date">{{ an.createdAt | date:'longDate' }}</span>
+                <h4>{{ an.title }}</h4>
+                <p>{{ an.summary || 'Lorem ipsum is a placeholder text commonly used.' }}</p>
+                <a href="#" class="yellow-link">Read More</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
 
-    <div *ngIf="claimToast()" class="pub-toast" [class.pub-toast--ok]="claimToastOk()" [class.pub-toast--err]="!claimToastOk()">{{ claimToast() }}</div>
-
-    <app-mosque-claim-drawer
-      *ngIf="showClaimDrawer() && m"
-      [open]="showClaimDrawer()"
-      [mosque]="m"
-      (closed)="closeClaimDrawer()"
-      (submitted)="onClaimSubmitted()" />
+    <!-- Footer -->
+    <footer class="public-footer">
+      <div class="footer-container">
+        <div class="footer-brand">
+          <div class="footer-logo">
+             <img *ngIf="mediaUrl(m.logoUrl); else footerLogoFallback" [src]="mediaUrl(m.logoUrl)!" [alt]="m.name + ' logo'">
+             <ng-template #footerLogoFallback>
+               <div class="fallback-logo-circle">
+                 <span class="material-symbols-outlined">mosque</span>
+               </div>
+             </ng-template>
+          </div>
+          <p class="footer-mosque-name">{{ m.name }} &<br>Islamic Research Center</p>
+          <div class="footer-socials">
+            <a href="#"><span class="material-symbols-outlined">facebook</span></a>
+            <a href="#"><span class="material-symbols-outlined">flutter_dash</span></a>
+          </div>
+        </div>
+        
+        <div class="footer-links-col">
+          <h4>Services</h4>
+          <ul>
+            <li><a href="#">Counseling</a></li>
+            <li><a href="#">Divorce</a></li>
+            <li><a href="#">Cemetery</a></li>
+            <li><a href="#">Hajj</a></li>
+          </ul>
+        </div>
+        
+        <div class="footer-links-col">
+          <h4>Useful links</h4>
+          <ul>
+            <li><a href="#">Home</a></li>
+            <li><a href="#">Programs</a></li>
+            <li><a href="#">Causes</a></li>
+            <li><a href="#">Contact Us</a></li>
+          </ul>
+        </div>
+        
+        <div class="footer-subscribe">
+          <h4>Subscribe To Our Newsletter</h4>
+          <form class="subscribe-form">
+            <input type="email" placeholder="Your email">
+            <button type="button">Subscribe</button>
+          </form>
+          <p class="subscribe-note">
+            <input type="checkbox" checked disabled> Your information will never be shared with any third party.
+          </p>
+        </div>
+      </div>
+      <div class="footer-bottom-bar">
+        <div class="footer-bottom-inner">
+          <p>Design by MosqueOS | <a href="#">clickSalute</a></p>
+          <p>Copyright 2026 MosqueOS | All Rights Reserved</p>
+        </div>
+      </div>
+    </footer>
   </ng-container>
 </div>

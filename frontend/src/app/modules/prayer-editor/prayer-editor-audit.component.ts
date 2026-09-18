@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ActivatedRoute } from '@angular/router';
 import { PrayerEditorService, PrayerAuditLog } from '../../core/services/prayer-editor.service';
 import { MosqueContextService } from '../../core/services/mosque-context.service';
 
@@ -76,12 +77,18 @@ import { MosqueContextService } from '../../core/services/mosque-context.service
 export class PrayerEditorAuditComponent implements OnInit {
   private editor = inject(PrayerEditorService);
   private mosqueCtx = inject(MosqueContextService);
+  private route = inject(ActivatedRoute);
   logs = signal<PrayerAuditLog[]>([]);
 
   ngOnInit(): void {
-    this.mosqueCtx.resolve().then(id => {
-      this.editor.getAuditLog(id).subscribe(l => this.logs.set(l));
-    });
+    const qId = parseInt(this.route.snapshot.queryParamMap.get('mosqueId') || '', 10);
+    if (!isNaN(qId) && qId > 0) {
+      this.editor.getAuditLog(qId).subscribe(l => this.logs.set(l));
+    } else {
+      this.mosqueCtx.resolve().then(id => {
+        this.editor.getAuditLog(id).subscribe(l => this.logs.set(l));
+      });
+    }
   }
 
   shortUser(id: string): string {

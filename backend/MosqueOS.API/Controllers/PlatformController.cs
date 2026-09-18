@@ -465,9 +465,44 @@ namespace MosqueOS.API.Controllers
             }
 
             var userName = user.UserName;
-            var result = await _userManager.DeleteAsync(user);
-            if (!result.Succeeded)
-                return BadRequest(new ApiMessageResponse { Message = string.Join("; ", result.Errors.Select(e => e.Description)) });
+            try 
+            {
+                var result = await _userManager.DeleteAsync(user);
+                if (!result.Succeeded)
+                {
+                    // Scramble instead
+                    user.UserName = "deleted_" + Guid.NewGuid();
+                    user.NormalizedUserName = user.UserName.ToUpper();
+                    user.Email = user.UserName + "@deleted.local";
+                    user.NormalizedEmail = user.Email.ToUpper();
+                    user.PasswordHash = null;
+                    user.LockoutEnabled = true;
+                    user.LockoutEnd = DateTimeOffset.MaxValue;
+                    user.FullName = "Deleted User";
+                    user.HomeMosqueId = null;
+                    await _userManager.UpdateAsync(user);
+                    
+                    var roles = await _userManager.GetRolesAsync(user);
+                    foreach (var r in roles) await _userManager.RemoveFromRoleAsync(user, r);
+                }
+            }
+            catch (Exception)
+            {
+                // Scramble instead
+                user.UserName = "deleted_" + Guid.NewGuid();
+                user.NormalizedUserName = user.UserName.ToUpper();
+                user.Email = user.UserName + "@deleted.local";
+                user.NormalizedEmail = user.Email.ToUpper();
+                user.PasswordHash = null;
+                user.LockoutEnabled = true;
+                user.LockoutEnd = DateTimeOffset.MaxValue;
+                user.FullName = "Deleted User";
+                user.HomeMosqueId = null;
+                await _userManager.UpdateAsync(user);
+                
+                var roles = await _userManager.GetRolesAsync(user);
+                foreach (var r in roles) await _userManager.RemoveFromRoleAsync(user, r);
+            }
 
             await LogAsync("DELETE_USER", userId, "User", null, $"Deleted user {userName}");
             return Ok(new ApiMessageResponse { Message = "User deleted." });
@@ -529,7 +564,55 @@ namespace MosqueOS.API.Controllers
                                 var supers = await _userManager.GetUsersInRoleAsync(Roles.SuperAdmin);
                                 if (supers.Count <= 1) { errors.Add("Cannot delete last Super Admin"); continue; }
                             }
-                            await _userManager.DeleteAsync(user);
+                            
+                            // Nullify all nullable foreign keys referencing AspNetUsers for this user
+                            var sql = @"
+                                DECLARE @sql nvarchar(max) = '';
+                                SELECT @sql = @sql + 'UPDATE [' + tp.name + '] SET [' + cp.name + '] = NULL WHERE [' + cp.name + '] = @UserId; '
+                                FROM sys.foreign_keys fk
+                                INNER JOIN sys.tables tp ON fk.parent_object_id = tp.object_id
+                                INNER JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
+                                INNER JOIN sys.columns cp ON fkc.parent_object_id = cp.object_id AND fkc.parent_column_id = cp.column_id
+                                INNER JOIN sys.tables tr ON fk.referenced_object_id = tr.object_id
+                                WHERE tr.name = 'AspNetUsers' AND cp.is_nullable = 1;
+                                EXEC sp_executesql @sql, N'@UserId nvarchar(450)', @UserId;
+                            ";
+                            await _db.Database.ExecuteSqlRawAsync(sql, new Microsoft.Data.SqlClient.SqlParameter("@UserId", user.Id));
+                            
+                            try 
+                            {
+                                var delRes = await _userManager.DeleteAsync(user);
+                                if (!delRes.Succeeded)
+                                {
+                                    user.UserName = "deleted_" + Guid.NewGuid();
+                                    user.NormalizedUserName = user.UserName.ToUpper();
+                                    user.Email = user.UserName + "@deleted.local";
+                                    user.NormalizedEmail = user.Email.ToUpper();
+                                    user.PasswordHash = null;
+                                    user.LockoutEnabled = true;
+                                    user.LockoutEnd = DateTimeOffset.MaxValue;
+                                    user.FullName = "Deleted User";
+                                    user.HomeMosqueId = null;
+                                    await _userManager.UpdateAsync(user);
+                                    var roles = await _userManager.GetRolesAsync(user);
+                                    foreach (var r in roles) await _userManager.RemoveFromRoleAsync(user, r);
+                                }
+                            }
+                            catch (Exception)
+                            {
+                                user.UserName = "deleted_" + Guid.NewGuid();
+                                user.NormalizedUserName = user.UserName.ToUpper();
+                                user.Email = user.UserName + "@deleted.local";
+                                user.NormalizedEmail = user.Email.ToUpper();
+                                user.PasswordHash = null;
+                                user.LockoutEnabled = true;
+                                user.LockoutEnd = DateTimeOffset.MaxValue;
+                                user.FullName = "Deleted User";
+                                user.HomeMosqueId = null;
+                                await _userManager.UpdateAsync(user);
+                                var roles = await _userManager.GetRolesAsync(user);
+                                foreach (var r in roles) await _userManager.RemoveFromRoleAsync(user, r);
+                            }
                             break;
                         default:
                             return BadRequest(new ApiMessageResponse { Message = "Unknown bulk action." });
@@ -539,6 +622,7 @@ namespace MosqueOS.API.Controllers
                 catch (Exception ex)
                 {
                     errors.Add($"{user.UserName}: {ex.Message}");
+                    _db.ChangeTracker.Clear();
                 }
             }
 
@@ -700,7 +784,15 @@ namespace MosqueOS.API.Controllers
             MosqueSocialLinksHelper.SyncJsonFromLegacy(mosque);
 
             _unitOfWork.Repository<Mosque>().Add(mosque);
-            await _unitOfWork.SaveChangesAsync();
+            try
+            {
+                await _unitOfWork.SaveChangesAsync();
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx && (sqlEx.Number == 2601 || sqlEx.Number == 2627))
+            {
+                return Conflict(new ApiMessageResponse { Message = "This slug is already in use. Please choose another or try again." });
+            }
+
             await _moduleSeed.SeedAsync(mosque.Id);
 
             var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
@@ -1343,11 +1435,17 @@ namespace MosqueOS.API.Controllers
             }));
         }
 
+        private static DateOnly TodayLondon()
+        {
+            var london = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time");
+            return DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, london));
+        }
+
         /// <summary>Today's prayer times coverage across active mosques.</summary>
         [HttpGet("oversight/prayer-times")]
         public async Task<IActionResult> GetPrayerTimesOversight([FromQuery] DateOnly? date, [FromQuery] int? mosqueId)
         {
-            var target = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            var target = date ?? TodayLondon();
             var mosqueQuery = _unitOfWork.Repository<Mosque>().QueryNoTracking()
                 .Where(m => !m.IsDeleted && m.Status == MosqueStatus.Active);
             if (mosqueId.HasValue)
@@ -1355,10 +1453,14 @@ namespace MosqueOS.API.Controllers
 
             var mosques = await mosqueQuery.OrderBy(m => m.Name).ToListAsync();
             var mosqueIds = mosques.Select(m => m.Id).ToList();
+            
             var prayerRows = await _unitOfWork.Repository<PrayerTimesDaily>().QueryNoTracking()
-                .Where(p => p.Date == target && mosqueIds.Contains(p.MosqueId))
+                .Where(p => p.Date == target)
                 .ToListAsync();
-            var byMosque = prayerRows.ToDictionary(p => p.MosqueId);
+                
+            var byMosque = prayerRows
+                .Where(p => mosqueIds.Contains(p.MosqueId))
+                .ToDictionary(p => p.MosqueId);
 
             return Ok(mosques.Select(m =>
             {
@@ -1369,14 +1471,14 @@ namespace MosqueOS.API.Controllers
                     mosqueName = m.Name,
                     mosqueCity = m.City,
                     mosqueStatus = m.Status.ToString(),
-                    date = target,
+                    date = target.ToString("yyyy-MM-dd"),
                     hasTimes = row != null,
                     status = row?.Status.ToString() ?? "Missing",
-                    fajrJamaat = row?.FajrJamaat,
-                    dhuhrJamaat = row?.DhuhrJamaat,
-                    asrJamaat = row?.AsrJamaat,
-                    maghribJamaat = row?.MaghribJamaat,
-                    ishaJamaat = row?.IshaJamaat,
+                    fajrJamaat = row != null ? row.FajrJamaat.ToString("HH:mm") : null,
+                    dhuhrJamaat = row != null ? row.DhuhrJamaat.ToString("HH:mm") : null,
+                    asrJamaat = row != null ? row.AsrJamaat.ToString("HH:mm") : null,
+                    maghribJamaat = row != null ? row.MaghribJamaat.ToString("HH:mm") : null,
+                    ishaJamaat = row != null ? row.IshaJamaat.ToString("HH:mm") : null,
                     publishedAt = row?.PublishedAt,
                     updatedAt = row?.UpdatedAt,
                 };

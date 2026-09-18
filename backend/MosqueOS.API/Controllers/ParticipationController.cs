@@ -17,14 +17,28 @@ namespace MosqueOS.API.Controllers
     public class ParticipationController : ControllerBase
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly MosqueOS.API.Services.MosqueAccessService _mosqueAccess;
 
-        public ParticipationController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
+        public ParticipationController(IUnitOfWork unitOfWork, MosqueOS.API.Services.MosqueAccessService mosqueAccess)
+        {
+            _unitOfWork = unitOfWork;
+            _mosqueAccess = mosqueAccess;
+        }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll(int mosqueId, [FromQuery] ParticipationType? type)
+        public async Task<IActionResult> GetAll(int mosqueId, [FromQuery] ParticipationType? type, [FromQuery] bool all = false)
         {
             var query = _unitOfWork.Repository<ParticipationOpportunity>().QueryNoTracking()
-                .Where(o => o.MosqueId == mosqueId && o.IsActive);
+                .Where(o => o.MosqueId == mosqueId);
+
+            bool isAdmin = User.Identity?.IsAuthenticated == true &&
+                           await _mosqueAccess.CanAccessMosqueAsync(User, mosqueId) == null;
+
+            if (!all || !isAdmin)
+            {
+                query = query.Where(o => o.IsActive);
+            }
+
             if (type.HasValue) query = query.Where(o => o.Type == type);
             return Ok(await query.OrderBy(o => o.Date).ToListAsync());
         }
@@ -51,6 +65,47 @@ namespace MosqueOS.API.Controllers
             _unitOfWork.Repository<ParticipationOpportunity>().Add(opportunity);
             await _unitOfWork.SaveChangesAsync();
             return Ok(opportunity);
+        }
+
+        [Authorize(Roles = Roles.Admins)]
+        [HttpPut("{opportunityId:int}")]
+        public async Task<IActionResult> Update(int mosqueId, int opportunityId, [FromBody] ParticipationOpportunity input)
+        {
+            var opp = await _unitOfWork.Repository<ParticipationOpportunity>().FindAsync(opportunityId);
+            if (opp == null || opp.MosqueId != mosqueId) return NotFound();
+
+            opp.Title = input.Title;
+            opp.Description = input.Description;
+            opp.Type = input.Type;
+            opp.Date = input.Date;
+            opp.IsActive = input.IsActive;
+
+            _unitOfWork.Repository<ParticipationOpportunity>().Update(opp);
+            await _unitOfWork.SaveChangesAsync();
+            return Ok(opp);
+        }
+
+        [Authorize(Roles = Roles.Admins)]
+        [HttpDelete("{opportunityId:int}")]
+        public async Task<IActionResult> Delete(int mosqueId, int opportunityId)
+        {
+            var opp = await _unitOfWork.Repository<ParticipationOpportunity>().FindAsync(opportunityId);
+            if (opp == null || opp.MosqueId != mosqueId) return NotFound();
+
+            // Prevent deleting if people are registered (just deactivate instead)
+            bool hasReg = await _unitOfWork.Repository<ParticipationRegistration>().Query().AnyAsync(r => r.OpportunityId == opportunityId);
+            if (hasReg)
+            {
+                opp.IsActive = false;
+                _unitOfWork.Repository<ParticipationOpportunity>().Update(opp);
+            }
+            else
+            {
+                _unitOfWork.Repository<ParticipationOpportunity>().Remove(opp);
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+            return NoContent();
         }
 
         [Authorize]

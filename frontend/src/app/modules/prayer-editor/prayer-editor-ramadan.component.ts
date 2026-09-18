@@ -1,11 +1,13 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import {
   PrayerEditorService, RamadanTimetable, RamadanDayEntry, PrayerSpecialTiming
 } from '../../core/services/prayer-editor.service';
 import { MosqueContextService } from '../../core/services/mosque-context.service';
+import { appDateString } from '../../core/utils/date.utils';
 
 @Component({
   selector: 'app-prayer-editor-ramadan',
@@ -133,6 +135,7 @@ export class PrayerEditorRamadanComponent implements OnInit {
   private editor = inject(PrayerEditorService);
   private mosqueCtx = inject(MosqueContextService);
   private snack = inject(MatSnackBar);
+  private route = inject(ActivatedRoute);
 
   timetable = signal<RamadanTimetable | null>(null);
   specials = signal<PrayerSpecialTiming[]>([]);
@@ -141,21 +144,27 @@ export class PrayerEditorRamadanComponent implements OnInit {
 
   dayForm: RamadanDayEntry = {
     dayNumber: 1,
-    date: new Date().toISOString().slice(0, 10),
+    date: appDateString(),
     suhoorEnd: '04:30:00',
     iftarJamaat: '19:45:00',
     taraweehJamaat: '21:00:00',
   };
 
   specialForm = {
-    date: new Date().toISOString().slice(0, 10),
+    date: appDateString(),
     label: '',
     time: '20:00',
     isRamadan: true,
   };
 
   ngOnInit(): void {
-    this.mosqueCtx.resolve().then(id => { this.mosqueId = id; this.load(); });
+    const qId = parseInt(this.route.snapshot.queryParamMap.get('mosqueId') || '', 10);
+    if (!isNaN(qId) && qId > 0) {
+      this.mosqueId = qId;
+      this.load();
+    } else {
+      this.mosqueCtx.resolve().then(id => { this.mosqueId = id; this.load(); });
+    }
   }
 
   load(): void {

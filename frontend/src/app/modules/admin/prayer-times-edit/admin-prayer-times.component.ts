@@ -1,9 +1,11 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, RouterModule } from '@angular/router';
 import { AdminService, PrayerExceptionRow } from '../../../core/services/admin.service';
 import { MosqueService } from '../../../core/services/mosque.service';
 import { MosqueContextService } from '../../../core/services/mosque-context.service';
+import { appDateString } from '../../../core/utils/date.utils';
 import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
 import { CardComponent } from '../../../shared/ui/card.component';
 import { JumuahTime, PrayerTimesDaily } from '../../../core/models';
@@ -11,19 +13,43 @@ import { JumuahTime, PrayerTimesDaily } from '../../../core/models';
 @Component({
   selector: 'app-admin-prayer-times',
   standalone: true,
-  imports: [CommonModule, FormsModule, PageHeaderComponent, CardComponent],
+  imports: [CommonModule, FormsModule, RouterModule, PageHeaderComponent, CardComponent],
   template: `
     <app-page-header [useAuthRole]="true" title="Edit Timetable" subtitle="Daily jamaat, Jumuah slots and exceptions" />
 
     <app-card *ngIf="times() as t" class="mb-6">
-      <h3 class="text-white font-bold mb-4">Daily Jamaat Times</h3>
+      <div class="flex flex-wrap justify-between items-center mb-4 gap-3">
+        <div class="flex items-center gap-3">
+          <h3 class="text-white font-bold">Daily Prayer Times</h3>
+          <span *ngIf="t.status" class="px-2 py-1 text-xs rounded text-white" [ngClass]="{'bg-green-600': t.status === 'Published', 'bg-gray-600': t.status !== 'Published'}">
+            {{ t.status }}
+          </span>
+        </div>
+        <a [routerLink]="['/dashboard/admin/prayer-times/templates']" [queryParams]="{mosqueId: mosqueId}" class="btn text-sm" style="text-decoration:none;">Templates & Generate</a>
+      </div>
+      <div class="mb-4">
+        <label class="text-label text-mos-muted block mb-1">Select Date</label>
+        <input class="input" type="date" [(ngModel)]="selectedDate" (ngModelChange)="loadDate($event)" style="max-width: 200px">
+      </div>
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <div *ngFor="let p of prayers">
-          <label class="text-label text-mos-muted">{{ p.label }}</label>
-          <input class="input" type="time" [ngModel]="toInputTime(t[p.jamaat])" (ngModelChange)="onTimeChange(p.jamaat, $event)">
+          <label class="text-label text-mos-muted font-semibold">{{ p.label }}</label>
+          <div class="flex flex-col gap-2 mt-1">
+            <div>
+              <span class="text-xs text-mos-muted">Start</span>
+              <input class="input text-sm p-2" type="time" [ngModel]="toInputTime(t[p.start])" (ngModelChange)="onTimeChange(p.start, $event)">
+            </div>
+            <div>
+              <span class="text-xs text-mos-muted">Jamaat</span>
+              <input class="input text-sm p-2" type="time" [ngModel]="toInputTime(t[p.jamaat])" (ngModelChange)="onTimeChange(p.jamaat, $event)">
+            </div>
+          </div>
         </div>
       </div>
-      <button class="btn mt-4" (click)="save(t)">Save Today</button>
+      <div class="flex gap-3 mt-6">
+        <button class="btn" (click)="saveDraft(t)">Save Draft</button>
+        <button class="btn" style="background:#10b981;color:#fff;" (click)="publish(t)">Publish</button>
+      </div>
       <p *ngIf="msg()" class="text-mos-muted text-sm mt-2">{{ msg() }}</p>
     </app-card>
 
@@ -71,26 +97,36 @@ import { JumuahTime, PrayerTimesDaily } from '../../../core/models';
 export class AdminPrayerTimesComponent implements OnInit {
   private admin = inject(AdminService);
   private mosqueService = inject(MosqueService);
+  private route = inject(ActivatedRoute);
   private mosqueCtx = inject(MosqueContextService);
   times = signal<PrayerTimesDaily | null>(null);
   jumuah = signal<JumuahTime[]>([]);
   exceptions = signal<PrayerExceptionRow[]>([]);
   msg = signal('');
+  selectedDate = appDateString();
   jumuahForm = { slotNumber: 1, jamaatTime: '13:00' };
-  exceptionForm = { date: new Date().toISOString().slice(0, 10), prayer: 'Fajr', overrideValue: '13:00', reason: '' };
+  exceptionForm = { date: appDateString(), prayer: 'Fajr', overrideValue: '13:00', reason: '' };
   prayers = [
-    { label: 'Fajr', jamaat: 'fajrJamaat' as const },
-    { label: 'Dhuhr', jamaat: 'dhuhrJamaat' as const },
-    { label: 'Asr', jamaat: 'asrJamaat' as const },
-    { label: 'Maghrib', jamaat: 'maghribJamaat' as const },
-    { label: 'Isha', jamaat: 'ishaJamaat' as const },
+    { label: 'Fajr', start: 'fajrStart' as const, jamaat: 'fajrJamaat' as const },
+    { label: 'Dhuhr', start: 'dhuhrStart' as const, jamaat: 'dhuhrJamaat' as const },
+    { label: 'Asr', start: 'asrStart' as const, jamaat: 'asrJamaat' as const },
+    { label: 'Maghrib', start: 'maghribStart' as const, jamaat: 'maghribJamaat' as const },
+    { label: 'Isha', start: 'ishaStart' as const, jamaat: 'ishaJamaat' as const },
   ];
-  private mosqueId = 1;
+  mosqueId = 1;
 
-  ngOnInit(): void { this.mosqueCtx.resolve().then(id => { this.mosqueId = id; this.load(); }); }
+  ngOnInit(): void {
+    const qId = parseInt(this.route.snapshot.queryParamMap.get('mosqueId') || '', 10);
+    if (!isNaN(qId) && qId > 0) {
+      this.mosqueId = qId;
+      this.load();
+    } else {
+      this.mosqueCtx.resolve().then(id => { this.mosqueId = id; this.load(); });
+    }
+  }
 
   load(): void {
-    this.mosqueService.getDailyPrayerTimes(this.mosqueId).subscribe(r => this.times.set(r.times));
+    this.loadDate(this.selectedDate);
     this.mosqueService.getJumuahTimes(this.mosqueId).subscribe(j => this.jumuah.set(j));
     this.admin.getPrayerExceptions(this.mosqueId).subscribe({
       next: list => this.exceptions.set(list),
@@ -98,27 +134,65 @@ export class AdminPrayerTimesComponent implements OnInit {
     });
   }
 
-  onTimeChange(field: 'fajrJamaat' | 'dhuhrJamaat' | 'asrJamaat' | 'maghribJamaat' | 'ishaJamaat', val: string): void {
-    const t = this.times();
-    if (t && val) t[field] = val.length === 5 ? val + ':00' : val;
+  loadDate(date: string): void {
+    this.selectedDate = date;
+    this.msg.set('');
+    // Pass includeDraft = true so the admin can see their own drafts
+    this.mosqueService.getDailyPrayerTimes(this.mosqueId, date, true).subscribe(r => {
+      if (r.times) {
+        this.times.set(r.times);
+      } else {
+        this.times.set({
+          id: 0, mosqueId: this.mosqueId, date: date,
+          fajrStart: '', fajrJamaat: '',
+          dhuhrStart: '', dhuhrJamaat: '',
+          asrStart: '', asrJamaat: '',
+          maghribStart: '', maghribJamaat: '',
+          ishaStart: '', ishaJamaat: '',
+          status: 'Draft'
+        });
+      }
+    });
   }
 
-  toInputTime(t: string): string { return t?.slice(0, 5) || ''; }
+  onTimeChange(field: keyof PrayerTimesDaily, val: string): void {
+    const t = this.times();
+    if (t && val) (t as any)[field] = val.length === 5 ? val + ':00' : val;
+  }
 
-  save(t: PrayerTimesDaily): void {
-    this.admin.upsertPrayerTimes(this.mosqueId, t).subscribe({
-      next: () => this.msg.set('Prayer times saved.'),
+  toInputTime(t: string): string { return typeof t === 'string' ? t.slice(0, 5) : ''; }
+
+  saveDraft(t: PrayerTimesDaily): void {
+    this.admin.upsertPrayerTimes(this.mosqueId, t, false).subscribe({
+      next: (res) => {
+        this.msg.set('Draft saved.');
+        this.times.set(res);
+      },
       error: () => this.msg.set('Save failed — check your role.')
+    });
+  }
+
+  publish(t: PrayerTimesDaily): void {
+    this.admin.upsertPrayerTimes(this.mosqueId, t, true).subscribe({
+      next: (res) => {
+        this.msg.set('Prayer times published.');
+        this.times.set(res);
+      },
+      error: () => this.msg.set('Publish failed — check your role.')
     });
   }
 
   addJumuah(): void {
     const time = this.jumuahForm.jamaatTime.length === 5 ? this.jumuahForm.jamaatTime + ':00' : this.jumuahForm.jamaatTime;
-    this.admin.addJumuahSlot(this.mosqueId, { slotNumber: this.jumuahForm.slotNumber, jamaatTime: time }).subscribe(() => this.load());
+    this.admin.addJumuahSlot(this.mosqueId, { slotNumber: this.jumuahForm.slotNumber, jamaatTime: time }).subscribe(() => {
+      this.mosqueService.getJumuahTimes(this.mosqueId).subscribe(j => this.jumuah.set(j));
+    });
   }
 
   removeJumuah(id: number): void {
-    this.admin.deleteJumuahSlot(this.mosqueId, id).subscribe(() => this.load());
+    this.admin.deleteJumuahSlot(this.mosqueId, id).subscribe(() => {
+      this.mosqueService.getJumuahTimes(this.mosqueId).subscribe(j => this.jumuah.set(j));
+    });
   }
 
   addException(): void {
@@ -131,12 +205,17 @@ export class AdminPrayerTimesComponent implements OnInit {
       overrideValue: time,
       reason: this.exceptionForm.reason?.trim() || undefined,
     }).subscribe({
-      next: () => { this.msg.set('Exception added.'); this.load(); },
+      next: () => { 
+        this.msg.set('Exception added.'); 
+        this.admin.getPrayerExceptions(this.mosqueId).subscribe(list => this.exceptions.set(list));
+      },
       error: () => this.msg.set('Could not add exception.'),
     });
   }
 
   removeException(id: number): void {
-    this.admin.deletePrayerException(this.mosqueId, id).subscribe(() => this.load());
+    this.admin.deletePrayerException(this.mosqueId, id).subscribe(() => {
+      this.admin.getPrayerExceptions(this.mosqueId).subscribe(list => this.exceptions.set(list));
+    });
   }
 }

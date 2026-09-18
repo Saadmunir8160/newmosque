@@ -34,8 +34,7 @@ namespace MosqueOS.API.Controllers
         {
             var query = _unitOfWork.Repository<Announcement>().QueryNoTracking().Where(a => a.MosqueId == mosqueId);
 
-            var isAdmin = User.IsInRole(Roles.SuperAdmin) || User.IsInRole(Roles.MosqueAdmin)
-                || User.IsInRole(Roles.MosqueOwner);
+            var isAdmin = await _mosqueAccess.CanAccessMosqueAsync(User, mosqueId);
             if (!all || !isAdmin)
                 query = query.Where(a => a.Status == PublishStatus.Published);
             else if (status.HasValue)
@@ -63,8 +62,7 @@ namespace MosqueOS.API.Controllers
                 .FirstOrDefaultAsync(a => a.Id == id && a.MosqueId == mosqueId);
             if (item == null) return NotFound();
 
-            var isAdmin = User.IsInRole(Roles.SuperAdmin) || User.IsInRole(Roles.MosqueAdmin)
-                || User.IsInRole(Roles.MosqueOwner) || User.IsInRole(Roles.ContentEditor);
+            var isAdmin = await _mosqueAccess.CanAccessMosqueAsync(User, mosqueId) || User.IsInRole(Roles.ContentEditor);
             if (!isAdmin && item.Status != PublishStatus.Published)
                 return NotFound();
 

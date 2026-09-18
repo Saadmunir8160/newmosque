@@ -4,6 +4,7 @@ import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { PlatformService, OversightPrayerRow } from '../../../core/services/platform.service';
 import { formatMosqueStatus } from '../../../core/utils/mosque-status.util';
+import { appDateString } from '../../../core/utils/date.utils';
 import { SuperAdminPageHeaderComponent } from '../../../shared/ui/super-admin-page-header.component';
 
 @Component({
@@ -21,7 +22,7 @@ export class SuperOversightPrayerTimesComponent implements OnInit {
   error = signal('');
   search = signal('');
   coverageFilter = signal<'All' | 'Missing' | 'Published' | 'Draft'>('All');
-  selectedDate = signal(new Date().toISOString().slice(0, 10));
+  selectedDate = signal(appDateString());
   readonly formatStatus = formatMosqueStatus;
 
   filtered = computed(() => {

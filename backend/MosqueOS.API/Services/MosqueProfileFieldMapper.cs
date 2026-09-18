@@ -26,31 +26,31 @@ public static class MosqueProfileFieldMapper
         if (dto.Country != null)
             mosque.Country = dto.Country.Trim();
         if (dto.Phone != null)
-            mosque.Phone = dto.Phone;
+            mosque.Phone = string.IsNullOrWhiteSpace(dto.Phone) ? null : dto.Phone;
         if (dto.Email != null)
-            mosque.Email = dto.Email;
+            mosque.Email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email;
         if (dto.Website != null)
-            mosque.Website = dto.Website;
+            mosque.Website = string.IsNullOrWhiteSpace(dto.Website) ? null : dto.Website;
         if (dto.FacebookUrl != null)
-            mosque.FacebookUrl = dto.FacebookUrl;
+            mosque.FacebookUrl = string.IsNullOrWhiteSpace(dto.FacebookUrl) ? null : dto.FacebookUrl;
         if (dto.InstagramUrl != null)
-            mosque.InstagramUrl = dto.InstagramUrl;
+            mosque.InstagramUrl = string.IsNullOrWhiteSpace(dto.InstagramUrl) ? null : dto.InstagramUrl;
         if (dto.YoutubeUrl != null)
-            mosque.YoutubeUrl = dto.YoutubeUrl;
+            mosque.YoutubeUrl = string.IsNullOrWhiteSpace(dto.YoutubeUrl) ? null : dto.YoutubeUrl;
         if (dto.TwitterUrl != null)
-            mosque.TwitterUrl = dto.TwitterUrl;
+            mosque.TwitterUrl = string.IsNullOrWhiteSpace(dto.TwitterUrl) ? null : dto.TwitterUrl;
         if (dto.SocialLinks != null)
             MosqueSocialLinksHelper.ApplyLinks(mosque, dto.SocialLinks);
         else if (dto.FacebookUrl != null || dto.InstagramUrl != null || dto.YoutubeUrl != null || dto.TwitterUrl != null)
             MosqueSocialLinksHelper.SyncAfterLegacyEdit(mosque);
         if (dto.ShortDescription != null)
-            mosque.ShortDescription = dto.ShortDescription.Trim();
+            mosque.ShortDescription = string.IsNullOrWhiteSpace(dto.ShortDescription) ? null : dto.ShortDescription.Trim();
         if (dto.Description != null)
-            mosque.Description = dto.Description.Trim();
+            mosque.Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description.Trim();
         if (dto.LogoUrl != null)
-            mosque.LogoUrl = dto.LogoUrl;
+            mosque.LogoUrl = string.IsNullOrWhiteSpace(dto.LogoUrl) ? null : dto.LogoUrl;
         if (dto.BannerUrl != null)
-            mosque.BannerUrl = dto.BannerUrl;
+            mosque.BannerUrl = string.IsNullOrWhiteSpace(dto.BannerUrl) ? null : dto.BannerUrl;
         mosque.MapLocation = dto.MapLocation;
         mosque.Latitude = dto.Latitude;
         mosque.Longitude = dto.Longitude;
@@ -67,11 +67,11 @@ public static class MosqueProfileFieldMapper
         if (dto.Capacity.HasValue)
             mosque.Capacity = dto.Capacity;
         if (dto.Vision != null)
-            mosque.Vision = dto.Vision.Trim();
+            mosque.Vision = string.IsNullOrWhiteSpace(dto.Vision) ? null : dto.Vision.Trim();
         if (dto.History != null)
-            mosque.History = dto.History.Trim();
+            mosque.History = string.IsNullOrWhiteSpace(dto.History) ? null : dto.History.Trim();
         if (dto.ParkingInfo != null)
-            mosque.ParkingInfo = dto.ParkingInfo.Trim();
+            mosque.ParkingInfo = string.IsNullOrWhiteSpace(dto.ParkingInfo) ? null : dto.ParkingInfo.Trim();
         if (dto.Gallery != null)
             mosque.GalleryJson = JsonSerializer.Serialize(dto.Gallery);
         if (dto.Services != null)

@@ -63,6 +63,24 @@ import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
         <button type="button" class="mos-dash-btn mos-dash-btn--accent" (click)="createClass()">Create class</button>
       </section>
 
+      <section class="mos-dash-panel">
+        <h3 class="mos-dash-panel__title">Enrol new student</h3>
+        <div class="mos-form-grid">
+          <label class="mos-form-field">
+            <span class="mos-form-label">Student name</span>
+            <input class="mos-form-input" placeholder="Full name" [(ngModel)]="studentForm.name">
+          </label>
+          <label class="mos-form-field">
+            <span class="mos-form-label">Assign to class</span>
+            <select class="mos-form-input" [(ngModel)]="studentForm.classId">
+              <option [value]="0">Select a class...</option>
+              <option *ngFor="let c of classes()" [value]="c.id">{{ c.name }}</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="mos-dash-btn mos-dash-btn--accent mt-2" [disabled]="!studentForm.name || !studentForm.classId || enroling()" (click)="createStudent()">{{ enroling() ? 'Enroling...' : 'Enrol student' }}</button>
+      </section>
+
       <section *ngFor="let c of classes()" class="mos-dash-panel">
         <h4 class="mos-class-title">{{ c.name }}</h4>
         <p class="mos-class-meta">{{ c.schedule || 'No schedule' }} · {{ c.enrolments?.length || 0 }} students</p>
@@ -72,27 +90,12 @@ import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
     </div>
   `,
   styles: [`
-    .mos-form-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 0.875rem;
-      margin-bottom: 1rem;
-    }
-    @media (min-width: 640px) {
-      .mos-form-grid { grid-template-columns: 1fr 1fr; }
-    }
+    .mos-form-grid { display: grid; grid-template-columns: 1fr; gap: 0.875rem; margin-bottom: 1rem; }
+    @media (min-width: 640px) { .mos-form-grid { grid-template-columns: 1fr 1fr; } }
     .mos-form-field { display: flex; flex-direction: column; gap: 0.35rem; }
-    .mos-class-title {
-      margin: 0;
-      font-size: 0.9375rem;
-      font-weight: 700;
-      color: var(--mos-text-primary);
-    }
-    .mos-class-meta {
-      margin: 0.25rem 0 0;
-      font-size: 0.8125rem;
-      color: var(--mos-text-secondary);
-    }
+    .mos-class-title { margin: 0; font-size: 0.9375rem; font-weight: 700; color: var(--mos-text-primary); }
+    .mos-class-meta { margin: 0.25rem 0 0; font-size: 0.8125rem; color: var(--mos-text-secondary); }
+    .mt-2 { margin-top: 0.5rem; }
   `]
 })
 export class AdminMadrassahComponent implements OnInit {
@@ -103,6 +106,8 @@ export class AdminMadrassahComponent implements OnInit {
   classes = signal<import('../../../core/services/madrassah.service').MadrassahClass[]>([]);
   search = '';
   classForm = { name: '', schedule: '' };
+  studentForm = { name: '', classId: 0 };
+  enroling = signal(false);
   mosqueId = 1;
 
   ngOnInit(): void {
@@ -123,6 +128,25 @@ export class AdminMadrassahComponent implements OnInit {
       this.classForm = { name: '', schedule: '' };
       this.madrassah.getDashboard(this.mosqueId).subscribe(d => this.dash.set(d));
       this.loadClasses();
+    });
+  }
+
+  createStudent(): void {
+    if (!this.studentForm.name.trim() || !this.studentForm.classId) return;
+    this.enroling.set(true);
+    this.admin.createStudent({ name: this.studentForm.name }).subscribe({
+      next: (res) => {
+        this.admin.enrolStudent(this.studentForm.classId, res.id).subscribe({
+          next: () => {
+            this.studentForm = { name: '', classId: 0 };
+            this.madrassah.getDashboard(this.mosqueId).subscribe(d => this.dash.set(d));
+            this.loadClasses();
+            this.enroling.set(false);
+          },
+          error: () => this.enroling.set(false)
+        });
+      },
+      error: () => this.enroling.set(false)
     });
   }
 }

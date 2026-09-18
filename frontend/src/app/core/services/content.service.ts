@@ -172,6 +172,10 @@ export class ContentService {
     return this.http.post(`${this.base}/journey-guides/${guideId}/stages`, stage);
   }
 
+  updateJourneyStage(guideId: number, stageId: number, stage: { title: string; description: string; orderIndex: number }): Observable<unknown> {
+    return this.http.put(`${this.base}/journey-guides/${guideId}/stages/${stageId}`, stage);
+  }
+
   createRitualGuide(data: { title: string; type: string }): Observable<RitualGuide> {
     return this.http.post<RitualGuide>(`${this.base}/ritual-guides`, data);
   }
@@ -197,11 +201,12 @@ export class ContentService {
   }
 
   // Communities
-  getCommunities(mosqueId?: number, search?: string, type?: string): Observable<Community[]> {
+  getCommunities(mosqueId?: number, search?: string, type?: string, all = false): Observable<Community[]> {
     const params: Record<string, string> = {};
     if (mosqueId) params['mosqueId'] = mosqueId.toString();
     if (search?.trim()) params['search'] = search.trim();
     if (type) params['type'] = type;
+    if (all) params['all'] = 'true';
     return this.http.get<Community[]>(`${this.base}/communities`, { params });
   }
 

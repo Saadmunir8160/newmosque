@@ -7,6 +7,7 @@ using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
 using System.Security.Claims;
+using MosqueOS.API.Services;
 
 namespace MosqueOS.API.Controllers
 {
@@ -15,14 +16,26 @@ namespace MosqueOS.API.Controllers
     public class CommunitiesController : ControllerBase
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly MosqueAccessService _mosqueAccess;
 
-        public CommunitiesController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
+        public CommunitiesController(IUnitOfWork unitOfWork, MosqueAccessService mosqueAccess)
+        {
+            _unitOfWork = unitOfWork;
+            _mosqueAccess = mosqueAccess;
+        }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll([FromQuery] int? mosqueId, [FromQuery] string? search, [FromQuery] string? type)
+        public async Task<IActionResult> GetAll([FromQuery] int? mosqueId, [FromQuery] string? search, [FromQuery] string? type, [FromQuery] bool all = false)
         {
-            var query = _unitOfWork.Repository<Community>().QueryNoTracking().Where(c => c.IsPublic);
+            var query = _unitOfWork.Repository<Community>().QueryNoTracking();
             if (mosqueId.HasValue) query = query.Where(c => c.MosqueId == mosqueId);
+
+            bool isAdmin = mosqueId.HasValue && User.Identity?.IsAuthenticated == true &&
+                           await _mosqueAccess.CanAccessMosqueAsync(User, mosqueId.Value) == null;
+
+            if (!all || !isAdmin)
+                query = query.Where(c => c.IsPublic);
+
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var term = search.Trim();

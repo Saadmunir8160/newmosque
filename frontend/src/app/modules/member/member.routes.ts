@@ -10,6 +10,7 @@ export const MEMBER_ROUTES: Routes = [
       { path: 'quran', loadComponent: () => import('./member-quran.component').then(m => m.MemberQuranComponent) },
       { path: 'duas', loadComponent: () => import('./member-duas.component').then(m => m.MemberDuasComponent) },
       { path: 'communities', loadComponent: () => import('./member-communities.component').then(m => m.MemberCommunitiesComponent) },
+      { path: 'communities/:id', loadComponent: () => import('./member-community-detail.component').then(m => m.MemberCommunityDetailComponent) },
       { path: 'ritual-guides', loadComponent: () => import('./member-ritual-guides.component').then(m => m.MemberRitualGuidesComponent) },
       { path: 'journey-guides', loadComponent: () => import('./member-journey-guides.component').then(m => m.MemberJourneyGuidesComponent) },
       { path: 'janaza', loadComponent: () => import('./member-janaza.component').then(m => m.MemberJanazaComponent) },

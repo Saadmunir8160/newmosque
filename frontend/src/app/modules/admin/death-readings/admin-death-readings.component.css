@@ -147,3 +147,9 @@
 .modal-label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--drm-muted); margin-bottom: 0.35rem; }
 .modal-input { width: 100%; box-sizing: border-box; padding: 0.55rem 0.75rem; border: 1px solid var(--drm-border); border-radius: 10px; font-size: 0.875rem; margin-bottom: 1rem; }
 .modal-foot { display: flex; justify-content: flex-end; gap: 0.5rem; }
+
+.empty-state { text-align: center; padding: 4rem 1rem; background: var(--drm-card); border-radius: var(--drm-radius); box-shadow: var(--drm-shadow); margin-top: 2rem; }
+.empty-state__icon { font-size: 3rem; display: block; margin-bottom: 1rem; }
+.empty-state h3 { font-size: 1.25rem; font-weight: 700; color: var(--drm-text); margin: 0 0 0.5rem; }
+.empty-state p { font-size: 0.875rem; color: var(--drm-muted); margin: 0; }
+.mt-4 { margin-top: 1rem; }

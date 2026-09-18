@@ -1,6 +1,6 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { PrayerEditorService, PrayerEditorDashboard } from '../../core/services/prayer-editor.service';
 import { MosqueContextService } from '../../core/services/mosque-context.service';
@@ -652,6 +652,7 @@ export class PrayerEditorDashboardComponent implements OnInit, OnDestroy {
   private editor = inject(PrayerEditorService);
   private mosqueCtx = inject(MosqueContextService);
   private auth = inject(AuthService);
+  private route = inject(ActivatedRoute);
 
   summary = signal<PrayerEditorDashboard | null>(null);
   times = signal<PrayerTimesDaily | null>(null);
@@ -698,7 +699,7 @@ export class PrayerEditorDashboardComponent implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
-    this.mosqueCtx.resolve().then(id => {
+    const loadData = (id: number) => {
       this.mosqueId = id;
       this.editor.getDashboard(id).subscribe(s => this.summary.set(s));
       // includeDraft so editors still get countdown for draft days
@@ -714,7 +715,14 @@ export class PrayerEditorDashboardComponent implements OnInit, OnDestroy {
           this.tickCountdown();
         },
       });
-    });
+    };
+
+    const qId = parseInt(this.route.snapshot.queryParamMap.get('mosqueId') || '', 10);
+    if (!isNaN(qId) && qId > 0) {
+      loadData(qId);
+    } else {
+      this.mosqueCtx.resolve().then(loadData);
+    }
     this.timer = setInterval(() => this.tickCountdown(), 1000);
   }
 

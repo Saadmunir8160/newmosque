@@ -1,5 +1,6 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ActivatedRoute } from '@angular/router';
 import { GuestService } from '../../core/services/guest.service';
 import { SeoService } from '../../core/services/seo.service';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
@@ -51,7 +52,7 @@ import {
         <div class="jumuah-grid">
           <div *ngFor="let j of jumuah()" class="j-slot">
             Slot {{ j.slotNumber }}:
-            <span *ngIf="j.khutbahTime">Khutbah {{ formatTime(j.khutbahTime) }} · </span>
+            <span *ngIf="j.khutbahTime && j.khutbahTime !== '00:00:00' && j.khutbahTime !== '00:00'">Khutbah {{ formatTime(j.khutbahTime) }} · </span>
             Jamaah {{ formatTime(j.jamaatTime) }}
           </div>
         </div>
@@ -115,6 +116,7 @@ import {
 export class GuestPrayerTimesComponent implements OnInit, OnDestroy {
   private guest = inject(GuestService);
   private seo = inject(SeoService);
+  private route = inject(ActivatedRoute);
   private mosqueId = this.guest.defaultMosqueId;
   private timer?: ReturnType<typeof setInterval>;
 
@@ -131,6 +133,9 @@ export class GuestPrayerTimesComponent implements OnInit, OnDestroy {
   tomorrowDaily: PrayerTimesDaily | null = null;
 
   ngOnInit(): void {
+    const qId = parseInt(this.route.snapshot.queryParamMap.get('mosqueId') || '', 10);
+    if (!isNaN(qId) && qId > 0) this.mosqueId = qId;
+
     this.seo.setPage('Prayer Times', 'View daily and monthly mosque prayer timetables.');
     this.guest.getDailyPrayer(this.mosqueId).subscribe(r => {
       this.daily.set(r.times);
@@ -172,7 +177,28 @@ export class GuestPrayerTimesComponent implements OnInit, OnDestroy {
 
   loadMonthly(): void {
     this.view.set('monthly');
-    this.guest.getMonthlyPrayer(this.mosqueId, this.year, this.month).subscribe(r => this.monthly.set(r.days));
+    this.guest.getMonthlyPrayer(this.mosqueId, this.year, this.month).subscribe(r => {
+      const daysInMonth = new Date(this.year, this.month, 0).getDate();
+      const fullMonth: PrayerTimesDaily[] = [];
+      let hasData = false;
+      
+      for (let i = 1; i <= daysInMonth; i++) {
+        const dateStr = `${this.year}-${String(this.month).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+        const existing = r.days.find(d => d.date === dateStr);
+        if (existing) {
+          hasData = true;
+          fullMonth.push(existing);
+        } else {
+          fullMonth.push({
+            id: 0, mosqueId: this.mosqueId, date: dateStr, status: 'Missing',
+            fajrStart: '', fajrJamaat: '', dhuhrStart: '', dhuhrJamaat: '', asrStart: '', asrJamaat: '',
+            maghribStart: '', maghribJamaat: '', ishaStart: '', ishaJamaat: ''
+          });
+        }
+      }
+      
+      this.monthly.set(hasData ? fullMonth : []);
+    });
   }
 
   shiftMonth(delta: number): void {

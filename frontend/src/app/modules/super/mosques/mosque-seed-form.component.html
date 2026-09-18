@@ -207,6 +207,23 @@
 
 
 
+  <section class="seed-section" *ngIf="!editMosque">
+    <h3 class="seed-section__title">Owner Invitation</h3>
+    <p class="seed-hint" style="margin-top:0;margin-bottom:12px;">If you want to invite an owner right away, provide their details below. If left blank, the mosque's contact email will be used.</p>
+    <div class="seed-grid">
+      <label class="seed-field">
+        <span class="seed-label">Owner Name</span>
+        <input class="seed-input" [(ngModel)]="form.ownerInviteName" (ngModelChange)="onFieldInput('ownerInviteName')" [disabled]="saving()" placeholder="Optional">
+      </label>
+
+      <label class="seed-field">
+        <span class="seed-label">Owner Email</span>
+        <input class="seed-input" type="email" [class.seed-input--invalid]="fieldErrors()['ownerInviteEmail']" [(ngModel)]="form.ownerInviteEmail" (ngModelChange)="onFieldInput('ownerInviteEmail')" [disabled]="saving()" placeholder="Optional">
+        <span *ngIf="fieldErrors()['ownerInviteEmail']" class="seed-error">{{ fieldErrors()['ownerInviteEmail'] }}</span>
+      </label>
+    </div>
+  </section>
+
   <section class="seed-section">
     <h3 class="seed-section__title">Settings</h3>
     <div class="seed-grid">
@@ -238,15 +255,7 @@
   <footer *ngIf="showFooter" class="seed-form__footer">
     <div class="seed-form__footer-left">
       <button type="button" class="seed-btn seed-btn--ghost" (click)="cancel()" [disabled]="saving()">Cancel</button>
-      <button
-        *ngIf="showFillTestData && !editMosque"
-        type="button"
-        class="seed-btn seed-btn--test"
-        (click)="fillTestData()"
-        [disabled]="saving()"
-        title="Development only — fills unique sample data">
-        Fill test data
-      </button>
+      <button *ngIf="showFillTestData && !editMosque" type="button" class="seed-btn seed-btn--ghost" (click)="fillTestData()" [disabled]="saving()">Fill Test Data</button>
     </div>
     <button type="button" class="seed-btn seed-btn--primary" (click)="save()" [disabled]="saving()">
       {{ saving() ? saveStageLabel() : (editMosque ? 'Save Changes' : 'Save Mosque') }}

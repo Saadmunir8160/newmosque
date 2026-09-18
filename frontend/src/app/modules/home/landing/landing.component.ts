@@ -706,7 +706,7 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
     { label: 'About', action: 'home' },
     { label: 'Features', action: 'features' },
     { label: 'Find a Mosque', route: '/mosques' },
-    { label: 'Demo Mosque', route: '/demo' },
+
     { label: 'Pricing', action: 'pricing' },
     { label: 'Privacy Policy', action: 'privacy' },
     { label: 'Terms of Service', action: 'terms' },

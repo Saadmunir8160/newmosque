@@ -7,11 +7,12 @@ import { MosqueContextService } from '../../core/services/mosque-context.service
 import { MosqueEvent } from '../../core/models';
 import { formatTime12 } from '../../core/utils/prayer.utils';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import { RouterModule } from '@angular/router';
 
 @Component({
   selector: 'app-events',
   standalone: true,
-  imports: [CommonModule, FormsModule, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, RouterModule, PageHeaderComponent],
   template: `
     <app-page-header badge="Member" title="Events" subtitle="Mosque gatherings and programmes" />
 
@@ -47,15 +48,18 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
         <h3 class="member-title">{{ e.title }}</h3>
         <p class="member-meta">{{ formatTime(e.startTime) }} · {{ e.location }}</p>
         <p class="member-desc" style="margin-top: 0.5rem;">{{ e.description }}</p>
-        <div class="member-actions" style="margin-top: 0.75rem;" *ngIf="auth.isAuthenticated()">
-          <button *ngIf="!isRegistered(e.id)" type="button" class="member-btn-primary"
-            [disabled]="busyId() === e.id" (click)="register(e.id)">
-            {{ busyId() === e.id ? 'Saving…' : 'Register' }}
-          </button>
-          <button *ngIf="isRegistered(e.id)" type="button" class="member-btn-secondary"
-            [disabled]="busyId() === e.id" (click)="cancel(e.id)">
-            Cancel registration
-          </button>
+        <div class="member-actions" style="margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center;">
+          <a [routerLink]="['/dashboard/guest/events', e.id]" class="member-btn-secondary" style="text-decoration: none;">View details</a>
+          <ng-container *ngIf="auth.isAuthenticated()">
+            <button *ngIf="!isRegistered(e.id)" type="button" class="member-btn-primary"
+              [disabled]="busyId() === e.id" (click)="register(e.id)">
+              {{ busyId() === e.id ? 'Saving…' : 'Register' }}
+            </button>
+            <button *ngIf="isRegistered(e.id)" type="button" class="member-btn-secondary"
+              [disabled]="busyId() === e.id" (click)="cancel(e.id)">
+              Cancel registration
+            </button>
+          </ng-container>
         </div>
         <p *ngIf="!auth.isAuthenticated()" class="member-hint" style="margin-top: 0.5rem;">
           Log in to register for this event.

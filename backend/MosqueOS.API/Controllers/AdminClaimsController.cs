@@ -42,6 +42,12 @@ public class AdminClaimsController : ControllerBase
         var items = await _claims.GetClaimsAsync(filter);
         var all = await _claims.GetClaimsAsync(null);
 
+        var claimedListings = await _unitOfWork.Repository<Mosque>().QueryNoTracking()
+            .Where(m => m.Status == MosqueStatus.Claimed && !m.IsDraft)
+            .ToListAsync();
+            
+        var pendingReviewListings = claimedListings.Count(m => MosqueProfileCompleteness.Calculate(m).completeness >= 40);
+
         return Ok(new
         {
             summary = new PendingClaimsSummaryResponse
@@ -49,7 +55,7 @@ public class AdminClaimsController : ControllerBase
                 Pending = all.Count(c => c.Status == nameof(OwnershipClaimStatus.Pending)),
                 Rejected = all.Count(c => c.Status == nameof(OwnershipClaimStatus.Rejected)),
                 ClaimPendingListings = 0, // Legacy
-                PendingReviewListings = await _unitOfWork.Repository<Mosque>().QueryNoTracking().CountAsync(m => m.Status == MosqueStatus.Claimed && !m.IsDraft && MosqueProfileCompleteness.Calculate(m).completeness >= 40)
+                PendingReviewListings = pendingReviewListings
             },
             items = items.Select(i => new
             {

@@ -178,6 +178,8 @@ export class MosqueSeedFormComponent implements OnChanges {
       website: 'https://example.org',
       timezone: 'Europe/London',
       status: 'Unclaimed',
+      ownerInviteEmail: `owner-${stamp}@mosqueos.test`,
+      ownerInviteName: 'Test Owner',
     };
 
     const social = this.form as MosqueSeedFormValue & {
@@ -210,18 +212,18 @@ export class MosqueSeedFormComponent implements OnChanges {
     const payload: Partial<Mosque> = {
       name: this.form.name.trim(),
       slug,
-      description: this.form.description.trim() || undefined,
-      address: this.form.address.trim() || undefined,
+      description: this.form.description.trim(),
+      address: this.form.address.trim(),
       city: this.form.city.trim(),
-      postcode: this.form.postcode.trim() || undefined,
+      postcode: this.form.postcode.trim(),
       country: this.form.country || 'United Kingdom',
-      phone: this.form.phone.trim() || undefined,
-      email: this.form.email.trim() || undefined,
-      website: this.form.website.trim() || undefined,
-      facebookUrl: social.facebookUrl?.trim() || undefined,
-      instagramUrl: social.instagramUrl?.trim() || undefined,
-      twitterUrl: social.twitterUrl?.trim() || undefined,
-      youtubeUrl: social.youtubeUrl?.trim() || undefined,
+      phone: this.form.phone.trim(),
+      email: this.form.email.trim(),
+      website: this.form.website.trim(),
+      facebookUrl: social.facebookUrl?.trim() ?? '',
+      instagramUrl: social.instagramUrl?.trim() ?? '',
+      twitterUrl: social.twitterUrl?.trim() ?? '',
+      youtubeUrl: social.youtubeUrl?.trim() ?? '',
       timezone: this.form.timezone || 'Europe/London',
     };
 

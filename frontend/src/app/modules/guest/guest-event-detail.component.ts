@@ -23,6 +23,20 @@ import { formatTime12 } from '../../core/utils/prayer.utils';
       <p><strong>Type:</strong> {{ e.eventType }}</p>
       <div class="body">{{ e.description }}</div>
     </section>
+
+    <section *ngIf="event()?.wirdCollection as wc" class="card" style="margin-top: 1rem;">
+      <h3 style="color: #fcd34d; font-size: 1rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+        <span style="font-size: 1.25rem;">📖</span> Guided Reading Sequence
+      </h3>
+      <p style="margin-bottom: 1rem;">This event includes a guided sequence of prayers, dhikr, and readings.</p>
+      <div style="background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+        <h4 style="color: #fff; margin: 0 0 0.25rem;">{{ wc.name }}</h4>
+        <p style="margin: 0; color: #94a3b8; font-size: 0.8125rem;">{{ wc.tariqa }} · {{ wc.type }}</p>
+      </div>
+      <a [routerLink]="['/dashboard/content/awrad', wc.id]" class="member-btn-primary" style="text-decoration: none; display: inline-block;">
+        View Reading Sequence
+      </a>
+    </section>
   `,
   styles: [`
     .back { display: inline-block; margin-bottom: 0.75rem; color: #fcd34d; font-size: 0.8125rem; text-decoration: none; }

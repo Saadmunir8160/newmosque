@@ -139,7 +139,10 @@
         </button>
         <div *ngIf="expandedStepId() === s.id" class="step-accordion__body">
           <p>{{ s.description || 'No instructions for this step.' }}</p>
-          <button type="button" class="step-delete" (click)="deleteStep(s, $event)">Delete step</button>
+          <div style="display: flex; gap: 0.75rem; margin-top: 0.75rem;">
+            <button type="button" class="step-delete" style="color: #6ee7b7; border-color: #6ee7b7;" (click)="openEditStep(activeGuide() ?? detail, s, $event)">Edit step</button>
+            <button type="button" class="step-delete" (click)="deleteStep(s, $event)">Delete step</button>
+          </div>
         </div>
       </li>
       <li *ngIf="!detail.steps.length" class="step-accordion__empty">No steps yet.</li>
@@ -169,7 +172,7 @@
     <div class="modal" (click)="$event.stopPropagation()" role="dialog">
       <header class="modal__head">
         <h2>
-          {{ panelMode() === 'create' ? 'Create Guide' : panelMode() === 'edit' ? 'Edit Guide' : panelMode() === 'add-step' ? 'Add Step' : 'Guide Preview' }}
+          {{ panelMode() === 'create' ? 'Create Guide' : panelMode() === 'edit' ? 'Edit Guide' : panelMode() === 'add-step' ? 'Add Step' : panelMode() === 'edit-step' ? 'Edit Step' : 'Guide Preview' }}
         </h2>
         <button type="button" class="modal__close" (click)="dismissPanel()" aria-label="Close">×</button>
       </header>
@@ -188,7 +191,7 @@
         </div>
       </div>
 
-      <div class="modal__body" *ngIf="panelMode() === 'add-step'">
+      <div class="modal__body" *ngIf="panelMode() === 'add-step' || panelMode() === 'edit-step'">
         <p *ngIf="activeGuide() as ag" class="modal-sub">Adding to: <strong>{{ ag.title }}</strong></p>
         <div class="field">
           <label class="field-label" for="step-title">Step title</label>
@@ -222,9 +225,9 @@
           (click)="saveGuide()" [disabled]="saving() || !form.title.trim()">
           {{ saving() ? 'Saving…' : 'Save' }}
         </button>
-        <button type="button" class="btn-primary" *ngIf="panelMode() === 'add-step'"
+        <button type="button" class="btn-primary" *ngIf="panelMode() === 'add-step' || panelMode() === 'edit-step'"
           (click)="saveStep()" [disabled]="saving() || !step.title.trim()">
-          {{ saving() ? 'Saving…' : 'Add Step' }}
+          {{ saving() ? 'Saving…' : panelMode() === 'edit-step' ? 'Update Step' : 'Add Step' }}
         </button>
       </footer>
       <footer class="modal__foot" *ngIf="panelMode() === 'view'">

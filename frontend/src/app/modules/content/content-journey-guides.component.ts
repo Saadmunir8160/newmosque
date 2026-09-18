@@ -43,12 +43,18 @@ const GUIDE_TYPES = ['Umrah', 'Hajj'] as const;
           <div class="grid grid-cols-1 sm:grid-cols-4 gap-2 mb-3">
             <input class="input" placeholder="Stage title" [(ngModel)]="stageForm.title">
             <input class="input sm:col-span-2" placeholder="Description" [(ngModel)]="stageForm.description">
-            <button type="button" class="btn" [disabled]="!stageForm.title.trim()" (click)="addStage(g.id)">Add stage</button>
+            <div class="flex gap-2">
+              <button type="button" class="btn flex-1" [disabled]="!stageForm.title.trim() || savingStage()" (click)="saveStage(g.id)">{{ editingStageId() ? 'Save' : 'Add' }}</button>
+              <button type="button" *ngIf="editingStageId()" class="btn-secondary flex-1" (click)="cancelEdit()">Cancel</button>
+            </div>
           </div>
           <ol class="space-y-2">
-            <li *ngFor="let s of d.stages" class="text-sm text-mos-muted">
-              <strong class="text-white">{{ s.orderIndex }}. {{ s.title }}</strong>
-              <span *ngIf="s.description"> — {{ s.description }}</span>
+            <li *ngFor="let s of d.stages" class="text-sm text-mos-muted flex justify-between items-start">
+              <div>
+                <strong class="text-white">{{ s.orderIndex }}. {{ s.title }}</strong>
+                <span *ngIf="s.description"> — {{ s.description }}</span>
+              </div>
+              <button type="button" class="btn-secondary text-xs py-1 px-2 ml-2" (click)="startEdit(s)">Edit</button>
             </li>
           </ol>
           <p *ngIf="!d.stages?.length" class="text-mos-muted text-sm">No stages yet.</p>
@@ -78,6 +84,8 @@ export class ContentJourneyGuidesComponent implements OnInit {
   toastOk = signal(true);
   form = { title: '', type: 'Umrah' as string };
   stageForm = { title: '', description: '', orderIndex: 1 };
+  editingStageId = signal<number | null>(null);
+  savingStage = signal(false);
 
   ngOnInit(): void { this.load(); }
 
@@ -112,25 +120,50 @@ export class ContentJourneyGuidesComponent implements OnInit {
     this.content.getJourneyGuide(id).subscribe({
       next: d => {
         this.detail.set(d);
+        this.cancelEdit(); // Reset form but keep expandedId
         this.stageForm.orderIndex = (d.stages?.length ?? 0) + 1;
       },
       error: () => this.showToast('Could not load guide.', false),
     });
   }
 
-  addStage(guideId: number): void {
+  startEdit(stage: any): void {
+    this.editingStageId.set(stage.id);
+    this.stageForm = {
+      title: stage.title,
+      description: stage.description || '',
+      orderIndex: stage.orderIndex
+    };
+  }
+
+  cancelEdit(): void {
+    this.editingStageId.set(null);
+    this.stageForm = { title: '', description: '', orderIndex: (this.detail()?.stages?.length ?? 0) + 1 };
+  }
+
+  saveStage(guideId: number): void {
     const payload = {
       title: this.stageForm.title.trim(),
       description: this.stageForm.description.trim(),
       orderIndex: this.stageForm.orderIndex,
     };
-    this.content.addJourneyStage(guideId, payload).subscribe({
+    this.savingStage.set(true);
+    const id = this.editingStageId();
+    
+    const req = id
+      ? this.content.updateJourneyStage(guideId, id, payload)
+      : this.content.addJourneyStage(guideId, payload);
+
+    req.subscribe({
       next: () => {
-        this.stageForm = { title: '', description: '', orderIndex: this.stageForm.orderIndex + 1 };
+        this.savingStage.set(false);
         this.loadDetail(guideId);
-        this.showToast('Stage added.', true);
+        this.showToast(id ? 'Stage updated.' : 'Stage added.', true);
       },
-      error: () => this.showToast('Could not add stage.', false),
+      error: () => {
+        this.savingStage.set(false);
+        this.showToast(id ? 'Could not update stage.' : 'Could not add stage.', false);
+      },
     });
   }
 

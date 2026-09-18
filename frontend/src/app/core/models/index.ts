@@ -176,6 +176,8 @@ export interface MosqueEvent {
   speaker?: string;
   eventType: string;
   status: string;
+  wirdCollectionId?: number;
+  wirdCollection?: WirdCollection;
 }
 
 export type JanazaStatus = 'Draft' | 'Published' | 'Unpublished';

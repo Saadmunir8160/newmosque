@@ -1,6 +1,7 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import {
   PrayerEditorService,
@@ -11,6 +12,7 @@ import {
   GenerateFromTemplateResult,
 } from '../../core/services/prayer-editor.service';
 import { MosqueContextService } from '../../core/services/mosque-context.service';
+import { appDateString } from '../../core/utils/date.utils';
 
 const DAY_LABELS = [
   { value: 0, label: 'Sun', short: 'S' },
@@ -319,15 +321,6 @@ function emptyForm(): JamaahTemplateUpsert {
         </div>
         <p *ngIf="!templates().length" class="muted empty-msg">No templates yet. Create one above.</p>
       </section>
-
-      <div class="ped-tip">
-        <span class="ped-tip__icon" aria-hidden="true">ℹ</span>
-        <p>
-          Templates are applied based on date range and priority. The template with the
-          <strong>lowest priority number</strong> (including 0) will be used when multiple templates match.
-          Generate also respects effective dates, specific dates, and excluded dates.
-        </p>
-      </div>
     </div>
   `,
   styles: [`
@@ -575,6 +568,7 @@ export class PrayerEditorTemplatesComponent implements OnInit {
   private editor = inject(PrayerEditorService);
   private mosqueCtx = inject(MosqueContextService);
   private snack = inject(MatSnackBar);
+  private route = inject(ActivatedRoute);
 
   templates = signal<JamaahTemplate[]>([]);
   editingId = signal<number | null>(null);
@@ -592,20 +586,26 @@ export class PrayerEditorTemplatesComponent implements OnInit {
   typeOptions = TYPE_OPTIONS;
 
   generateTemplateId = 0;
-  generateFrom = new Date().toISOString().slice(0, 10);
-  generateTo = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  generateFrom = appDateString();
+  generateTo = appDateString(new Date(Date.now() + 7 * 86400000));
   overwritePublished = false;
   skipExisting = false;
-  publishGenerated = true;
+  publishGenerated = false;
   previewResult = signal<GenerateFromTemplateResult | null>(null);
 
   private mosqueId = 1;
 
   ngOnInit(): void {
-    this.mosqueCtx.resolve().then(id => {
-      this.mosqueId = id;
+    const qId = parseInt(this.route.snapshot.queryParamMap.get('mosqueId') || '', 10);
+    if (!isNaN(qId) && qId > 0) {
+      this.mosqueId = qId;
       this.load();
-    });
+    } else {
+      this.mosqueCtx.resolve().then(id => {
+        this.mosqueId = id;
+        this.load();
+      });
+    }
   }
 
   toInput(t: string): string {
@@ -751,13 +751,13 @@ export class PrayerEditorTemplatesComponent implements OnInit {
 
   edit(t: JamaahTemplate): void {
     this.editingId.set(t.id);
-    const prayers = (t.prayers?.length ? t.prayers : defaultPrayers()).map((p, i) => ({
+    const prayers = (t.prayers?.length ? t.prayers : defaultPrayers()).map((p: JamaahTemplatePrayer, i: number) => ({
       prayerName: p.prayerName,
       startTime: this.toFull(this.toInput(p.startTime)),
       jamaatTime: this.toFull(this.toInput(p.jamaatTime)),
       sortOrder: p.sortOrder ?? i,
     }));
-    const byName = new Map(prayers.map(p => [p.prayerName, p]));
+    const byName = new Map(prayers.map((p: JamaahTemplatePrayer) => [p.prayerName, p]));
     const days = t.daysOfWeek?.length ? [...t.daysOfWeek] : [0, 1, 2, 3, 4, 5, 6];
     this.form = {
       name: t.name,
@@ -770,12 +770,12 @@ export class PrayerEditorTemplatesComponent implements OnInit {
       daysOfWeek: days,
       specificDates: t.specificDates ?? [],
       excludedDates: t.excludedDates ?? [],
-      prayers: PRAYER_NAMES.map((name, i) => byName.get(name) ?? {
+      prayers: PRAYER_NAMES.map((name, i) => byName.get(name) ?? ({
         prayerName: name,
         startTime: defaultPrayers()[i].startTime,
         jamaatTime: defaultPrayers()[i].jamaatTime,
         sortOrder: i,
-      }),
+      } as JamaahTemplatePrayer)),
     };
     this.specificDateList = [...(t.specificDates ?? [])];
     this.excludedDateList = [...(t.excludedDates ?? [])];

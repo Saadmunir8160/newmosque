@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { PrayerEditorService } from '../../core/services/prayer-editor.service';
 import { MosqueContextService } from '../../core/services/mosque-context.service';
@@ -114,6 +115,7 @@ export class PrayerEditorJumuahComponent implements OnInit {
   private editor = inject(PrayerEditorService);
   private mosqueCtx = inject(MosqueContextService);
   private snack = inject(MatSnackBar);
+  private route = inject(ActivatedRoute);
 
   jumuah = signal<JumuahTime[]>([]);
   busyId = signal<number | null>(null);
@@ -121,7 +123,13 @@ export class PrayerEditorJumuahComponent implements OnInit {
   private mosqueId = 1;
 
   ngOnInit(): void {
-    this.mosqueCtx.resolve().then(id => { this.mosqueId = id; this.load(); });
+    const qId = parseInt(this.route.snapshot.queryParamMap.get('mosqueId') || '', 10);
+    if (!isNaN(qId) && qId > 0) {
+      this.mosqueId = qId;
+      this.load();
+    } else {
+      this.mosqueCtx.resolve().then(id => { this.mosqueId = id; this.load(); });
+    }
   }
 
   trackById = (_: number, j: JumuahTime) => j.id;

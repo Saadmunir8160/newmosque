@@ -32,18 +32,21 @@ import { CardComponent } from '../../../shared/ui/card.component';
         <option value="YouthGroup">Youth Group</option><option value="SistersGroup">Sisters Group</option>
       </select>
       <textarea class="input mb-2" rows="2" placeholder="Description" [(ngModel)]="form.description"></textarea>
-      <button class="btn" (click)="create()">Create Community</button>
+      <label class="chk mb-2"><input type="checkbox" [(ngModel)]="form.isPublic" /> Public (Visible to guests)</label>
+      <br>
+      <button class="btn mt-2" (click)="create()">Create Community</button>
     </app-card>
 
     <app-card *ngFor="let c of filtered()" class="block mt-3">
       <h4 class="text-white font-bold">{{ c.name }}</h4>
-      <p class="text-mos-muted text-sm">{{ c.type }} · {{ c.isPublic ? 'Public' : 'Private' }}</p>
+      <p class="text-mos-muted text-sm">{{ c.type }} · <span [class.text-green-400]="c.isPublic" [class.text-red-400]="!c.isPublic">{{ c.isPublic ? 'Public' : 'Private' }}</span></p>
       <p *ngIf="c.description" class="text-mos-muted text-sm mt-1">{{ c.description }}</p>
     </app-card>
     <p *ngIf="!filtered().length" class="empty">No communities match your filters.</p>
   `,
   styles: [`
     .toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+    .chk { color: #a7f3d0; font-size: 0.8125rem; display: flex; align-items: center; gap: 0.35rem; }
     .input{background:#0F172A;border:1px solid #F8FAFC;border-radius:8px;padding:10px;color:#fff;width:100%}
     .w-auto { width: auto; min-width: 140px; }
     .btn{background:#f59e0b;color:#0F172A;font-weight:700;padding:8px 16px;border-radius:8px;border:none;cursor:pointer}
@@ -55,7 +58,7 @@ export class AdminCommunitiesComponent implements OnInit {
   private content = inject(ContentService);
   private mosqueCtx = inject(MosqueContextService);
   items = signal<Community[]>([]);
-  form = { name: '', type: 'Tariqa', description: '' };
+  form = { name: '', type: 'Tariqa', description: '', isPublic: true };
   search = '';
   typeFilter = '';
   mid = 1;
@@ -77,12 +80,12 @@ export class AdminCommunitiesComponent implements OnInit {
   }
 
   reload(): void {
-    this.content.getCommunities(this.mid).subscribe(c => this.items.set(c));
+    this.content.getCommunities(this.mid, undefined, undefined, true).subscribe(c => this.items.set(c));
   }
 
   create(): void {
-    this.admin.createCommunity({ ...this.form, mosqueId: this.mid, isPublic: true }).subscribe(() => {
-      this.form = { name: '', type: 'Tariqa', description: '' };
+    this.admin.createCommunity({ ...this.form, mosqueId: this.mid }).subscribe(() => {
+      this.form = { name: '', type: 'Tariqa', description: '', isPublic: true };
       this.reload();
     });
   }

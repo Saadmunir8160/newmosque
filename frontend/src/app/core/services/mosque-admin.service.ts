@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
@@ -77,12 +77,15 @@ export class MosqueAdminService {
   }
 
   getUsers(mosqueId: number, category?: string, search?: string, activeOnly?: boolean): Observable<MosqueAdminUser[]> {
-    const params = new URLSearchParams();
-    if (category) params.set('category', category);
-    if (search?.trim()) params.set('search', search.trim());
-    if (activeOnly !== undefined) params.set('activeOnly', String(activeOnly));
-    const q = params.toString() ? `?${params}` : '';
-    return this.http.get<MosqueAdminUser[]>(`${this.base}/mosques/${mosqueId}/admin/users${q}`);
+    let params = new HttpParams();
+    if (category) params = params.set('category', category);
+    if (search) params = params.set('search', search);
+    if (activeOnly) params = params.set('activeOnly', 'true');
+    return this.http.get<MosqueAdminUser[]>(`${this.base}/mosques/${mosqueId}/admin/users`, { params });
+  }
+
+  bulkUserAction(mosqueId: number, req: { userIds: string[], action: string, role?: string }): Observable<any> {
+    return this.http.post<any>(`${this.base}/mosques/${mosqueId}/admin/users/bulk`, req);
   }
 
   createUser(mosqueId: number, body: {

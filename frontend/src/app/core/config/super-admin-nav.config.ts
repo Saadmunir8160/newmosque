@@ -45,7 +45,7 @@ export const SUPER_ADMIN_NAV_SECTIONS: SuperNavSection[] = [
       { section: 'Mosques', label: 'Add Mosque', route: '/dashboard/super/mosques/add', icon: 'add', matIcon: 'add_business' },
       { section: 'Mosques', label: 'Mosque Claims', route: '/dashboard/super/claims', icon: 'stamp', matIcon: 'verified_user', badgeKey: 'claims' },
       { section: 'Mosques', label: 'Registration Requests', route: '/dashboard/super/registrations', icon: 'add', matIcon: 'how_to_reg', badgeKey: 'registrations' },
-      { section: 'Mosques', label: 'Invitations', route: '/dashboard/super/invitations', icon: 'mail', matIcon: 'mail' },
+
     ],
   },
   {

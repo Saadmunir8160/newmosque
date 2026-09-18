@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { PrayerEditorService } from '../../core/services/prayer-editor.service';
 import { MosqueContextService } from '../../core/services/mosque-context.service';
 import { PrayerTimesDaily } from '../../core/models';
@@ -97,6 +98,7 @@ import { PrayerTimesDaily } from '../../core/models';
 export class PrayerEditorMonthlyComponent implements OnInit {
   private editor = inject(PrayerEditorService);
   private mosqueCtx = inject(MosqueContextService);
+  private route = inject(ActivatedRoute);
 
   rows = signal<PrayerTimesDaily[]>([]);
   loading = signal(false);
@@ -109,10 +111,16 @@ export class PrayerEditorMonthlyComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.mosqueCtx.resolve().then(id => {
-      this.mosqueId = id;
+    const qId = parseInt(this.route.snapshot.queryParamMap.get('mosqueId') || '', 10);
+    if (!isNaN(qId) && qId > 0) {
+      this.mosqueId = qId;
       this.load();
-    });
+    } else {
+      this.mosqueCtx.resolve().then(id => {
+        this.mosqueId = id;
+        this.load();
+      });
+    }
   }
 
   onMonthInput(value: string): void {

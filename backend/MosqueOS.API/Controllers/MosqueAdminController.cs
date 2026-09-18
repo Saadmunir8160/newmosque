@@ -9,6 +9,7 @@ using MosqueOS.Application.Common.Interfaces;
 using MosqueOS.Domain;
 using MosqueOS.Domain.Constants;
 using MosqueOS.Domain.Entities;
+using MosqueOS.Infrastructure;
 using System.Security.Claims;
 
 namespace MosqueOS.API.Controllers;
@@ -20,6 +21,8 @@ public class MosqueAdminController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly RoleManager<IdentityRole> _roleManager;
+    private readonly ApplicationDbContext _db;
     private readonly MosqueAccessService _mosqueAccess;
 
     private static readonly string[] ManagedUserRoles =
@@ -30,10 +33,14 @@ public class MosqueAdminController : ControllerBase
     public MosqueAdminController(
         IUnitOfWork unitOfWork,
         UserManager<ApplicationUser> userManager,
+        RoleManager<IdentityRole> roleManager,
+        ApplicationDbContext db,
         MosqueAccessService mosqueAccess)
     {
         _unitOfWork = unitOfWork;
         _userManager = userManager;
+        _roleManager = roleManager;
+        _db = db;
         _mosqueAccess = mosqueAccess;
     }
 
@@ -250,6 +257,119 @@ public class MosqueAdminController : ControllerBase
             await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddYears(100));
 
         return Ok(await ToUserDtoAsync(user));
+    }
+
+    [HttpPost("users/bulk")]
+    public async Task<IActionResult> BulkUserAction(int mosqueId, [FromBody] Models.Platform.BulkUserActionRequest dto)
+    {
+        if (!await _mosqueAccess.CanAccessMosqueAsync(User, mosqueId)) return Forbid();
+
+        if (dto.UserIds == null || dto.UserIds.Length == 0)
+            return BadRequest(new ApiMessageResponse { Message = "No users selected." });
+
+        var processed = 0;
+        var errors = new List<string>();
+
+        foreach (var userId in dto.UserIds.Distinct())
+        {
+            var user = await _userManager.Users.FirstOrDefaultAsync(u => u.Id == userId && u.HomeMosqueId == mosqueId);
+            if (user == null) { errors.Add($"{userId}: not found or not in mosque"); continue; }
+
+            try
+            {
+                switch (dto.Action?.ToLowerInvariant())
+                {
+                    case "assignrole":
+                        if (string.IsNullOrWhiteSpace(dto.Role) || !ManagedUserRoles.Contains(dto.Role))
+                        { errors.Add($"{user.UserName}: invalid role for mosque admin"); continue; }
+                        if (!await _roleManager.RoleExistsAsync(dto.Role))
+                            await _roleManager.CreateAsync(new IdentityRole(dto.Role));
+                        if (!await _userManager.IsInRoleAsync(user, dto.Role))
+                            await _userManager.AddToRoleAsync(user, dto.Role);
+                        break;
+                    case "activate":
+                        user.LockoutEnd = null;
+                        user.LockoutEnabled = false;
+                        await _userManager.UpdateAsync(user);
+                        break;
+                    case "deactivate":
+                        if (await _userManager.IsInRoleAsync(user, Roles.MosqueAdmin) || await _userManager.IsInRoleAsync(user, Roles.SuperAdmin))
+                        { errors.Add($"{user.UserName}: cannot deactivate admin"); continue; }
+                        user.LockoutEnabled = true;
+                        user.LockoutEnd = DateTimeOffset.UtcNow.AddYears(100);
+                        await _userManager.UpdateAsync(user);
+                        break;
+                    case "delete":
+                        if (await _userManager.IsInRoleAsync(user, Roles.MosqueAdmin) || await _userManager.IsInRoleAsync(user, Roles.SuperAdmin))
+                        { errors.Add($"{user.UserName}: cannot delete admin"); continue; }
+                        
+                        // Nullify all nullable foreign keys referencing AspNetUsers for this user
+                        var sql = @"
+                            DECLARE @sql nvarchar(max) = '';
+                            SELECT @sql = @sql + 'UPDATE [' + tp.name + '] SET [' + cp.name + '] = NULL WHERE [' + cp.name + '] = @UserId; '
+                            FROM sys.foreign_keys fk
+                            INNER JOIN sys.tables tp ON fk.parent_object_id = tp.object_id
+                            INNER JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
+                            INNER JOIN sys.columns cp ON fkc.parent_object_id = cp.object_id AND fkc.parent_column_id = cp.column_id
+                            INNER JOIN sys.tables tr ON fk.referenced_object_id = tr.object_id
+                            WHERE tr.name = 'AspNetUsers' AND cp.is_nullable = 1;
+                            EXEC sp_executesql @sql, N'@UserId nvarchar(450)', @UserId;
+                        ";
+                        await _db.Database.ExecuteSqlRawAsync(sql, new Microsoft.Data.SqlClient.SqlParameter("@UserId", user.Id));
+                        
+                        try 
+                        {
+                            var delRes = await _userManager.DeleteAsync(user);
+                            if (!delRes.Succeeded)
+                            {
+                                user.UserName = "deleted_" + Guid.NewGuid();
+                                user.NormalizedUserName = user.UserName.ToUpper();
+                                user.Email = user.UserName + "@deleted.local";
+                                user.NormalizedEmail = user.Email.ToUpper();
+                                user.PasswordHash = null;
+                                user.LockoutEnabled = true;
+                                user.LockoutEnd = DateTimeOffset.MaxValue;
+                                user.FullName = "Deleted User";
+                                user.HomeMosqueId = null;
+                                await _userManager.UpdateAsync(user);
+                                var roles = await _userManager.GetRolesAsync(user);
+                                foreach (var r in roles) await _userManager.RemoveFromRoleAsync(user, r);
+                            }
+                        }
+                        catch (Exception)
+                        {
+                            user.UserName = "deleted_" + Guid.NewGuid();
+                            user.NormalizedUserName = user.UserName.ToUpper();
+                            user.Email = user.UserName + "@deleted.local";
+                            user.NormalizedEmail = user.Email.ToUpper();
+                            user.PasswordHash = null;
+                            user.LockoutEnabled = true;
+                            user.LockoutEnd = DateTimeOffset.MaxValue;
+                            user.FullName = "Deleted User";
+                            user.HomeMosqueId = null;
+                            await _userManager.UpdateAsync(user);
+                            var roles = await _userManager.GetRolesAsync(user);
+                            foreach (var r in roles) await _userManager.RemoveFromRoleAsync(user, r);
+                        }
+                        break;
+                    default:
+                        return BadRequest(new ApiMessageResponse { Message = "Unknown bulk action." });
+                }
+                processed++;
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"{user.UserName}: {ex.Message}");
+                _db.ChangeTracker.Clear();
+            }
+        }
+
+        return Ok(new
+        {
+            message = $"Processed {processed} user(s).",
+            processed,
+            errors
+        });
     }
 
     [HttpGet("participation/pending")]

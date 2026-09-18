@@ -22,7 +22,7 @@ import { AuthService } from '../../../core/auth/auth.service';
       padding: 2rem 1rem;
       padding-top: max(2rem, env(safe-area-inset-top));
       padding-bottom: max(5.5rem, calc(env(safe-area-inset-bottom) + 3rem));
-      background: #0F4C3A;
+      background: url('/assets/images/mosque-bg.jpg') center/cover no-repeat;
       position: relative;
       overflow: hidden;
     }
@@ -30,7 +30,7 @@ import { AuthService } from '../../../core/auth/auth.service';
       content: '';
       position: absolute;
       inset: 0;
-      background: linear-gradient(180deg, #0B3D2E 0%, #0F4C3A 42%, #16624A 100%);
+      background: linear-gradient(180deg, rgba(11, 61, 46, 0.8) 0%, rgba(15, 76, 58, 0.88) 42%, rgba(22, 98, 74, 0.95) 100%);
       pointer-events: none;
     }
     .splash::after {

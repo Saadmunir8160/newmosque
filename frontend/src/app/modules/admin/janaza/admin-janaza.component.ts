@@ -90,7 +90,7 @@ export class AdminJanazaComponent implements OnInit {
 
   load(): void {
     this.loading.set(true);
-    this.mosque.getJanaza(this.mid, this.search.trim() || undefined).subscribe({
+    this.mosque.getJanaza(this.mid, true, this.search.trim() || undefined).subscribe({
       next: j => { this.items.set(j); this.loading.set(false); },
       error: () => this.loading.set(false),
     });

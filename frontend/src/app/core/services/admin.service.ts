@@ -166,8 +166,8 @@ export class AdminService {
   }
 
   // Prayer times admin
-  upsertPrayerTimes(mosqueId: number, data: Partial<PrayerTimesDaily>): Observable<PrayerTimesDaily> {
-    return this.http.put<PrayerTimesDaily>(`${this.base}/mosques/${mosqueId}/prayer-times/daily`, data);
+  upsertPrayerTimes(mosqueId: number, data: Partial<PrayerTimesDaily>, publish: boolean = false): Observable<PrayerTimesDaily> {
+    return this.http.put<PrayerTimesDaily>(`${this.base}/mosques/${mosqueId}/prayer-times/daily?publish=${publish}`, data);
   }
 
   getPrayerExceptions(mosqueId: number): Observable<PrayerExceptionRow[]> {
@@ -206,6 +206,14 @@ export class AdminService {
     return this.http.post(`${environment.apiUrl}/madrassah/classes`, { ...data, mosqueId });
   }
 
+  createStudent(data: { name: string; gender?: string; dateOfBirth?: string }): Observable<{ id: number }> {
+    return this.http.post<{ id: number }>(`${environment.apiUrl}/madrassah/students`, data);
+  }
+
+  enrolStudent(classId: number, studentId: number): Observable<unknown> {
+    return this.http.post(`${environment.apiUrl}/madrassah/classes/${classId}/enrol/${studentId}`, {});
+  }
+
   // Announcements admin
   createAnnouncement(mosqueId: number, data: Partial<Announcement>): Observable<Announcement> {
     return this.http.post<Announcement>(`${this.base}/mosques/${mosqueId}/announcements`, data);
@@ -240,6 +248,14 @@ export class AdminService {
   // Participation
   createParticipation(mosqueId: number, data: Partial<ParticipationOpportunity>): Observable<ParticipationOpportunity> {
     return this.http.post<ParticipationOpportunity>(`${this.base}/mosques/${mosqueId}/participation`, data);
+  }
+
+  updateParticipation(mosqueId: number, oppId: number, data: Partial<ParticipationOpportunity>): Observable<ParticipationOpportunity> {
+    return this.http.put<ParticipationOpportunity>(`${this.base}/mosques/${mosqueId}/participation/${oppId}`, data);
+  }
+
+  deleteParticipation(mosqueId: number, oppId: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/mosques/${mosqueId}/participation/${oppId}`);
   }
 
   // Communities

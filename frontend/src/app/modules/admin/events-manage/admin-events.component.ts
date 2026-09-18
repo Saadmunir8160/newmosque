@@ -6,7 +6,8 @@ import { MosqueService } from '../../../core/services/mosque.service';
 import { MosqueContextService } from '../../../core/services/mosque-context.service';
 import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
 import { CardComponent } from '../../../shared/ui/card.component';
-import { MosqueEvent } from '../../../core/models';
+import { MosqueEvent, WirdCollection } from '../../../core/models';
+import { ContentService } from '../../../core/services/content.service';
 
 @Component({
   selector: 'app-admin-events',
@@ -37,6 +38,10 @@ import { MosqueEvent } from '../../../core/models';
           <option value="General">General</option><option value="Mawlid">Mawlid</option>
           <option value="Dhikr">Dhikr</option><option value="Class">Class</option>
         </select>
+        <select class="input" [(ngModel)]="form.wirdCollectionId">
+          <option [ngValue]="null">-- No Awrad / Reading --</option>
+          <option *ngFor="let c of collections()" [ngValue]="c.id">{{ c.name }}</option>
+        </select>
         <textarea class="input md:col-span-2" rows="2" placeholder="Description" [(ngModel)]="form.description"></textarea>
       </div>
       <button class="btn mt-3" (click)="create()">Create Event</button>
@@ -61,6 +66,20 @@ import { MosqueEvent } from '../../../core/models';
           <input class="input" type="date" [(ngModel)]="editForm.date" />
           <input class="input" type="time" [(ngModel)]="editForm.startTime" />
           <input class="input" [(ngModel)]="editForm.location" />
+          <select class="input" [(ngModel)]="editForm.eventType">
+            <option value="General">General</option><option value="Mawlid">Mawlid</option>
+            <option value="Dhikr">Dhikr</option><option value="Class">Class</option>
+          </select>
+          <select class="input" [(ngModel)]="editForm.wirdCollectionId">
+            <option [ngValue]="null">-- No Awrad / Reading --</option>
+            <option *ngFor="let c of collections()" [ngValue]="c.id">{{ c.name }}</option>
+          </select>
+          <select class="input" [(ngModel)]="editForm.status">
+            <option value="Scheduled">Scheduled</option>
+            <option value="Cancelled">Cancelled</option>
+            <option value="Completed">Completed</option>
+          </select>
+          <textarea class="input md:col-span-2" rows="2" [(ngModel)]="editForm.description"></textarea>
         </div>
         <div class="flex gap-2 mt-2">
           <button class="btn-sm edit" (click)="saveEdit(e.id)">Save</button>
@@ -84,16 +103,21 @@ export class AdminEventsComponent implements OnInit {
   private admin = inject(AdminService);
   private mosque = inject(MosqueService);
   private mosqueCtx = inject(MosqueContextService);
+  private content = inject(ContentService);
   items = signal<MosqueEvent[]>([]);
-  form = { title: '', date: '', startTime: '19:00', location: '', description: '', eventType: 'General' };
-  editForm = { title: '', date: '', startTime: '19:00', location: '', description: '', eventType: 'General', status: 'Scheduled' };
+  collections = signal<WirdCollection[]>([]);
+  form = { title: '', date: '', startTime: '19:00', location: '', description: '', eventType: 'General', wirdCollectionId: null as number | null };
+  editForm = { title: '', date: '', startTime: '19:00', location: '', description: '', eventType: 'General', status: 'Scheduled', wirdCollectionId: null as number | null };
   editingId = signal<number | null>(null);
   search = '';
   typeFilter = '';
   upcomingOnly = false;
   mid = 1;
 
-  ngOnInit(): void { this.mosqueCtx.resolve().then(id => { this.mid = id; this.load(); }); }
+  ngOnInit(): void { 
+    this.mosqueCtx.resolve().then(id => { this.mid = id; this.load(); }); 
+    this.content.getCollections().subscribe(c => this.collections.set(c));
+  }
 
   load(): void {
     this.mosque.getEvents(this.mid, this.search, this.typeFilter || undefined, this.upcomingOnly)
@@ -101,7 +125,12 @@ export class AdminEventsComponent implements OnInit {
   }
 
   create(): void {
-    const data = { ...this.form, startTime: this.form.startTime + ':00', status: 'Scheduled' };
+    const data = { 
+      ...this.form, 
+      wirdCollectionId: this.form.wirdCollectionId ?? undefined,
+      startTime: this.form.startTime + ':00', 
+      status: 'Scheduled' 
+    };
     this.admin.createEvent(this.mid, data).subscribe(() => this.load());
   }
 
@@ -111,12 +140,14 @@ export class AdminEventsComponent implements OnInit {
       title: e.title, date: e.date, startTime: e.startTime.slice(0, 5),
       location: e.location ?? '', description: e.description ?? '',
       eventType: e.eventType, status: e.status ?? 'Scheduled',
+      wirdCollectionId: e.wirdCollectionId ?? null
     };
   }
 
   saveEdit(id: number): void {
     this.admin.updateEvent(this.mid, id, {
       ...this.editForm,
+      wirdCollectionId: this.editForm.wirdCollectionId ?? undefined,
       startTime: this.editForm.startTime.length === 5 ? this.editForm.startTime + ':00' : this.editForm.startTime,
     }).subscribe(() => { this.editingId.set(null); this.load(); });
   }

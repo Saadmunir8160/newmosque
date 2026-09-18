@@ -83,8 +83,8 @@ type StatusFilter = 'all' | 'Published' | 'Draft' | 'InReview' | 'Approved' | 'U
             <div class="form-card__head">
               <div class="form-card__icon" aria-hidden="true">📿</div>
               <div>
-                <h3 class="form-card__title">Add adhkar item</h3>
-                <p class="form-card__sub">New entry for member dhikr lists</p>
+                <h3 class="form-card__title">{{ editingId() ? 'Edit adhkar item' : 'Add adhkar item' }}</h3>
+                <p class="form-card__sub">{{ editingId() ? 'Update existing entry' : 'New entry for member dhikr lists' }}</p>
               </div>
             </div>
 
@@ -113,10 +113,11 @@ type StatusFilter = 'all' | 'Published' | 'Draft' | 'InReview' | 'Approved' | 'U
               </div>
             </div>
 
-            <button type="button" class="btn-primary" (click)="create()"
+            <button type="button" class="btn-primary" (click)="save()"
               [disabled]="saving() || !form.title.trim() || !form.arabicText.trim()">
-              {{ saving() ? 'Adding…' : 'Add adhkar item' }}
+              {{ saving() ? 'Saving…' : (editingId() ? 'Save changes' : 'Add adhkar item') }}
             </button>
+            <button type="button" class="btn-outline" style="width: 100%; margin-top: 8px;" *ngIf="editingId()" (click)="cancelEdit()">Cancel</button>
             <p *ngIf="msg()" class="form-msg" [class.form-msg--err]="!msgOk()">{{ msg() }}</p>
           </section>
         </aside>
@@ -136,8 +137,11 @@ type StatusFilter = 'all' | 'Published' | 'Draft' | 'InReview' | 'Approved' | 'U
           <div *ngIf="!loading() && filtered().length" class="adhkar-grid">
             <article *ngFor="let a of filtered()" class="item-card">
               <div class="item-card__header">
-                <h4 class="item-card__title">{{ a.title }}</h4>
-                <span class="count-badge">×{{ a.defaultCount }}</span>
+                <div>
+                  <h4 class="item-card__title">{{ a.title }}</h4>
+                  <span class="count-badge">×{{ a.defaultCount }}</span>
+                </div>
+                <button type="button" class="wf-btn" (click)="startEdit(a)">Edit</button>
               </div>
 
               <div class="item-card__arabic-wrap">
@@ -681,6 +685,7 @@ export class ContentAdhkarComponent implements OnInit {
   msgOk = signal(true);
   query = '';
   statusFilter = signal<StatusFilter>('all');
+  editingId = signal<number | null>(null);
 
   publishedCount = computed(() =>
     this.items().filter(a => (a.status || 'Published') === 'Published').length
@@ -736,24 +741,43 @@ export class ContentAdhkarComponent implements OnInit {
     this.filtered.set(list);
   }
 
-  create(): void {
+  startEdit(item: AdhkarItem): void {
+    this.editingId.set(item.id);
+    this.form = { title: item.title, arabicText: item.arabicText, defaultCount: item.defaultCount };
+    this.msg.set('');
+  }
+
+  cancelEdit(): void {
+    this.editingId.set(null);
+    this.form = { title: '', arabicText: '', defaultCount: 33 };
+    this.msg.set('');
+  }
+
+  save(): void {
     const title = this.form.title.trim();
     const arabicText = this.form.arabicText.trim();
     if (!title || !arabicText) return;
     this.saving.set(true);
     this.msg.set('');
-    this.editor.createAdhkar({ ...this.form, title, arabicText }).subscribe({
+    
+    const id = this.editingId();
+    const req = id 
+      ? this.editor.updateAdhkar(id, { ...this.form, title, arabicText })
+      : this.editor.createAdhkar({ ...this.form, title, arabicText });
+
+    req.subscribe({
       next: () => {
         this.form = { title: '', arabicText: '', defaultCount: 33 };
+        this.editingId.set(null);
         this.saving.set(false);
         this.msgOk.set(true);
-        this.msg.set('Adhkar item added.');
+        this.msg.set(id ? 'Adhkar item updated.' : 'Adhkar item added.');
         this.load();
       },
       error: () => {
         this.saving.set(false);
         this.msgOk.set(false);
-        this.msg.set('Could not add item.');
+        this.msg.set('Could not save item.');
       },
     });
   }

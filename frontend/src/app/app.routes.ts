@@ -9,7 +9,6 @@ import { VerifyEmailComponent } from './modules/auth/verify-email/verify-email.c
 import { VerifyEmailPendingComponent } from './modules/auth/verify-email-pending/verify-email-pending.component';
 import { TodayComponent } from './modules/home/today/today.component';
 import { LandingComponent } from './modules/home/landing/landing.component';
-import { DemoMosqueComponent } from './modules/home/demo-mosque/demo-mosque.component';
 import { MosqueProfilePageComponent } from './modules/home/mosque-profile-page/mosque-profile-page.component';
 import { MosqueDirectoryComponent } from './modules/home/mosque-directory/mosque-directory.component';
 import { MosqueRequestComponent } from './modules/home/mosque-request/mosque-request.component';
@@ -45,7 +44,6 @@ export const routes: Routes = [
   { path: 'mosques', component: MosqueDirectoryComponent },
   { path: 'mosques/request', component: MosqueRequestComponent },
   { path: 'find-mosque', redirectTo: 'mosques', pathMatch: 'full' },
-  { path: 'demo', component: DemoMosqueComponent },
   { path: 'claim-mosque/:slug', loadComponent: () => import('./modules/home/claim-mosque-page/claim-mosque-page.component').then(m => m.ClaimMosquePageComponent) },
   { path: 'mosque/:slug/claim', component: MosqueProfilePageComponent, data: { openClaim: true } },
   { path: 'mosque/:slug', component: MosqueProfilePageComponent },

@@ -44,8 +44,19 @@ import { ParticipationOpportunity } from '../../../core/models';
     </app-card>
 
     <app-card *ngFor="let o of items()" class="block mt-3">
-      <h4 class="text-white font-bold">{{ o.title }}</h4>
-      <p class="text-mos-muted text-sm">{{ o.type }} · {{ o.description }}</p>
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <h4 class="text-white font-bold">
+            {{ o.title }}
+            <span *ngIf="!o.isActive" style="color: #ef4444; font-size: 0.75rem; margin-left: 0.5rem; font-weight: normal;">(Inactive)</span>
+          </h4>
+          <p class="text-mos-muted text-sm">{{ o.type }} · {{ o.description }}</p>
+        </div>
+        <div class="actions">
+          <button class="btn-outline" (click)="toggleActive(o)">{{ o.isActive ? 'Deactivate' : 'Activate' }}</button>
+          <button class="btn-no" (click)="deleteOpp(o.id)">Delete</button>
+        </div>
+      </div>
     </app-card>
   `,
   styles: [`
@@ -56,6 +67,7 @@ import { ParticipationOpportunity } from '../../../core/models';
     .actions { display: flex; gap: 0.5rem; }
     .btn-ok { background: #10b981; color: #0F172A; font-weight: 700; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
     .btn-no { background: #ef4444; color: #fff; font-weight: 700; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+    .btn-outline { background: transparent; border: 1px solid #94a3b8; color: #f8fafc; font-weight: 600; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
     .input{background:#0F172A;border:1px solid #F8FAFC;border-radius:8px;padding:10px;color:#fff;width:100%}
     .btn{background:#f59e0b;color:#0F172A;font-weight:700;padding:8px 16px;border-radius:8px;border:none;cursor:pointer}
   `]
@@ -78,12 +90,25 @@ export class AdminParticipationComponent implements OnInit {
   }
 
   reload(): void {
-    this.mosque.getParticipation(this.mid).subscribe(o => this.items.set(o));
+    this.mosque.getParticipation(this.mid, true).subscribe(o => this.items.set(o));
     this.mosqueAdmin.getPendingParticipation(this.mid).subscribe(p => this.pending.set(p));
   }
 
   create(): void {
-    this.admin.createParticipation(this.mid, { ...this.form, isActive: true }).subscribe(() => this.reload());
+    if (!this.form.title) return;
+    this.admin.createParticipation(this.mid, { ...this.form, isActive: true }).subscribe(() => {
+      this.form = { title: '', type: 'Volunteering', description: '' };
+      this.reload();
+    });
+  }
+
+  toggleActive(o: ParticipationOpportunity): void {
+    this.admin.updateParticipation(this.mid, o.id, { ...o, isActive: !o.isActive }).subscribe(() => this.reload());
+  }
+
+  deleteOpp(id: number): void {
+    if (!confirm('Are you sure you want to delete this opportunity?')) return;
+    this.admin.deleteParticipation(this.mid, id).subscribe(() => this.reload());
   }
 
   setStatus(id: number, status: string): void {

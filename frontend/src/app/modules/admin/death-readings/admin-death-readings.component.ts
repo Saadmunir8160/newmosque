@@ -22,6 +22,8 @@ export class AdminDeathReadingsComponent implements OnInit {
   saving = signal(false);
   targetModal = signal(false);
   targetInput = 100_000;
+  createModal = signal(false);
+  createForm = { deceasedName: '', targetReadings: 100_000, title: '' };
   toast = signal('');
   toastOk = signal(true);
 
@@ -37,8 +39,39 @@ export class AdminDeathReadingsComponent implements OnInit {
     this.loading.set(true);
     this.readings.getMonitor(this.mid, this.dateFrom, this.dateTo).subscribe({
       next: d => { this.data.set(d); this.targetInput = d.targetReadings; this.loading.set(false); },
-      error: () => { this.loading.set(false); this.showToast('Could not load monitor data.', false); },
+      error: (err) => { 
+        this.loading.set(false); 
+        if (err.status === 404) {
+          this.data.set(null);
+        } else {
+          this.showToast('Could not load monitor data.', false); 
+        }
+      },
     });
+  }
+
+  openCreateModal(): void {
+    this.createForm = { deceasedName: '', targetReadings: 100_000, title: '' };
+    this.createModal.set(true);
+  }
+
+  createCampaign(): void {
+    if (!this.createForm.deceasedName.trim()) return;
+    this.saving.set(true);
+    // Use http client to call create endpoint
+    this.http.post(`${this.readings['base']}/mosques/${this.mid}/reading-campaigns`, this.createForm)
+      .subscribe({
+        next: () => {
+          this.saving.set(false);
+          this.createModal.set(false);
+          this.showToast('Campaign created.', true);
+          this.reload();
+        },
+        error: () => {
+          this.saving.set(false);
+          this.showToast('Could not create campaign.', false);
+        }
+      });
   }
 
   gaugeBg(percent: number): string {

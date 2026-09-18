@@ -107,17 +107,27 @@
         <p *ngIf="!d.groupProgress.length" class="panel-empty">No regional data yet.</p>
       </section>
 
-      <!-- Admin actions -->
       <section class="panel panel--actions">
         <div class="panel__head"><h2>Admin Actions</h2></div>
         <div class="action-btns">
-          <button type="button" class="btn-solid" (click)="openTargetModal()">Edit Target</button>
+          <button type="button" class="btn-solid" (click)="openCreateModal()">New Campaign</button>
+          <button type="button" class="btn-outline" (click)="openTargetModal()">Edit Target</button>
           <button type="button" class="btn-outline" (click)="exportReport()">Export Report</button>
           <button type="button" class="btn-outline" [disabled]="d.isArchived" (click)="archiveCampaign()">Archive Campaign</button>
           <button type="button" class="btn-outline btn-outline--warn" (click)="resetCampaign()">Reset Campaign</button>
         </div>
         <p *ngIf="d.isArchived" class="archived-note">This campaign is archived.</p>
       </section>
+    </div>
+  </ng-container>
+  
+  <!-- Empty state when no campaign exists -->
+  <ng-container *ngIf="!loading() && !data()">
+    <div class="empty-state">
+      <span class="empty-state__icon">📖</span>
+      <h3>No Active Campaign</h3>
+      <p>Start an Esaal-e-Sawab reading campaign for a deceased community member.</p>
+      <button type="button" class="btn-solid mt-4" (click)="openCreateModal()">Create Campaign</button>
     </div>
   </ng-container>
 
@@ -130,6 +140,26 @@
       <div class="modal-foot">
         <button type="button" class="btn-outline" (click)="targetModal.set(false)">Cancel</button>
         <button type="button" class="btn-solid" [disabled]="saving()" (click)="saveTarget()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create campaign modal -->
+  <div *ngIf="createModal()" class="modal-backdrop" (click)="createModal.set(false)">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3>Create Reading Campaign</h3>
+      <label class="modal-label" for="c-name">Deceased Name *</label>
+      <input id="c-name" class="modal-input" placeholder="Full name" [(ngModel)]="createForm.deceasedName">
+      
+      <label class="modal-label" for="c-title">Campaign Title (Optional)</label>
+      <input id="c-title" class="modal-input" placeholder="e.g. Esaal-e-Sawab — John Doe" [(ngModel)]="createForm.title">
+      
+      <label class="modal-label" for="c-target">Target Readings</label>
+      <input id="c-target" class="modal-input" type="number" min="1" [(ngModel)]="createForm.targetReadings">
+      
+      <div class="modal-foot">
+        <button type="button" class="btn-outline" (click)="createModal.set(false)">Cancel</button>
+        <button type="button" class="btn-solid" [disabled]="saving() || !createForm.deceasedName.trim()" (click)="createCampaign()">Create</button>
       </div>
     </div>
   </div>

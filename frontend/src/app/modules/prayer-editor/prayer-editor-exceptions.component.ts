@@ -1,9 +1,11 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { PrayerEditorService, PrayerException } from '../../core/services/prayer-editor.service';
 import { MosqueContextService } from '../../core/services/mosque-context.service';
+import { appDateString } from '../../core/utils/date.utils';
 
 const CATEGORIES = ['Ramadan', 'Eid', 'Friday', 'Special Event', 'Other'] as const;
 const PRAYERS = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'] as const;
@@ -112,13 +114,14 @@ export class PrayerEditorExceptionsComponent implements OnInit {
   private editor = inject(PrayerEditorService);
   private mosqueCtx = inject(MosqueContextService);
   private snack = inject(MatSnackBar);
+  private route = inject(ActivatedRoute);
 
   exceptions = signal<PrayerException[]>([]);
   busy = signal(false);
   categories = CATEGORIES;
   prayers = PRAYERS;
   form = {
-    date: new Date().toISOString().slice(0, 10),
+    date: appDateString(),
     category: 'Ramadan' as string,
     prayer: 'Isha',
     field: 'jamaat' as 'jamaat' | 'start',
@@ -128,10 +131,16 @@ export class PrayerEditorExceptionsComponent implements OnInit {
   private mosqueId = 1;
 
   ngOnInit(): void {
-    this.mosqueCtx.resolve().then(id => {
-      this.mosqueId = id;
+    const qId = parseInt(this.route.snapshot.queryParamMap.get('mosqueId') || '', 10);
+    if (!isNaN(qId) && qId > 0) {
+      this.mosqueId = qId;
       this.load();
-    });
+    } else {
+      this.mosqueCtx.resolve().then(id => {
+        this.mosqueId = id;
+        this.load();
+      });
+    }
   }
 
   displayPrayer(prayer: string): string {

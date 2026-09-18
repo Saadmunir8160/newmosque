@@ -25,7 +25,9 @@ export class GuestService {
   readonly defaultMosqueId = environment.defaultMosqueId;
 
   getHome(mosqueId = this.defaultMosqueId): Observable<PublicHome> {
-    return this.http.get<PublicHome>(`${this.base}/home`, { params: { mosqueId } });
+    let params: Record<string, string> = {};
+    if (mosqueId) params['mosqueId'] = mosqueId.toString();
+    return this.http.get<PublicHome>(`${this.base}/home`, { params });
   }
 
   getMosque(mosqueId: number): Observable<Mosque> {

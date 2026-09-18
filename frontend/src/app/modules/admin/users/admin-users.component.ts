@@ -38,15 +38,32 @@ import { ROLES } from '../../../core/constants/roles';
       <p *ngIf="msg()" class="msg">{{ msg() }}</p>
     </app-card>
 
+    <section *ngIf="selectedIds().size > 0" class="bulk-bar" aria-label="Bulk actions">
+      <span class="bulk-bar__count">{{ selectedIds().size }} selected</span>
+      <select class="input input-sm bulk-select" [(ngModel)]="bulkRole" aria-label="Bulk role">
+        <option value="">Assign role…</option>
+        <option *ngFor="let r of allRoles" [value]="r">{{ r }}</option>
+      </select>
+      <button type="button" class="btn btn-sm" (click)="runBulk('assignRole')" [disabled]="actionBusy() === 'bulk'">Assign role</button>
+      <button type="button" class="btn btn-sm btn-ok" (click)="runBulk('activate')" [disabled]="actionBusy() === 'bulk'">Activate</button>
+      <button type="button" class="btn btn-sm btn-warn" (click)="runBulk('deactivate')" [disabled]="actionBusy() === 'bulk'">Deactivate</button>
+      <button type="button" class="btn btn-sm btn-danger" (click)="runBulk('delete')" [disabled]="actionBusy() === 'bulk'">Delete</button>
+      <button type="button" class="link bulk-clear" (click)="clearSelection()">Clear</button>
+    </section>
+
     <app-card>
       <div class="table-wrap">
         <table class="table">
           <thead>
-            <tr><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th></th></tr>
+            <tr>
+              <th style="width: 40px"><input type="checkbox" (change)="toggleAll($event)" [checked]="users().length > 0 && selectedIds().size === users().length"></th>
+              <th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th></th>
+            </tr>
           </thead>
           <tbody>
             <tr *ngFor="let u of users()">
               <ng-container *ngIf="editingId() !== u.id; else editRow">
+                <td><input type="checkbox" [checked]="selectedIds().has(u.id)" (change)="toggleSelection(u.id)"></td>
                 <td>{{ u.fullName }}</td>
                 <td>{{ u.email }}</td>
                 <td>{{ u.phone || '—' }}</td>
@@ -57,6 +74,7 @@ import { ROLES } from '../../../core/constants/roles';
                 </td>
               </ng-container>
               <ng-template #editRow>
+                <td></td>
                 <td><input class="input input-sm" [(ngModel)]="editForm.fullName"></td>
                 <td><input class="input input-sm" [(ngModel)]="editForm.email"></td>
                 <td><input class="input input-sm" [(ngModel)]="editForm.phone"></td>
@@ -92,6 +110,14 @@ import { ROLES } from '../../../core/constants/roles';
     .link { background: none; border: none; color: #fbbf24; cursor: pointer; font-weight: 600; margin-right: 0.5rem; }
     .muted { color: #6ee7b7; }
     .empty { margin: 0; color: #6ee7b7; font-size: 0.8125rem; }
+    .bulk-bar { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem; background: rgba(245, 158, 11, 0.1); border: 1px solid #f59e0b; border-radius: 8px; margin-bottom: 1rem; }
+    .bulk-bar__count { font-weight: 700; color: #f59e0b; margin-right: 0.5rem; }
+    .bulk-select { width: auto; display: inline-block; }
+    .btn-sm { padding: 4px 8px; font-size: 0.8125rem; }
+    .btn-ok { background: #10b981; color: #fff; }
+    .btn-warn { background: #f59e0b; color: #fff; }
+    .btn-danger { background: #ef4444; color: #fff; }
+    .bulk-clear { color: #94a3b8; text-decoration: underline; margin-left: auto; }
   `]
 })
 export class AdminUsersComponent implements OnInit {
@@ -107,6 +133,11 @@ export class AdminUsersComponent implements OnInit {
   search = '';
   activeOnly = false;
   mosqueId = 1;
+
+  selectedIds = signal<Set<string>>(new Set());
+  bulkRole = '';
+  actionBusy = signal<string | null>(null);
+  allRoles = [ROLES.Teacher, ROLES.Parent, ROLES.Member, ROLES.PrayerTimesEditor, ROLES.ContentEditor, ROLES.Muqaddam];
 
   form = { fullName: '', email: '', phone: '', password: 'ChangeMe@123' };
 
@@ -170,5 +201,48 @@ export class AdminUsersComponent implements OnInit {
 
   toggleActive(u: MosqueAdminUser): void {
     this.admin.setUserActive(this.mosqueId, u.id, !u.isActive).subscribe(() => this.load());
+  }
+
+  toggleSelection(id: string): void {
+    const s = new Set(this.selectedIds());
+    if (s.has(id)) s.delete(id);
+    else s.add(id);
+    this.selectedIds.set(s);
+  }
+
+  toggleAll(event: Event): void {
+    const chk = (event.target as HTMLInputElement).checked;
+    if (chk) this.selectedIds.set(new Set(this.users().map(u => u.id)));
+    else this.selectedIds.set(new Set());
+  }
+
+  clearSelection(): void {
+    this.selectedIds.set(new Set());
+    this.bulkRole = '';
+  }
+
+  runBulk(action: string): void {
+    const ids = Array.from(this.selectedIds());
+    if (!ids.length) return;
+    if (action === 'delete' && !confirm(`Delete ${ids.length} user(s)?`)) return;
+    if (action === 'deactivate' && !confirm(`Deactivate ${ids.length} user(s)?`)) return;
+
+    this.actionBusy.set('bulk');
+    this.admin.bulkUserAction(this.mosqueId, {
+      userIds: ids,
+      action,
+      role: this.bulkRole || undefined
+    }).subscribe({
+      next: (res: any) => {
+        this.msg.set(res.errors?.length ? `${res.message} ${res.errors.length} error(s).` : res.message);
+        this.clearSelection();
+        this.actionBusy.set(null);
+        this.load();
+      },
+      error: (err: any) => {
+        this.msg.set(err?.error?.message || 'Bulk action failed.');
+        this.actionBusy.set(null);
+      }
+    });
   }
 }

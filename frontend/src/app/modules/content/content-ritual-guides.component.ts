@@ -7,7 +7,7 @@ import { ContentService, RitualGuide, RitualGuideDetail, RitualStep } from '../.
 const GUIDE_TYPES = ['Wudu', 'Ghusl', 'Salah', 'Other'] as const;
 type TypeFilter = '' | (typeof GUIDE_TYPES)[number];
 type SortKey = 'recent' | 'title' | 'steps';
-type PanelMode = 'create' | 'edit' | 'add-step' | 'view' | null;
+type PanelMode = 'create' | 'edit' | 'add-step' | 'edit-step' | 'view' | null;
 
 @Component({
   selector: 'app-content-ritual-guides',
@@ -36,6 +36,7 @@ export class ContentRitualGuidesComponent implements OnInit {
   panelMode = signal<PanelMode>(null);
   activeGuide = signal<RitualGuide | null>(null);
   expandedStepId = signal<number | null>(null);
+  editingStepId = signal<number | null>(null);
 
   form = { title: '', type: 'Wudu' as string };
   step = { title: '', description: '', orderIndex: 1 };
@@ -146,6 +147,14 @@ export class ContentRitualGuidesComponent implements OnInit {
     if (this.expandedDetail()?.id !== g.id) this.loadDetail(g.id);
   }
 
+  openEditStep(g: RitualGuide, s: RitualStep, event?: Event): void {
+    event?.stopPropagation();
+    this.activeGuide.set(g);
+    this.editingStepId.set(s.id);
+    this.step = { title: s.title, description: s.description || '', orderIndex: s.orderIndex };
+    this.panelMode.set('edit-step');
+  }
+
   editFromView(): void {
     const g = this.activeGuide();
     if (!g) return;
@@ -160,6 +169,7 @@ export class ContentRitualGuidesComponent implements OnInit {
   dismissPanel(): void {
     this.panelMode.set(null);
     this.activeGuide.set(null);
+    this.editingStepId.set(null);
   }
 
   toggleExpand(g: RitualGuide): void {
@@ -233,17 +243,23 @@ export class ContentRitualGuidesComponent implements OnInit {
     const g = this.activeGuide();
     if (!g || !this.step.title.trim()) return;
     this.saving.set(true);
-    this.content.addRitualStep(g.id, this.step).subscribe({
+    
+    const mode = this.panelMode();
+    const req = mode === 'edit-step' && this.editingStepId()
+      ? this.content.updateRitualStep(g.id, this.editingStepId()!, this.step)
+      : this.content.addRitualStep(g.id, this.step);
+
+    req.subscribe({
       next: () => {
         this.saving.set(false);
-        this.showToast('Step added', true);
+        this.showToast(mode === 'edit-step' ? 'Step updated' : 'Step added', true);
         this.dismissPanel();
         this.load();
         this.loadDetail(g.id);
       },
       error: () => {
         this.saving.set(false);
-        this.showToast('Could not add step', false);
+        this.showToast('Could not save step', false);
       },
     });
   }

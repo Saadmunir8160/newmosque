@@ -29,11 +29,19 @@ namespace MosqueOS.API.Controllers
 
         private string? UserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
 
+        [AllowAnonymous]
         [HttpGet]
-        public async Task<IActionResult> GetAll(int mosqueId, [FromQuery] string? search = null)
+        public async Task<IActionResult> GetAll(int mosqueId, [FromQuery] bool all = false, [FromQuery] string? search = null, [FromQuery] PublishStatus? status = null)
         {
             var query = _unitOfWork.Repository<JanazaAnnouncement>().QueryNoTracking()
                 .Where(j => j.MosqueId == mosqueId);
+
+            var isAdmin = await _mosqueAccess.CanAccessMosqueAsync(User, mosqueId);
+            if (!all || !isAdmin)
+                query = query.Where(j => j.Status == PublishStatus.Published);
+            else if (status.HasValue)
+                query = query.Where(j => j.Status == status);
+
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var term = search.Trim();
@@ -51,12 +59,17 @@ namespace MosqueOS.API.Controllers
             return Ok(items);
         }
 
+        [AllowAnonymous]
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Get(int mosqueId, int id)
         {
             var item = await _unitOfWork.Repository<JanazaAnnouncement>().QueryNoTracking()
                 .FirstOrDefaultAsync(j => j.Id == id && j.MosqueId == mosqueId);
             if (item == null) return NotFound();
+
+            var isAdmin = await _mosqueAccess.CanAccessMosqueAsync(User, mosqueId);
+            if (!isAdmin && item.Status != PublishStatus.Published)
+                return NotFound();
 
             var users = await LoadUserLookupAsync(new[] { item.CreatedById }.Where(x => x != null)!);
             return Ok(ToListItem(item, users));
