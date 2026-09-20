@@ -23,7 +23,7 @@ import { CardComponent } from '../../shared/ui/card.component';
       <p class="text-mos-muted text-xs mb-2 uppercase tracking-wide">Students ({{ c.enrolments?.length || 0 }})</p>
       <ul class="space-y-1">
         <li *ngFor="let e of c.enrolments" class="text-mos-text text-sm">
-          • {{ e.student?.name }} <span class="text-mos-primary">({{ e.status }})</span>
+          • {{ e.student.name }} <span class="text-mos-primary">({{ e.status }})</span>
         </li>
       </ul>
       <p *ngIf="!c.enrolments?.length" class="text-mos-muted text-sm">No students enrolled.</p>
